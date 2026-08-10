@@ -68,7 +68,7 @@ docs/ADR/
 ## Process
 
 1. Create the ADR file using the template.
-2. Record the decision in `PROJECT_PROGRESS.md` under **Decisions**.
+2. Record the decision in `PROJECT_PROGRESS.md` under **Current Decisions**.
 3. Reference the ADR from related documentation where relevant.
 4. Update the ADR status if the decision later changes.
 

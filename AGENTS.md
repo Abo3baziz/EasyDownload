@@ -34,7 +34,7 @@ For every new task:
 2. Create a new branch from the latest `main`.
 3. Implement only the requested changes.
 4. Update documentation if necessary.
-5. Update `PROJECT_PROGRESS.md` when implementation status changes.
+5. Update `PROJECT_PROGRESS.md` when the current project state changes and add meaningful historical changes to `CHANGELOG.md`.
 6. Run relevant tests and checks.
 7. If the work is a completed feature, open a Pull Request.
 8. Do not open a Pull Request for non-feature work unless explicitly instructed.
@@ -96,7 +96,7 @@ Each feature Pull Request should:
 - Include a clear description of the feature and changes.
 - Reference related documentation when applicable.
 - Update endpoint documentation when endpoints change.
-- Update `PROJECT_PROGRESS.md` when implementation status changes.
+- Update `PROJECT_PROGRESS.md` when the current project state changes and add meaningful historical changes to `CHANGELOG.md`.
 - Ensure relevant tests pass before opening the PR.
 - Target the `main` branch.
 - Do not merge the Pull Request unless explicitly instructed by the user.
@@ -112,6 +112,7 @@ Do **not** open Pull Requests for:
 - Chores
 - Dependency updates
 - `PROJECT_PROGRESS.md` updates
+- `CHANGELOG.md` updates
 
 Unless the user explicitly instructs otherwise.
 
@@ -171,7 +172,7 @@ Update relevant project documentation when the implementation changes:
 - Testing procedures
 - Operational procedures
 
-Update `PROJECT_PROGRESS.md` when implementation status changes.
+Update `PROJECT_PROGRESS.md` when the current project state changes and add meaningful historical changes to `CHANGELOG.md`.
 
 ## 7. Review
 
@@ -211,7 +212,7 @@ A **feature** is considered complete only when:
 - Documentation is updated.
 - OpenAPI specification is updated if applicable.
 - Tests are added or updated.
-- `PROJECT_PROGRESS.md` is updated.
+- `PROJECT_PROGRESS.md` reflects the current project state; historical changes are recorded in `CHANGELOG.md`.
 - The feature is ready for a Pull Request.
 
 For **non-feature work**, completion means the requested changes are implemented, relevant tests/checks pass, and required documentation is updated.
@@ -249,6 +250,30 @@ Defines the testing strategy, test levels, and how tests are run.
 Records significant architecture decisions and their rationale.
 
 - `docs/ADR/`
+
+### Project Progress
+
+Captures the current project state, phase, decisions, and pending work.
+
+- `PROJECT_PROGRESS.md`
+
+### Changelog
+
+Records meaningful historical project changes, ordered by date.
+
+- `CHANGELOG.md`
+
+## Documentation Responsibilities
+
+| File                   | Responsibility                          |
+| ---------------------- | --------------------------------------- |
+| `AGENTS.md`            | Instructions and workflow for AI agents |
+| `PROJECT_PROGRESS.md`  | Current project state                   |
+| `CHANGELOG.md`         | Historical project changes              |
+| `docs/REQUIREMENTS.md` | Product requirements                    |
+| `docs/ARCHITECTURE.md` | System architecture                     |
+| `docs/TESTING.md`      | Testing strategy                        |
+| `docs/ADR/`            | Architectural decisions                 |
 
 ## Documentation Priority
 
@@ -312,45 +337,104 @@ Never:
 
 # Project Progress Tracking
 
-After completing implementation work, update `PROJECT_PROGRESS.md` when the project's implementation status has changed.
+`PROJECT_PROGRESS.md` captures only the current project state.
 
-Only record work completed during the current response.
+`CHANGELOG.md` records meaningful historical changes.
 
-Do not mark tasks as completed unless they have been fully implemented and verified.
+After completing work:
 
-If architectural or design decisions are made, record them under **Decisions**.
+- Update `PROJECT_PROGRESS.md` only when the current project state changes.
+- Add meaningful historical changes to `CHANGELOG.md`.
+- Do not append routine implementation history to `PROJECT_PROGRESS.md`.
 
-Keep updates concise and avoid repeating unchanged information.
+## Documentation Workflow
 
-Use the following template:
+Follow this workflow for every task:
+
+1. Read `AGENTS.md` for agent instructions.
+2. Read `PROJECT_PROGRESS.md` when current project state is relevant.
+3. Identify the task's relevant documentation.
+4. Read only the documentation relevant to the task.
+5. Make the requested changes.
+6. Update the relevant source-of-truth documentation.
+7. Update `PROJECT_PROGRESS.md` only when the current project state changes.
+8. Add meaningful historical changes to `CHANGELOG.md`.
+9. Do not append routine implementation history to `PROJECT_PROGRESS.md`.
+
+The agent should not automatically read the entire `CHANGELOG.md` for every task.
+
+## `PROJECT_PROGRESS.md` Structure
+
+Use the following structure:
 
 ```md
-## Project Progress
+# Project Progress
 
-### Completed
+## Current Status
 
-- ...
+**Phase:** ...
+**Status:** ...
 
-### Deliverables
-
-- ...
-
-### Decisions
+## Completed
 
 - ...
 
-### Pending
+## Current Decisions
 
 - ...
 
-### Next Step
+## Pending
+
+- [ ] ...
+
+## Current Focus
+
+...
+
+## Important References
+
+- `docs/REQUIREMENTS.md` — ...
+- `docs/ARCHITECTURE.md` — ...
+- `docs/TESTING.md` — ...
+- `docs/ADR/` — ...
+- `CHANGELOG.md` — ...
+```
+
+Guidelines:
+
+- Include only information relevant to understanding the current project state.
+- Do not duplicate requirements, architecture, testing, or ADR content; link to the relevant document instead.
+- Record only work completed during the current response when updating.
+- Do not mark tasks as completed unless they have been fully implemented and verified.
+- Keep the file concise and easy for an agent to scan.
+
+## `CHANGELOG.md` Structure
+
+Use a chronological structure:
+
+```md
+# Changelog
+
+## YYYY-MM-DD
+
+### Added
+
+- ...
+
+### Changed
+
+- ...
+
+### Fixed
+
+- ...
+
+### Infrastructure
 
 - ...
 ```
 
-The summary should:
+Guidelines:
 
-- Include only changes made during the current response.
-- Be concise (5–10 bullet points total).
-- Reflect the current project state accurately.
-- Avoid duplicating information already present in `PROJECT_PROGRESS.md`.
+- Record meaningful project history, not every tiny file edit.
+- Use actual project dates; do not invent historical changes.

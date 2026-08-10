@@ -1,36 +1,40 @@
-## Project Progress
+# Project Progress
 
-### Completed
+## Current Status
 
-- Established project documentation baseline (AGENTS.md, REQUIREMENTS.md, ARCHITECTURE.md).
-- Fixed misspelled `docs/REQUIRMENTS.md` filename to `docs/REQUIREMENTS.md` and reconciled references.
-- Added functional requirements FR-012 through FR-019 (queue, history, retry, notifications, settings, filename collisions, proxy, updates).
-- Updated requirement priorities (P1/P2) to reference the new FRs.
-- Created `docs/TESTING.md` with the testing strategy.
-- Created `docs/ADR/README.md` documenting the ADR process.
-- Initialized the git repository with a `main` branch.
+**Phase:** Documentation
 
-### Deliverables
+**Status:** Documentation complete; no application code yet
 
-- `docs/REQUIREMENTS.md` — expanded functional requirements.
-- `docs/TESTING.md` — testing strategy.
-- `docs/ADR/README.md` — ADR process and template.
-- `PROJECT_PROGRESS.md` — this progress log.
+## Completed
 
-### Decisions
+- Documentation baseline established: requirements, architecture, testing strategy, and ADR process.
+- Git repository initialized with a `main` branch.
+- Requirements defined through FR-019, including download queue, history, retry, notifications, settings, filename collision handling, proxy configuration, and dependency updates.
 
-- Documentation-only phase; no application code exists yet.
-- Single concurrent download allowed for the MVP; queue support is required.
-- Filename collision default behavior left as an implementation decision.
+## Current Decisions
+
+- Single concurrent download allowed for the MVP; queue support required (FR-012).
+- Filename collision default behavior is an implementation decision (FR-017).
 - Proxy configuration (FR-018) and application auto-updates (FR-019) deferred to a future version.
 
-### Pending
+## Pending
 
-- Application implementation (Electron, React + TypeScript).
-- yt-dlp and FFmpeg integration.
-- Dependency management strategy.
-- ADRs for significant architecture decisions.
+- [ ] Implement the Electron application skeleton following `docs/ARCHITECTURE.md`.
+- [ ] Implement the React + TypeScript renderer.
+- [ ] Implement yt-dlp and FFmpeg integration.
+- [ ] Define the dependency management strategy.
+- [ ] Create ADRs for significant architecture decisions once the decisions are established.
 
-### Next Step
+## Current Focus
 
-- Implement the Electron application skeleton following `docs/ARCHITECTURE.md`.
+Implement the Electron application skeleton following `docs/ARCHITECTURE.md`.
+
+## Important References
+
+- `AGENTS.md` — instructions and workflow for AI agents.
+- `docs/REQUIREMENTS.md` — product requirements and functional requirements (FR-001 through FR-019).
+- `docs/ARCHITECTURE.md` — system architecture, Electron process model, and services.
+- `docs/TESTING.md` — testing strategy and how to run tests.
+- `docs/ADR/` — architecture decision records and ADR process.
+- `CHANGELOG.md` — historical project changes.
