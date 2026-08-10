@@ -11,6 +11,8 @@ import { createMediaService } from './media/media-service'
 import { ProcessManager } from './process/process-manager'
 import type { SettingsManager } from './settings/settings-manager'
 import { createSettingsManager } from './settings/settings-manager'
+import type { YtDlpService } from './ytdlp/ytdlp-service'
+import { createYtDlpService } from './ytdlp/ytdlp-service'
 
 export interface Services {
   media: MediaService
@@ -40,7 +42,8 @@ export function createServices(deps: ServicesDeps): Services {
     concurrencyLimit: DEFAULT_SETTINGS.concurrencyLimit
   }
   const settings = createSettingsManager({ dir: deps.userDataDir, defaults: settingsDefaults })
-  const media = createMediaService({ dependencies })
+  const ytDlp: YtDlpService = createYtDlpService({ processes })
+  const media = createMediaService({ dependencies, ytDlp })
   const downloads = createDownloadManager()
 
   return { media, downloads, files, dependencies, settings }

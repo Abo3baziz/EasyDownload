@@ -130,6 +130,72 @@ button:disabled {
   background: var(--bg-elevated);
 }
 
+.media-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.media-thumbnail {
+  width: 128px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.media-heading h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.media-meta {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.media-card h3 {
+  margin: 16px 0 8px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.format-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.format-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.format-label {
+  font-weight: 600;
+}
+
+.format-details {
+  display: flex;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
 .directory-row {
   display: flex;
   gap: 8px;

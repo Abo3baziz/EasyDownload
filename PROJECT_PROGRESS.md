@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Phase:** Implementation — application skeleton
+**Phase:** Implementation — media inspection
 
-**Status:** Electron application skeleton complete; core download features pending
+**Status:** yt-dlp-based media inspection implemented; download execution pending
 
 ## Completed
 
@@ -14,6 +14,7 @@
 - Renderer shell: Home, Downloads, and Settings pages with dependency/settings UI.
 - Build tooling: electron-vite, TypeScript, Vitest, React Testing Library.
 - Unit, integration, and renderer tests passing; production build succeeds.
+- yt-dlp-based media inspection: dedicated yt-dlp service with safe argument construction, output parsing, and error mapping; normalization into the application media model (FR-002, FR-003, FR-004); Home page media display with thumbnail, metadata, and format labels.
 
 ## Current Decisions
 
@@ -22,10 +23,10 @@
 - Single concurrent download allowed for the MVP; queue support required (FR-012).
 - Filename collision default behavior is an implementation decision (FR-017).
 - Proxy configuration (FR-018) and application auto-updates (FR-019) deferred to a future version.
+- yt-dlp metadata inspection uses `--dump-json --no-playlist --skip-download`; format lists are deduplicated by label and sorted by resolution.
 
 ## Pending
 
-- [ ] Implement yt-dlp-based media inspection in the Media Service.
 - [ ] Implement download execution, progress, and cancellation via the Download Manager.
 - [ ] Implement FFmpeg post-processing integration where required.
 - [ ] Define the dependency management and bundling strategy.
@@ -34,7 +35,7 @@
 
 ## Current Focus
 
-Implement yt-dlp-based media inspection in the Media Service.
+Implement download execution, progress, and cancellation via the Download Manager.
 
 ## Important References
 

@@ -13,6 +13,8 @@
 - Electron application skeleton with main/preload/renderer architecture, validated IPC layer, and main process services (Media Service, Download Manager, Process Manager, File Manager, Dependency Manager, Settings Manager).
 - Renderer shell with Home, Downloads, and Settings pages exposing the controlled preload API.
 - Test suite: unit, integration, and renderer tests using Vitest and React Testing Library.
+- yt-dlp-based media inspection: dedicated yt-dlp service (safe argument construction, output parsing, error mapping), normalization into the application media model, and shared formatting utilities.
+- Home page media display with thumbnail, metadata, and understandable format labels (FR-002, FR-003, FR-004).
 
 ### Changed
 

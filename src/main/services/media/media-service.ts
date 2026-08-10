@@ -2,6 +2,8 @@ import type { MediaInfo } from '../../../shared/types/media'
 import { isValidMediaUrl } from '../../../shared/utils/url'
 import { AppError } from '../../utils/errors'
 import type { DependencyManager } from '../dependencies/dependency-manager'
+import type { YtDlpService } from '../ytdlp/ytdlp-service'
+import { normalizeMediaInfo } from './normalize'
 
 export interface MediaService {
   inspectUrl(url: string): Promise<MediaInfo>
@@ -9,6 +11,7 @@ export interface MediaService {
 
 export interface MediaServiceOptions {
   dependencies: DependencyManager
+  ytDlp: YtDlpService
 }
 
 export function createMediaService(options: MediaServiceOptions): MediaService {
@@ -23,10 +26,8 @@ export function createMediaService(options: MediaServiceOptions): MediaService {
         throw new AppError('DependencyError', 'yt-dlp is not available.')
       }
 
-      throw new AppError(
-        'NotImplementedError',
-        'Media inspection is not implemented yet in the application skeleton.'
-      )
+      const raw = await options.ytDlp.inspect(url)
+      return normalizeMediaInfo(raw)
     }
   }
 }
