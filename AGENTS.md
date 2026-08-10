@@ -228,7 +228,7 @@ Before implementing or modifying any feature, consult the relevant documentation
 
 ### Requirements
 
-Defines the functionality of the ecommerce system, including supported features, system behavior, security requirements, and project scope.
+Defines the functionality of the media downloader application, including supported features, system behavior, security requirements, and project scope.
 
 - `docs/REQUIREMENTS.md`
 
@@ -237,6 +237,18 @@ Defines the functionality of the ecommerce system, including supported features,
 Defines the overall system architecture, layering, module boundaries, request flow, and design principles.
 
 - `docs/ARCHITECTURE.md`
+
+### Testing
+
+Defines the testing strategy, test levels, and how tests are run.
+
+- `docs/TESTING.md`
+
+### Architecture Decision Records
+
+Records significant architecture decisions and their rationale.
+
+- `docs/ADR/`
 
 ## Documentation Priority
 

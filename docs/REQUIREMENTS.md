@@ -96,6 +96,8 @@ The application should be designed to support:
 
 Platform-specific functionality must be isolated where possible.
 
+Distribution on macOS must account for application signing and notarization requirements.
+
 ---
 
 # 4. Scope
@@ -302,6 +304,118 @@ Potential failures include:
 * Invalid format selection.
 
 Errors should provide useful information without exposing unnecessary internal implementation details.
+
+---
+
+## FR-012 — Download Queue
+
+The application must support queueing downloads.
+
+The queue must:
+
+* Allow adding a download while another is active.
+* Maintain an ordered queue.
+* Allow cancelling a queued download.
+* Allow clearing the queue.
+* Execute queued downloads automatically once active downloads complete.
+
+The MVP may limit execution to a single concurrent download.
+
+---
+
+## FR-013 — Download History
+
+The application must maintain a history of completed and failed downloads.
+
+History should persist across application restarts.
+
+The application should allow the user to:
+
+* View past downloads.
+* View the status of each historical download.
+* View filename, file size, source, and destination for completed downloads.
+* Retry a failed or cancelled download where supported.
+* Clear history.
+
+History storage is an implementation decision and must not require a remote service.
+
+---
+
+## FR-014 — Retry
+
+The application must allow the user to retry a failed or cancelled download.
+
+Retry must reuse the original download configuration.
+
+Retry must not be offered for downloads that are no longer resolvable.
+
+---
+
+## FR-015 — Desktop Notifications
+
+The application may show desktop notifications.
+
+Notifications should cover:
+
+* Download completion.
+* Download failure.
+
+Notifications must be optional and user-controllable.
+
+Notification behavior must be isolated from the core download workflow.
+
+---
+
+## FR-016 — Application Settings
+
+The application must provide a settings interface for user preferences.
+
+Settings should include:
+
+* Default download directory.
+* Whether desktop notifications are enabled.
+* Download concurrency limit where supported.
+* Dependency management preferences where applicable.
+
+Settings must be persisted locally.
+
+The download directory preference defined in FR-009 is part of application settings.
+
+---
+
+## FR-017 — Filename Collision Handling
+
+The application must define behavior when a downloaded file would overwrite an existing file.
+
+The application should choose one of:
+
+* Auto-rename the new file.
+* Overwrite the existing file.
+* Prompt the user before overwriting.
+
+The default behavior is an implementation decision.
+
+The chosen behavior must never write outside the selected download directory.
+
+---
+
+## FR-018 — Proxy / Network Configuration
+
+The application should allow optional proxy configuration for network operations.
+
+Proxy settings must be passed safely to yt-dlp.
+
+Proxy support may be deferred to a future version.
+
+---
+
+## FR-019 — Application and Dependency Updates
+
+The application must be able to detect the version of bundled or managed yt-dlp and FFmpeg dependencies.
+
+The application should support updating managed dependencies.
+
+Application-level auto-updates may be added in a future version.
 
 ---
 
@@ -748,13 +862,15 @@ Agents working on this project must:
 
 * Linux support
 * macOS support
-* Download history
-* Queue management
-* Retry
+* Download history (FR-013)
+* Queue management (FR-012)
+* Retry (FR-014)
 * Better format selection
 * Dependency management
 * File management
-* Desktop notifications
+* Desktop notifications (FR-015)
+* Application settings (FR-016)
+* Filename collision handling (FR-017)
 
 ## P2 — Future
 
@@ -766,6 +882,8 @@ Agents working on this project must:
 * Audio-only downloads
 * Advanced presets
 * Multi-download concurrency
+* Proxy / network configuration (FR-018)
+* Application and dependency auto-updates (FR-019)
 
 ---
 

@@ -289,12 +289,15 @@ The Download Manager is responsible for the lifecycle of downloads.
 Responsibilities:
 
 * Create download jobs.
+* Maintain the download queue.
 * Track download state.
 * Start downloads.
 * Cancel downloads.
+* Retry failed or cancelled downloads.
 * Track progress.
 * Handle completion.
 * Handle failure.
+* Record download history.
 * Coordinate yt-dlp and FFmpeg.
 * Notify the renderer about state changes.
 
@@ -1057,6 +1060,8 @@ Download Manager
 ```
 
 Concurrency limits should be configurable in the future.
+
+Queue management (FR-012) is handled by the Download Manager.
 
 The initial MVP may support only one active download if that simplifies implementation.
 
