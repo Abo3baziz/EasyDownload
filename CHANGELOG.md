@@ -15,6 +15,7 @@
 - Test suite: unit, integration, and renderer tests using Vitest and React Testing Library.
 - yt-dlp-based media inspection: dedicated yt-dlp service (safe argument construction, output parsing, error mapping), normalization into the application media model, and shared formatting utilities.
 - Home page media display with thumbnail, metadata, and understandable format labels (FR-002, FR-003, FR-004).
+- Build-time yt-dlp bundling: `scripts/download-ytdlp.mjs` downloads the platform-specific standalone binary into `resources/bin/`; runtime resolver (`resolveYtDlpBinary`) locates the bundled binary in packaged and dev builds with PATH fallback; electron-builder packaging config with `extraResources` (ADR-001).
 
 ### Changed
 
@@ -31,3 +32,4 @@
 
 - Initialized the git repository with a `main` branch.
 - Added build and development tooling: electron-vite (vite 7), TypeScript, and Vitest with project scripts for typecheck, test, and build.
+- Added electron-builder for packaging and `download:yt-dlp` / `dist:<platform>` npm scripts; added `docs/ADR/001-build-time-yt-dlp-bundling.md`.

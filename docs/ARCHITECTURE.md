@@ -555,6 +555,8 @@ The Dependency Manager should be responsible for:
 * Selecting the correct platform binary.
 * Reporting missing dependencies.
 
+yt-dlp is bundled with the application at build time and located at runtime by a binary resolver; see ADR-001 for the distribution decision.
+
 Future versions may support automatic dependency updates.
 
 ---
@@ -1200,12 +1202,13 @@ Suggested ADRs:
 
 ```text
 docs/ADR/
-├── 001-electron.md
-├── 002-local-first-architecture.md
-├── 003-yt-dlp-integration.md
-├── 004-ffmpeg-integration.md
-├── 005-electron-security.md
-└── 006-chrome-extension-integration.md
+├── 001-build-time-yt-dlp-bundling.md
+├── 002-electron.md
+├── 003-local-first-architecture.md
+├── 004-yt-dlp-integration.md
+├── 005-ffmpeg-integration.md
+├── 006-electron-security.md
+└── 007-chrome-extension-integration.md
 ```
 
 Not all ADRs need to be created immediately.

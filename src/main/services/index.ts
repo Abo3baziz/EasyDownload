@@ -13,6 +13,7 @@ import type { SettingsManager } from './settings/settings-manager'
 import { createSettingsManager } from './settings/settings-manager'
 import type { YtDlpService } from './ytdlp/ytdlp-service'
 import { createYtDlpService } from './ytdlp/ytdlp-service'
+import { resolveYtDlpBinary } from './ytdlp/yt-dlp-resolver'
 
 export interface Services {
   media: MediaService
@@ -27,11 +28,20 @@ export interface ServicesDeps {
   defaultDownloadDirectory: string
   selectDirectory: () => Promise<string | null>
   openPath: (path: string) => Promise<string>
+  isPackaged: boolean
+  resourcesPath: string
+  appPath: string
 }
 
 export function createServices(deps: ServicesDeps): Services {
   const processes = new ProcessManager()
-  const dependencies = createDependencyManager(processes)
+  const ytDlpCommand =
+    resolveYtDlpBinary({
+      isPackaged: deps.isPackaged,
+      resourcesPath: deps.resourcesPath,
+      appPath: deps.appPath
+    }) ?? 'yt-dlp'
+  const dependencies = createDependencyManager(processes, { ytDlpCommand })
   const files = createFileManager({
     selectDirectory: deps.selectDirectory,
     openPath: deps.openPath
@@ -42,7 +52,7 @@ export function createServices(deps: ServicesDeps): Services {
     concurrencyLimit: DEFAULT_SETTINGS.concurrencyLimit
   }
   const settings = createSettingsManager({ dir: deps.userDataDir, defaults: settingsDefaults })
-  const ytDlp: YtDlpService = createYtDlpService({ processes })
+  const ytDlp: YtDlpService = createYtDlpService({ processes, ytDlpCommand })
   const media = createMediaService({ dependencies, ytDlp })
   const downloads = createDownloadManager()
 

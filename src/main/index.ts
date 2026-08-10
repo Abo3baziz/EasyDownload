@@ -51,7 +51,10 @@ function setupServices(): void {
       }
       return result.filePaths[0] ?? null
     },
-    openPath: (path) => shell.openPath(path)
+    openPath: (path) => shell.openPath(path),
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    appPath: app.getAppPath()
   })
   registerIpc(services)
 }
