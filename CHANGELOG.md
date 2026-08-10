@@ -10,6 +10,9 @@
 - `docs/ADR/README.md` defining the ADR process and template.
 - `PROJECT_PROGRESS.md` as the current-state progress log.
 - `CHANGELOG.md` recording meaningful project history.
+- Electron application skeleton with main/preload/renderer architecture, validated IPC layer, and main process services (Media Service, Download Manager, Process Manager, File Manager, Dependency Manager, Settings Manager).
+- Renderer shell with Home, Downloads, and Settings pages exposing the controlled preload API.
+- Test suite: unit, integration, and renderer tests using Vitest and React Testing Library.
 
 ### Changed
 
@@ -25,3 +28,4 @@
 ### Infrastructure
 
 - Initialized the git repository with a `main` branch.
+- Added build and development tooling: electron-vite (vite 7), TypeScript, and Vitest with project scripts for typecheck, test, and build.

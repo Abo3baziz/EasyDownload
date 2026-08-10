@@ -2,33 +2,39 @@
 
 ## Current Status
 
-**Phase:** Documentation
+**Phase:** Implementation — application skeleton
 
-**Status:** Documentation complete; no application code yet
+**Status:** Electron application skeleton complete; core download features pending
 
 ## Completed
 
-- Documentation baseline established: requirements, architecture, testing strategy, and ADR process.
-- Git repository initialized with a `main` branch.
-- Requirements defined through FR-019, including download queue, history, retry, notifications, settings, filename collision handling, proxy configuration, and dependency updates.
+- Electron application skeleton: main/preload/renderer architecture with secure window creation and controlled preload API.
+- Main process services: Media Service, Download Manager, Process Manager, File Manager, Dependency Manager, and Settings Manager.
+- Explicit, validated IPC layer using zod schema validation.
+- Renderer shell: Home, Downloads, and Settings pages with dependency/settings UI.
+- Build tooling: electron-vite, TypeScript, Vitest, React Testing Library.
+- Unit, integration, and renderer tests passing; production build succeeds.
 
 ## Current Decisions
 
+- Build tooling: electron-vite (vite 7) with Vitest and React Testing Library.
+- IPC payloads validated with zod; handlers return a structured `IpcResult` rather than throwing across IPC.
 - Single concurrent download allowed for the MVP; queue support required (FR-012).
 - Filename collision default behavior is an implementation decision (FR-017).
 - Proxy configuration (FR-018) and application auto-updates (FR-019) deferred to a future version.
 
 ## Pending
 
-- [ ] Implement the Electron application skeleton following `docs/ARCHITECTURE.md`.
-- [ ] Implement the React + TypeScript renderer.
-- [ ] Implement yt-dlp and FFmpeg integration.
-- [ ] Define the dependency management strategy.
+- [ ] Implement yt-dlp-based media inspection in the Media Service.
+- [ ] Implement download execution, progress, and cancellation via the Download Manager.
+- [ ] Implement FFmpeg post-processing integration where required.
+- [ ] Define the dependency management and bundling strategy.
+- [ ] Add desktop notifications wiring.
 - [ ] Create ADRs for significant architecture decisions once the decisions are established.
 
 ## Current Focus
 
-Implement the Electron application skeleton following `docs/ARCHITECTURE.md`.
+Implement yt-dlp-based media inspection in the Media Service.
 
 ## Important References
 

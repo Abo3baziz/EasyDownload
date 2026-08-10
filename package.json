@@ -1,0 +1,43 @@
+{
+  "name": "media-downloader",
+  "version": "0.1.0",
+  "description": "Cross-platform desktop media downloader built with Electron, React, and TypeScript.",
+  "main": "./out/main/index.js",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "test:unit": "vitest run src/shared src/main",
+    "test:integration": "vitest run tests/integration",
+    "test:renderer": "vitest run src/renderer",
+    "test:e2e": "node -e \"console.log('E2E tests are not yet configured.')\"",
+    "test": "npm run test:unit && npm run test:integration && npm run test:renderer"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^43.3.0",
+    "electron-vite": "^5.0.0",
+    "jsdom": "^29.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10"
+  }
+}
