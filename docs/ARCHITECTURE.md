@@ -1,0 +1,1236 @@
+# Architecture — Media Downloader
+
+## 1. Purpose
+
+This document defines the technical architecture of the Media Downloader desktop application.
+
+It describes:
+
+* Application structure.
+* Electron process boundaries.
+* Renderer/Main/Preload responsibilities.
+* IPC communication.
+* Download lifecycle.
+* yt-dlp integration.
+* FFmpeg integration.
+* Filesystem interaction.
+* Dependency management.
+* Error handling.
+* Security boundaries.
+* Cross-platform considerations.
+* Future Chrome extension integration.
+
+This document defines **how the application is built**.
+
+Product behavior and feature requirements are defined in:
+
+```text
+docs/REQUIREMENTS.md
+```
+
+---
+
+# 2. Architecture Goals
+
+The architecture should prioritize:
+
+1. Local-first processing.
+2. Clear separation between UI and privileged operations.
+3. Secure Electron architecture.
+4. Isolated yt-dlp integration.
+5. Isolated FFmpeg integration.
+6. Reliable process management.
+7. Responsive UI during downloads.
+8. Cross-platform compatibility.
+9. Extensibility for future browser integration.
+10. Maintainability and testability.
+11. Minimal infrastructure requirements.
+
+---
+
+# 3. High-Level Architecture
+
+The application is a desktop application built with Electron.
+
+```mermaid
+flowchart TB
+    User[User]
+
+    subgraph Electron["Electron Application"]
+        Renderer[Renderer Process<br/>React + TypeScript]
+        Preload[Preload Script]
+        Main[Main Process]
+
+        IPC[Secure IPC API]
+
+        DownloadManager[Download Manager]
+        MediaService[Media Service]
+        ProcessManager[Process Manager]
+        FileManager[File Manager]
+        DependencyManager[Dependency Manager]
+
+        YTDLP[yt-dlp]
+        FFmpeg[FFmpeg]
+        FileSystem[Local File System]
+    end
+
+    User --> Renderer
+
+    Renderer <--> IPC
+    IPC <--> Preload
+    Preload <--> Main
+
+    Main --> DownloadManager
+    Main --> MediaService
+    Main --> FileManager
+    Main --> DependencyManager
+
+    DownloadManager --> ProcessManager
+    MediaService --> ProcessManager
+
+    ProcessManager --> YTDLP
+    ProcessManager --> FFmpeg
+
+    FileManager --> FileSystem
+    YTDLP --> FileSystem
+    FFmpeg --> FileSystem
+```
+
+---
+
+# 4. Core Architecture Principle
+
+The application follows a **privileged-core + unprivileged-UI** model.
+
+```text
+Renderer
+   │
+   │ controlled IPC
+   ▼
+Preload
+   │
+   ▼
+Main Process
+   │
+   ├── Services
+   ├── Process Management
+   ├── Filesystem
+   └── Native APIs
+```
+
+The renderer must never directly access privileged operating-system functionality.
+
+---
+
+# 5. Electron Process Architecture
+
+Electron provides three primary layers in this application:
+
+```text
+┌────────────────────────────────────┐
+│ Renderer Process                   │
+│ React + TypeScript                 │
+│                                    │
+│ UI / State / Presentation          │
+└─────────────────┬──────────────────┘
+                  │
+                  │ IPC
+                  ▼
+┌────────────────────────────────────┐
+│ Preload                            │
+│                                    │
+│ Controlled Renderer API            │
+└─────────────────┬──────────────────┘
+                  │
+                  │ IPC
+                  ▼
+┌────────────────────────────────────┐
+│ Main Process                       │
+│                                    │
+│ Application / Native Services      │
+└────────────────────────────────────┘
+```
+
+---
+
+# 6. Renderer Process
+
+## Responsibilities
+
+The renderer is responsible for:
+
+* React UI.
+* User interaction.
+* Application screens.
+* Client-side UI state.
+* Download display.
+* Media metadata presentation.
+* Format selection UI.
+* Progress visualization.
+* Error presentation.
+* Application settings UI.
+
+## Restrictions
+
+The renderer must not:
+
+* Spawn operating-system processes.
+* Execute yt-dlp.
+* Execute FFmpeg.
+* Access the filesystem directly.
+* Use Node.js filesystem APIs.
+* Use unrestricted Electron APIs.
+* Construct shell commands.
+
+The renderer communicates with the main process exclusively through the exposed preload API.
+
+---
+
+# 7. Preload Layer
+
+The preload script acts as a security boundary between the renderer and Electron's privileged APIs.
+
+Conceptually:
+
+```text
+React
+  ↓
+window.mediaDownloader
+  ↓
+Preload
+  ↓
+IPC
+  ↓
+Main
+```
+
+The preload layer should expose a minimal and explicit API.
+
+Example:
+
+```text
+window.mediaDownloader.inspectUrl()
+window.mediaDownloader.startDownload()
+window.mediaDownloader.cancelDownload()
+window.mediaDownloader.selectDirectory()
+window.mediaDownloader.openFile()
+window.mediaDownloader.openDirectory()
+window.mediaDownloader.onDownloadProgress()
+```
+
+The exact API is subject to implementation.
+
+The preload layer must not expose:
+
+```text
+ipcRenderer
+shell
+fs
+child_process
+process
+require
+```
+
+directly to the renderer.
+
+---
+
+# 8. Main Process
+
+The Electron main process is the privileged application layer.
+
+It is responsible for:
+
+* Application lifecycle.
+* Browser window creation.
+* IPC handlers.
+* Native dialogs.
+* Filesystem operations.
+* Child process management.
+* yt-dlp execution.
+* FFmpeg execution.
+* Download management.
+* Dependency management.
+* Opening files/directories.
+* Application-level configuration.
+
+The main process should delegate functionality to dedicated services rather than becoming a large monolithic module.
+
+---
+
+# 9. Application Services
+
+The main process should contain separate services with clear responsibilities.
+
+Suggested conceptual structure:
+
+```text
+Main Process
+│
+├── Download Manager
+│
+├── Media Service
+│
+├── Process Manager
+│
+├── File Manager
+│
+├── Dependency Manager
+│
+└── Settings Manager
+```
+
+---
+
+# 10. Download Manager
+
+The Download Manager is responsible for the lifecycle of downloads.
+
+Responsibilities:
+
+* Create download jobs.
+* Track download state.
+* Start downloads.
+* Cancel downloads.
+* Track progress.
+* Handle completion.
+* Handle failure.
+* Coordinate yt-dlp and FFmpeg.
+* Notify the renderer about state changes.
+
+Example lifecycle:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Queued
+    Queued --> Inspecting
+    Inspecting --> Ready
+    Inspecting --> Failed
+
+    Ready --> Downloading
+    Downloading --> Processing
+    Downloading --> Completed
+    Downloading --> Failed
+    Downloading --> Cancelled
+
+    Processing --> Completed
+    Processing --> Failed
+
+    Completed --> [*]
+    Failed --> [*]
+    Cancelled --> [*]
+```
+
+---
+
+# 11. Media Service
+
+The Media Service provides media inspection functionality.
+
+Responsibilities:
+
+* Validate media URL.
+* Invoke yt-dlp metadata extraction.
+* Parse yt-dlp output.
+* Normalize metadata.
+* Normalize available formats.
+* Return structured data to the application.
+
+Conceptual flow:
+
+```text
+URL
+ ↓
+Validation
+ ↓
+yt-dlp Inspection
+ ↓
+Raw Metadata
+ ↓
+Parser / Normalizer
+ ↓
+Application Media Model
+ ↓
+Renderer
+```
+
+The renderer should never parse raw yt-dlp output.
+
+---
+
+# 12. yt-dlp Integration
+
+yt-dlp should be isolated behind a dedicated adapter/service.
+
+The rest of the application should not depend directly on yt-dlp's command-line syntax.
+
+Conceptually:
+
+```text
+Download Manager
+       ↓
+yt-dlp Service
+       ↓
+Process Manager
+       ↓
+yt-dlp executable
+```
+
+The yt-dlp service is responsible for:
+
+* Building safe arguments.
+* Executing yt-dlp.
+* Parsing output.
+* Reporting progress.
+* Reporting errors.
+* Cancelling execution.
+* Returning structured results.
+
+---
+
+# 13. FFmpeg Integration
+
+FFmpeg should also be isolated behind a dedicated service.
+
+Conceptually:
+
+```text
+Download Manager
+       ↓
+FFmpeg Service
+       ↓
+Process Manager
+       ↓
+FFmpeg executable
+```
+
+FFmpeg may be required for operations such as:
+
+* Merging separate video/audio streams.
+* Format conversion.
+* Audio extraction.
+* Post-processing.
+
+The application should not assume that every download requires FFmpeg.
+
+---
+
+# 14. Process Manager
+
+The Process Manager provides a common abstraction for running external executables.
+
+Responsibilities:
+
+* Spawn processes.
+* Pass arguments safely.
+* Capture stdout.
+* Capture stderr.
+* Track process state.
+* Handle exit codes.
+* Terminate processes.
+* Handle child-process cleanup.
+
+Conceptual interface:
+
+```text
+ProcessManager
+├── spawn()
+├── stdout
+├── stderr
+├── exit
+├── kill()
+└── dispose()
+```
+
+The Process Manager must never execute user-provided strings as shell commands.
+
+Prefer:
+
+```text
+executable + argument array
+```
+
+over:
+
+```text
+shell command string
+```
+
+---
+
+# 15. Filesystem Architecture
+
+Filesystem operations should be centralized through a File Manager.
+
+```text
+Renderer
+   │
+   │ IPC
+   ▼
+File Manager
+   │
+   ▼
+Operating System
+```
+
+The File Manager is responsible for:
+
+* Selecting directories.
+* Resolving application paths.
+* Managing temporary files.
+* Opening files.
+* Opening directories.
+* Validating output paths.
+* Cleaning temporary files.
+
+The renderer must not directly access filesystem APIs.
+
+---
+
+# 16. Download Storage
+
+Downloads should be stored on the user's local filesystem.
+
+Conceptually:
+
+```text
+Application
+    │
+    ├── Temporary Files
+    │
+    └── User-selected Download Directory
+```
+
+The application should distinguish between:
+
+```text
+Temporary processing files
+```
+
+and:
+
+```text
+Final user files
+```
+
+Temporary files should be cleaned after:
+
+* Successful processing.
+* Cancellation.
+* Failure where cleanup is safe.
+
+---
+
+# 17. Dependency Management
+
+The application depends on:
+
+```text
+yt-dlp
+FFmpeg
+```
+
+The architecture should support application-managed versions of these dependencies.
+
+Conceptually:
+
+```text
+Application
+│
+├── Dependency Manager
+│
+├── yt-dlp
+│
+└── FFmpeg
+```
+
+The Dependency Manager should be responsible for:
+
+* Detecting availability.
+* Determining versions.
+* Locating executables.
+* Selecting the correct platform binary.
+* Reporting missing dependencies.
+
+Future versions may support automatic dependency updates.
+
+---
+
+# 18. Cross-Platform Architecture
+
+The application targets:
+
+```text
+Windows
+macOS
+Linux
+```
+
+The core application architecture should remain platform-independent.
+
+Platform-specific functionality should be isolated.
+
+Examples:
+
+```text
+platform/
+├── windows
+├── macos
+└── linux
+```
+
+The exact directory structure is an implementation decision.
+
+The application must not hardcode platform-specific paths such as:
+
+```text
+C:\Downloads
+```
+
+Instead, use Electron/Node platform-aware APIs.
+
+---
+
+# 19. IPC Architecture
+
+IPC is the primary communication mechanism between the renderer and main process.
+
+Conceptually:
+
+```text
+Renderer
+   │
+   │ request
+   ▼
+Preload
+   │
+   │ IPC
+   ▼
+Main
+   │
+   ▼
+Service
+   │
+   │ response/event
+   ▼
+Renderer
+```
+
+---
+
+# 20. IPC Principles
+
+IPC channels must:
+
+1. Have a single clear responsibility.
+2. Validate incoming data.
+3. Return structured results.
+4. Avoid exposing privileged APIs.
+5. Avoid generic command execution.
+6. Avoid passing raw internal objects unnecessarily.
+
+Example conceptual channels:
+
+```text
+media:inspect
+download:create
+download:start
+download:cancel
+download:get
+download:list
+dialog:select-directory
+file:open
+file:open-directory
+```
+
+Exact channel names may change during implementation.
+
+---
+
+# 21. Download Progress Communication
+
+Download progress originates from yt-dlp or FFmpeg.
+
+The flow should be:
+
+```mermaid
+sequenceDiagram
+    participant UI as Renderer
+    participant Main as Electron Main
+    participant DM as Download Manager
+    participant YT as yt-dlp
+    participant FS as File System
+
+    UI->>Main: Start Download
+    Main->>DM: Create Download Job
+    DM->>YT: Start Process
+
+    loop Download
+        YT->>DM: Progress
+        DM->>Main: Progress Event
+        Main->>UI: IPC Progress Event
+        UI->>UI: Update Progress
+    end
+
+    YT->>FS: Write Media
+    YT->>DM: Process Complete
+    DM->>Main: Completed
+    Main->>UI: IPC Completed Event
+```
+
+The renderer should receive normalized progress data rather than raw yt-dlp output.
+
+---
+
+# 22. Media Inspection Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Renderer
+    participant Main as Main Process
+    participant Media as Media Service
+    participant YT as yt-dlp
+
+    User->>UI: Enter URL
+    UI->>Main: inspectUrl(url)
+    Main->>Media: Inspect URL
+    Media->>YT: Execute inspection
+    YT-->>Media: Metadata + formats
+    Media-->>Main: Normalized Media
+    Main-->>UI: Media result
+    UI-->>User: Display media
+```
+
+---
+
+# 23. Download Flow
+
+```mermaid
+sequenceDiagram
+    participant UI as Renderer
+    participant Main as Main Process
+    participant DM as Download Manager
+    participant YT as yt-dlp
+    participant FF as FFmpeg
+    participant FS as File System
+
+    UI->>Main: startDownload(config)
+    Main->>DM: Create job
+    DM->>YT: Start yt-dlp
+
+    YT-->>DM: Download progress
+    DM-->>Main: Progress event
+    Main-->>UI: Progress event
+
+    alt FFmpeg required
+        YT->>FF: Post-process
+        FF-->>DM: Processing progress
+    end
+
+    YT-->>DM: Complete
+    DM->>FS: Finalize file
+    DM-->>Main: Completed
+    Main-->>UI: Completed event
+```
+
+---
+
+# 24. Error Handling Architecture
+
+Errors should be handled at the layer where they originate and converted into application-level errors before reaching the renderer.
+
+Conceptually:
+
+```text
+yt-dlp error
+      ↓
+Process Manager
+      ↓
+yt-dlp Service
+      ↓
+Download Manager
+      ↓
+IPC Error
+      ↓
+Renderer
+      ↓
+User-friendly message
+```
+
+The renderer should not receive unnecessary raw stack traces or internal process details.
+
+---
+
+# 25. Error Categories
+
+The application should distinguish between errors such as:
+
+```text
+ValidationError
+UnsupportedMediaError
+DependencyError
+ProcessError
+NetworkError
+FilesystemError
+DownloadError
+ProcessingError
+CancellationError
+UnknownError
+```
+
+The exact error model should be defined during implementation.
+
+---
+
+# 26. Security Architecture
+
+Electron security is a core architectural requirement.
+
+The application should use:
+
+```text
+contextIsolation: true
+nodeIntegration: false
+```
+
+The renderer communicates with privileged code through the preload bridge.
+
+```mermaid
+flowchart LR
+    Renderer["Renderer<br/>Untrusted UI"]
+    Preload["Preload<br/>Controlled Bridge"]
+    Main["Main Process<br/>Privileged"]
+    OS["Operating System"]
+
+    Renderer -->|Allowed API| Preload
+    Preload -->|Validated IPC| Main
+    Main -->|Privileged Operations| OS
+```
+
+The renderer must never receive unrestricted access to:
+
+* Node.js.
+* Filesystem.
+* Child processes.
+* Shell commands.
+* Electron internals.
+
+---
+
+# 27. Command Execution Security
+
+External commands must be executed using safe argument passing.
+
+Preferred:
+
+```text
+executable
+arguments[]
+```
+
+Avoid:
+
+```text
+shell command constructed from strings
+```
+
+User-controlled values must never be inserted into shell commands without appropriate handling.
+
+This applies to:
+
+* URLs.
+* Format IDs.
+* Filenames.
+* Output paths.
+* User settings.
+
+---
+
+# 28. Future Chrome Extension Architecture
+
+The Chrome extension is not part of the MVP but the architecture must allow future integration.
+
+Target architecture:
+
+```mermaid
+flowchart LR
+    Browser["Chrome Browser"]
+    Extension["Chrome Extension"]
+    Native["Local Integration"]
+    Main["Electron Main Process"]
+    DM["Download Manager"]
+    YT["yt-dlp"]
+
+    Browser --> Extension
+    Extension --> Native
+    Native --> Main
+    Main --> DM
+    DM --> YT
+```
+
+The extension should act as a **discovery and control layer**, not the download engine.
+
+Responsibilities:
+
+### Chrome Extension
+
+* Detect potentially downloadable media.
+* Present detected media to the user.
+* Send selected media information to the desktop application.
+
+### Electron
+
+* Receive requests.
+* Validate URLs.
+* Inspect media.
+* Manage downloads.
+* Execute yt-dlp.
+* Execute FFmpeg.
+* Manage local files.
+
+---
+
+# 29. Future Extension Communication
+
+The exact communication mechanism is intentionally not finalized.
+
+Possible approaches include:
+
+* Chrome Native Messaging.
+* Local IPC bridge.
+* Controlled localhost communication.
+
+The final approach must satisfy:
+
+* Local-only communication where possible.
+* Authentication/verification of requests.
+* No unrestricted command execution.
+* No unrestricted filesystem access.
+* No public internet API requirement.
+
+The decision should be documented in an ADR before implementation.
+
+---
+
+# 30. Suggested Project Structure
+
+The exact structure may evolve, but the project should maintain clear boundaries.
+
+Conceptual structure:
+
+```text
+src/
+├── main/
+│   ├── main.ts
+│   ├── ipc/
+│   ├── services/
+│   │   ├── download/
+│   │   ├── media/
+│   │   ├── process/
+│   │   ├── filesystem/
+│   │   └── dependencies/
+│   ├── platform/
+│   └── utils/
+│
+├── preload/
+│   ├── preload.ts
+│   └── api/
+│
+├── renderer/
+│   ├── components/
+│   ├── features/
+│   ├── pages/
+│   ├── hooks/
+│   ├── state/
+│   ├── services/
+│   └── types/
+│
+└── shared/
+    ├── types/
+    ├── schemas/
+    └── constants/
+```
+
+The exact directory names are implementation details.
+
+---
+
+# 31. Shared Types
+
+Types shared between renderer and main process should live in a shared layer.
+
+Examples:
+
+```text
+MediaInfo
+MediaFormat
+Download
+DownloadProgress
+DownloadStatus
+DownloadOptions
+DownloadError
+```
+
+This prevents duplicated contracts between the renderer and main process.
+
+---
+
+# 32. Data Flow Rules
+
+The following dependency direction should be maintained:
+
+```text
+Renderer
+   ↓
+Preload API
+   ↓
+IPC
+   ↓
+Main
+   ↓
+Application Services
+   ↓
+External Tools / OS
+```
+
+Avoid reverse dependencies such as:
+
+```text
+Service → React component
+```
+
+or:
+
+```text
+yt-dlp service → renderer implementation
+```
+
+Services should remain independent of the UI.
+
+---
+
+# 33. State Management
+
+The renderer may maintain UI state for:
+
+* Current media.
+* Selected format.
+* Current download state.
+* Download progress.
+* UI preferences.
+
+The main process remains the source of truth for privileged operations and active external processes.
+
+For active downloads:
+
+```text
+Main Process
+    ↓
+Download Manager
+    ↓
+Download State
+    ↓
+Renderer Events
+    ↓
+UI State
+```
+
+The renderer should not assume that a local UI state change means the underlying process succeeded.
+
+---
+
+# 34. Concurrency
+
+The architecture should support multiple downloads in the future.
+
+The Download Manager should therefore treat downloads as independent jobs.
+
+Conceptually:
+
+```text
+Download Manager
+│
+├── Job A → yt-dlp
+├── Job B → yt-dlp
+└── Job C → yt-dlp
+```
+
+Concurrency limits should be configurable in the future.
+
+The initial MVP may support only one active download if that simplifies implementation.
+
+---
+
+# 35. Temporary Files
+
+Temporary files must be associated with the relevant download job.
+
+Example:
+
+```text
+Download Job
+   │
+   ├── temp directory
+   ├── intermediate media
+   └── final media
+```
+
+Cleanup must occur when appropriate.
+
+The application must avoid leaving large temporary media files indefinitely.
+
+---
+
+# 36. Logging
+
+The application should have structured logging for important application events.
+
+Useful events include:
+
+* Application startup.
+* Dependency detection.
+* Media inspection.
+* Download creation.
+* Download start.
+* Download progress where appropriate.
+* Download completion.
+* Download failure.
+* Process termination.
+* FFmpeg processing.
+* Unexpected errors.
+
+Logs must not expose sensitive information unnecessarily.
+
+Examples of potentially sensitive values include:
+
+* User filesystem paths.
+* Private URLs.
+* Authentication tokens.
+* Cookies.
+* Credentials.
+
+---
+
+# 37. Testing Architecture
+
+Testing should follow the application boundaries.
+
+### Unit Tests
+
+Test:
+
+* URL validation.
+* Format normalization.
+* yt-dlp output parsing.
+* Progress parsing.
+* Download state transitions.
+* Error mapping.
+* Path validation.
+
+### Integration Tests
+
+Test:
+
+* yt-dlp integration.
+* FFmpeg integration.
+* Process Manager.
+* Download Manager.
+* Filesystem behavior.
+
+### Renderer Tests
+
+Test:
+
+* Components.
+* User interactions.
+* State transitions.
+* Error display.
+
+### End-to-End Tests
+
+Test critical user workflows such as:
+
+```text
+Enter URL
+ ↓
+Inspect
+ ↓
+Select format
+ ↓
+Download
+ ↓
+Completed
+```
+
+The exact testing strategy is defined in `docs/TESTING.md`.
+
+---
+
+# 38. Architecture Constraints
+
+The following constraints are mandatory:
+
+1. The core downloader must remain local-first.
+2. Electron must be used as the desktop framework.
+3. React + TypeScript must be used for the renderer.
+4. yt-dlp must remain isolated behind an application service.
+5. FFmpeg must remain isolated behind an application service.
+6. Renderer code must not execute system commands.
+7. Renderer code must not access the filesystem directly.
+8. Node.js integration must remain disabled in the renderer.
+9. Context isolation must remain enabled.
+10. IPC must use explicit, validated channels.
+11. User input must never be converted into unsafe shell commands.
+12. The architecture must remain extensible for future Chrome extension integration.
+13. No remote backend is required for the core downloader.
+
+---
+
+# 39. Architecture Decisions
+
+Important architectural decisions should be documented as ADRs.
+
+Suggested ADRs:
+
+```text
+docs/ADR/
+├── 001-electron.md
+├── 002-local-first-architecture.md
+├── 003-yt-dlp-integration.md
+├── 004-ffmpeg-integration.md
+├── 005-electron-security.md
+└── 006-chrome-extension-integration.md
+```
+
+Not all ADRs need to be created immediately.
+
+Create an ADR when a decision is significant, difficult to reverse, or likely to affect future architecture.
+
+---
+
+# 40. Source of Truth
+
+Documentation responsibilities are separated as follows:
+
+```text
+REQUIREMENTS.md
+    ↓
+What the product must do
+
+ARCHITECTURE.md
+    ↓
+How the product is structured
+
+ADR/
+    ↓
+Why significant architectural decisions were made
+
+TESTING.md
+    ↓
+How the product is tested
+```
+
+Before implementing a feature, the agent must consult the relevant documentation.
+
+When an implementation changes an architectural decision, the agent must update the relevant documentation.
