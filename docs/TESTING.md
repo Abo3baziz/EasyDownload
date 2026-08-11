@@ -58,6 +58,7 @@ Cover:
 * URL validation.
 * Format normalization.
 * yt-dlp output parsing.
+* FFmpeg argument construction and progress parsing.
 * Progress parsing.
 * Download state transitions.
 * Error mapping.

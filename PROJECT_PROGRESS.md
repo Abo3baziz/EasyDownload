@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Phase:** Implementation — FFmpeg audio merging, download history, and notifications
+**Phase:** Implementation — download workflow, history, notifications, and FFmpeg service
 
-**Status:** Download execution implemented via the Download Manager (queue, progress, cancellation, retry); video-only formats merge best audio via yt-dlp/FFmpeg; download history persisted locally with clear-history support; desktop notifications implemented for download completion and failure, controlled by the notifications setting
+**Status:** Download execution implemented via the Download Manager (queue, progress, cancellation, retry); video-only formats merge best audio via yt-dlp/FFmpeg; download history persisted locally with clear-history support; desktop notifications implemented for download completion and failure, controlled by the notifications setting; dedicated FFmpeg Service available for merge, convert, and audio-extraction operations
 
 ## Completed
 
@@ -24,6 +24,7 @@
 - FFmpeg audio merging verified end-to-end with the bundled binaries: video-only formats download with `-f <id>+bestaudio`, merge into the requested container, produce a file with an audio stream, and report the final merged path as the download destination.
 - Download history persistence (FR-013): History Manager persists terminal downloads (completed/failed/cancelled) to `history.json` in the user data directory; the Download Manager lazy-loads history, persists terminal records on state change, captures final file size, retries history-loaded downloads via reconstructed configuration, and clears history through a `history:clear` IPC channel; Downloads page shows a Clear history button and file size/filename for completed downloads.
 - Desktop notifications (FR-015): Notification Manager observes the download update stream and, when enabled in settings, shows OS notifications for download completion and failure; notification behavior is isolated from the core download workflow.
+- Dedicated FFmpeg Service: reusable FFmpeg abstraction with merge, convert, and audio-extraction operations; safe argument construction, `-progress` parsing into normalized progress, cancellation support, and mapped application errors; wired into the main process service graph for future features while downloads continue to use yt-dlp's built-in merging.
 
 ## Current Decisions
 
@@ -37,15 +38,15 @@
 - Download progress uses a single `download:state` IPC event carrying the normalized download; the renderer never parses raw yt-dlp output. yt-dlp is launched with argument arrays (never shell strings) and progress is parsed with `--newline`.
 - Audio merging for video-only formats is delegated to yt-dlp (`-f <id>+bestaudio`) using the bundled FFmpeg (falling back to PATH); downloads fail early with a clear error when FFmpeg is unavailable (DEP-002).
 - Desktop notifications (FR-015) are driven by the download update stream and isolated from the download workflow: the Download Manager is unaware of notifications, and notification failures are swallowed.
+- The FFmpeg Service exposes structured operations (merge, convert, extractAudio) with safe argument construction and `-progress` parsing; codecs are a small structured set rather than raw codec argument strings. Download merging remains delegated to yt-dlp post-processing.
 
 ## Pending
 
-- [ ] Implement a dedicated FFmpeg Service for conversion and audio extraction.
 - [ ] Create ADRs for remaining significant decisions (Electron security, etc.).
 
 ## Current Focus
 
-Dedicated FFmpeg Service for conversion and audio extraction.
+ADRs for remaining significant decisions (Electron security, etc.).
 
 ## Important References
 
