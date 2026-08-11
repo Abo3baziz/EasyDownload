@@ -282,10 +282,14 @@ Main Process
 │
 ├── History Manager
 │
-└── Notification Manager
+├── Notification Manager
+│
+└── FFmpeg Service
 ```
 
 The Notification Manager owns desktop notifications (FR-015). It observes the Download Manager's update stream and, when notifications are enabled in settings, surfaces download completion and failure to the user. Notification behavior is isolated from the core download workflow: the Download Manager is unaware of notifications, and notification failures are swallowed so they never affect downloads.
+
+The FFmpeg Service wraps the FFmpeg executable for merge, convert, and audio-extraction operations. See section 13.
 
 ---
 
@@ -423,7 +427,15 @@ FFmpeg may be required for operations such as:
 
 The application should not assume that every download requires FFmpeg.
 
-For the MVP, audio merging is delegated to yt-dlp's built-in post-processing: when the selected format is video-only, the Download Manager requests `-f <id>+bestaudio` (plus a merge container) and yt-dlp invokes FFmpeg. FFmpeg is bundled with the application at build time and located at runtime by a binary resolver; the yt-dlp service passes the bundled binary's directory via `--ffmpeg-location`, falling back to FFmpeg from PATH when no bundled binary is present (see ADR-002). A dedicated FFmpeg Service remains future work for conversion and extraction use cases.
+The FFmpeg Service provides a reusable abstraction over the FFmpeg executable with three operations:
+
+* `merge` — combine a video and an audio stream into one file (`-c copy`).
+* `convert` — remux or transcode a file to another container/codec.
+* `extractAudio` — strip video and encode audio to a requested codec.
+
+The service builds safe argument arrays (never shell strings), runs FFmpeg through the Process Manager with `-progress` output parsed into normalized progress, supports cancellation, and maps failures to application errors. Media codecs are expressed as a small structured set of options rather than raw codec argument strings.
+
+For the MVP, audio merging for downloads is delegated to yt-dlp's built-in post-processing: when the selected format is video-only, the Download Manager requests `-f <id>+bestaudio` (plus a merge container) and yt-dlp invokes FFmpeg. FFmpeg is bundled with the application at build time and located at runtime by a binary resolver; the yt-dlp service passes the bundled binary's directory via `--ffmpeg-location`, falling back to FFmpeg from PATH when no bundled binary is present (see ADR-002). The dedicated FFmpeg Service is wired into the main process service graph and is available to future features such as direct conversion and audio extraction; the download workflow continues to use yt-dlp's built-in merging.
 
 ---
 

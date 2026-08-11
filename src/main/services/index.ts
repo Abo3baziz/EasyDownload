@@ -8,6 +8,8 @@ import { createDependencyManager } from './dependencies/dependency-manager'
 import type { DownloadManager } from './download/download-manager'
 import { createDownloadManager } from './download/download-manager'
 import { resolveFfmpegBinary } from './ffmpeg/ffmpeg-resolver'
+import type { FfmpegService } from './ffmpeg/ffmpeg-service'
+import { createFfmpegService } from './ffmpeg/ffmpeg-service'
 import type { FileManager } from './filesystem/file-manager'
 import { createFileManager } from './filesystem/file-manager'
 import type { HistoryManager } from './history/history-manager'
@@ -31,6 +33,7 @@ export interface Services {
   settings: SettingsManager
   history: HistoryManager
   notifications: NotificationManager
+  ffmpeg: FfmpegService
 }
 
 export interface ServicesDeps {
@@ -78,6 +81,7 @@ export function createServices(deps: ServicesDeps): Services {
     }
   })
   const ytDlp: YtDlpService = createYtDlpService({ processes, ytDlpCommand, ffmpegLocation })
+  const ffmpeg: FfmpegService = createFfmpegService({ processes, ffmpegCommand })
   const media = createMediaService({ dependencies, ytDlp })
   const downloads = createDownloadManager({
     ytDlp,
@@ -93,5 +97,14 @@ export function createServices(deps: ServicesDeps): Services {
     }
   })
 
-  return { media, downloads, files, dependencies, settings, history, notifications }
+  return {
+    media,
+    downloads,
+    files,
+    dependencies,
+    settings,
+    history,
+    notifications,
+    ffmpeg
+  }
 }

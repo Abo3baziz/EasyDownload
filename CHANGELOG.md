@@ -4,6 +4,12 @@
 
 ### Added
 
+- Dedicated FFmpeg Service: reusable FFmpeg abstraction with `merge`, `convert`, and `extractAudio` operations. Safe argument arrays (never shell strings), structured codec options, `-progress pipe:1` parsing into normalized progress, cancellation support, and mapped application errors (`FilesystemError`/`ProcessingError`/`DependencyError`). Wired into the main process service graph; the download workflow continues to use yt-dlp's built-in merging (ADR-002). Unit tests cover argument construction, progress parsing, error mapping, and operation lifecycle.
+
+## 2026-08-11
+
+### Added
+
 - Desktop notifications (FR-015): new Notification Manager in the main process observes the Download Manager update stream and, when notifications are enabled in settings, shows OS notifications for download completion and failure (using the media title, file name, or URL, and the mapped error message on failure). Notification behavior is isolated from the core download workflow: the Download Manager is unaware of notifications and notification failures are swallowed. The existing `notificationsEnabled` setting and Settings page checkbox control the feature.
 
 ## 2026-08-11
