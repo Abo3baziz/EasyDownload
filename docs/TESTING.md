@@ -83,6 +83,7 @@ Cover:
 * History persistence (FR-013).
 * Retry behavior (FR-014).
 * Settings persistence (FR-016).
+* Notification Manager behavior (FR-015).
 
 External executables must be represented by test doubles.
 

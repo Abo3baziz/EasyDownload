@@ -56,5 +56,6 @@ export function registerIpc(services: Services): void {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(IPC_CHANNELS.downloadStateEvent, download)
     }
+    void services.notifications.notify(download)
   })
 }

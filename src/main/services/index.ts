@@ -1,3 +1,4 @@
+import { Notification } from 'electron'
 import { stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { AppSettings } from '../../shared/types/settings'
@@ -13,6 +14,8 @@ import type { HistoryManager } from './history/history-manager'
 import { createHistoryManager } from './history/history-manager'
 import type { MediaService } from './media/media-service'
 import { createMediaService } from './media/media-service'
+import type { NotificationManager } from './notifications/notification-manager'
+import { createNotificationManager } from './notifications/notification-manager'
 import { ProcessManager } from './process/process-manager'
 import type { SettingsManager } from './settings/settings-manager'
 import { createSettingsManager } from './settings/settings-manager'
@@ -27,6 +30,7 @@ export interface Services {
   dependencies: DependencyManager
   settings: SettingsManager
   history: HistoryManager
+  notifications: NotificationManager
 }
 
 export interface ServicesDeps {
@@ -66,6 +70,13 @@ export function createServices(deps: ServicesDeps): Services {
   }
   const settings = createSettingsManager({ dir: deps.userDataDir, defaults: settingsDefaults })
   const history = createHistoryManager({ dir: deps.userDataDir })
+  const notifications = createNotificationManager({
+    isSupported: () => Notification.isSupported(),
+    getSettings: () => settings.load(),
+    show: (title, body) => {
+      new Notification({ title, body }).show()
+    }
+  })
   const ytDlp: YtDlpService = createYtDlpService({ processes, ytDlpCommand, ffmpegLocation })
   const media = createMediaService({ dependencies, ytDlp })
   const downloads = createDownloadManager({
@@ -82,5 +93,5 @@ export function createServices(deps: ServicesDeps): Services {
     }
   })
 
-  return { media, downloads, files, dependencies, settings, history }
+  return { media, downloads, files, dependencies, settings, history, notifications }
 }
