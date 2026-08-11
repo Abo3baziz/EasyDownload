@@ -4,6 +4,12 @@
 
 ### Added
 
+- Application icon set: `electron-icon-builder` and `sharp` dev dependencies with an `icon:generate` script that turns a square 1024×1024 source PNG (`resources/logo.png`) into `build/icons/` (Windows `.ico`, macOS `.icns`, and a Linux PNG set); electron-builder config points `win`/`mac`/`linux` at the generated icons, and the main window uses the icon in development. A `scripts/extract-ico-png.mjs` helper extracts the largest embedded PNG from an ICO source and upscales it to the required 1024×1024 source. Verified end-to-end with an unpacked Windows build (`EasyDownload.exe` carries the icon).
+
+## 2026-08-11
+
+### Added
+
 - Download history persistence (FR-013): new History Manager persists terminal downloads (completed/failed/cancelled) as JSON in the user data directory; the Download Manager lazy-loads history into the job list, persists terminal records after each terminal state transition, captures the final file size of completed downloads via an injected `statFile` callback, and retries history-loaded downloads by reconstructing the configuration (format ID and directory) from the persisted record.
 - New `history:clear` IPC channel and renderer `clearHistory` API; the Downloads page shows a Clear history button when terminal records exist and displays file name and size for completed downloads.
 - Shared `Download` model extended with `formatId` and `fileSize`; unit and renderer tests added for persistence, file size display, retry-from-history, and clear history.

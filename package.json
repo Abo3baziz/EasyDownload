@@ -22,6 +22,7 @@
     "test": "npm run test:unit && npm run test:integration && npm run test:renderer",
     "download:yt-dlp": "node scripts/download-ytdlp.mjs",
     "download:ffmpeg": "node scripts/download-ffmpeg.mjs",
+    "icon:generate": "electron-icon-builder --input=resources/logo.png --output=build --flatten",
     "dist:win": "npm run download:yt-dlp && npm run download:ffmpeg && npm run build && electron-builder --win",
     "dist:mac": "npm run download:yt-dlp && npm run download:ffmpeg && npm run build && electron-builder --mac",
     "dist:linux": "npm run download:yt-dlp && npm run download:ffmpeg && npm run build && electron-builder --linux"
@@ -29,6 +30,9 @@
   "build": {
     "appId": "com.easydownload.app",
     "productName": "EasyDownload",
+    "directories": {
+      "buildResources": "build"
+    },
     "files": [
       "out/**",
       "package.json"
@@ -40,16 +44,19 @@
       }
     ],
     "win": {
+      "icon": "build/icons/icon.ico",
       "target": [
         "nsis"
       ]
     },
     "mac": {
+      "icon": "build/icons/icon.icns",
       "target": [
         "dmg"
       ]
     },
     "linux": {
+      "icon": "build/icons",
       "target": [
         "AppImage"
       ]
@@ -69,8 +76,10 @@
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^43.3.0",
     "electron-builder": "^26.15.3",
+    "electron-icon-builder": "^2.0.1",
     "electron-vite": "^5.0.0",
     "jsdom": "^29.1.1",
+    "sharp": "^0.35.3",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
     "vitest": "^4.1.10"

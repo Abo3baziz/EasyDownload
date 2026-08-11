@@ -1,7 +1,13 @@
 import { app, BrowserWindow, dialog, shell } from 'electron'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { registerIpc } from './ipc'
 import { createServices } from './services'
+
+function resolveWindowIcon(): string | undefined {
+  const icon = join(app.getAppPath(), 'build', 'icons', '1024x1024.png')
+  return existsSync(icon) ? icon : undefined
+}
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -11,6 +17,7 @@ function createMainWindow(): BrowserWindow {
     minHeight: 600,
     show: false,
     title: 'EasyDownload',
+    icon: resolveWindowIcon(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
