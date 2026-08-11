@@ -21,10 +21,14 @@ export function createDependencyManager(
   const ffmpegCommand = options.ffmpegCommand ?? 'ffmpeg'
   const timeoutMs = options.timeoutMs ?? 5000
 
-  async function check(name: DependencyName, command: string): Promise<DependencyStatus> {
+  async function check(
+    name: DependencyName,
+    command: string,
+    versionArgs: readonly string[]
+  ): Promise<DependencyStatus> {
     try {
       const result = await processes.runToCompletion(command, {
-        args: ['--version'],
+        args: [...versionArgs],
         timeoutMs
       })
       if (result.exitCode !== 0 || result.timedOut) {
@@ -37,9 +41,12 @@ export function createDependencyManager(
   }
 
   return {
-    checkYtDlp: () => check('yt-dlp', ytDlpCommand),
-    checkFfmpeg: () => check('ffmpeg', ffmpegCommand),
-    checkAll: async () => [await check('yt-dlp', ytDlpCommand), await check('ffmpeg', ffmpegCommand)]
+    checkYtDlp: () => check('yt-dlp', ytDlpCommand, ['--version']),
+    checkFfmpeg: () => check('ffmpeg', ffmpegCommand, ['-version']),
+    checkAll: async () => [
+      await check('yt-dlp', ytDlpCommand, ['--version']),
+      await check('ffmpeg', ffmpegCommand, ['-version'])
+    ]
   }
 }
 
