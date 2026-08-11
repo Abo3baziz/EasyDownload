@@ -1,7 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../../utils/errors'
-import type { ProcessManager, ProcessResult } from '../process/process-manager'
-import { buildInspectArgs, createYtDlpService, parseInspectionOutput } from './ytdlp-service'
+import type {
+  ProcessManager,
+  ProcessResult,
+  StartStreamingOptions,
+  StartedProcess
+} from '../process/process-manager'
+import {
+  buildDownloadArgs,
+  buildInspectArgs,
+  createYtDlpService,
+  parseEta,
+  parseInspectionOutput,
+  parseProgressLine,
+  parseSize,
+  toDownloadError
+} from './ytdlp-service'
 
 const SAMPLE_JSON = {
   id: 'abc123',
@@ -161,5 +175,240 @@ describe('parseInspectionOutput', () => {
 
   it('throws a ProcessError for malformed JSON', () => {
     expect(() => parseInspectionOutput('{invalid')).toThrow(AppError)
+  })
+})
+
+describe('buildDownloadArgs', () => {
+  it('builds download arguments with the format id, output template, and URL', () => {
+    const args = buildDownloadArgs('https://example.com/watch?v=1', '137', 'D:\\Downloads')
+    expect(args).toEqual([
+      '--newline',
+      '--no-playlist',
+      '--no-call-home',
+      '-f',
+      '137',
+      '-o',
+      'D:\\Downloads\\%(title)s [%(id)s].%(ext)s',
+      'https://example.com/watch?v=1'
+    ])
+  })
+})
+
+describe('parseSize', () => {
+  it('parses binary units', () => {
+    expect(parseSize('1.17GiB')).toBe(1.17 * 1024 ** 3)
+    expect(parseSize('288.32MiB')).toBe(288.32 * 1024 ** 2)
+    expect(parseSize('512KiB')).toBe(512 * 1024)
+  })
+
+  it('parses decimal units', () => {
+    expect(parseSize('1.5MB')).toBe(1_500_000)
+  })
+
+  it('returns undefined for unknown units', () => {
+    expect(parseSize('1.5XB')).toBeUndefined()
+  })
+})
+
+describe('parseEta', () => {
+  it('parses MM:SS and HH:MM:SS', () => {
+    expect(parseEta('01:32')).toBe(92)
+    expect(parseEta('01:01:32')).toBe(3692)
+  })
+
+  it('returns undefined for invalid values', () => {
+    expect(parseEta('abc')).toBeUndefined()
+  })
+})
+
+describe('parseProgressLine', () => {
+  it('parses percent, size, speed, and ETA from a yt-dlp progress line', () => {
+    expect(parseProgressLine('[download]  72.1% of 1.17GiB at 4.8MiB/s ETA 01:32')).toEqual({
+      percent: 72.1,
+      downloadedBytes: Math.round(0.721 * 1.17 * 1024 ** 3),
+      totalBytes: 1.17 * 1024 ** 3,
+      speedBytesPerSecond: 4.8 * 1024 ** 2,
+      etaSeconds: 92
+    })
+  })
+
+  it('parses a completion line without speed or ETA', () => {
+    expect(parseProgressLine('[download] 100% of 1.17GiB')).toEqual({
+      percent: 100,
+      downloadedBytes: Math.round(1.17 * 1024 ** 3),
+      totalBytes: 1.17 * 1024 ** 3
+    })
+  })
+
+  it('returns undefined for non-progress lines', () => {
+    expect(parseProgressLine('[download] Destination: /tmp/video.mp4')).toBeUndefined()
+    expect(parseProgressLine('[Merger] Merging formats into "video.mp4"')).toBeUndefined()
+  })
+})
+
+describe('toDownloadError', () => {
+  function result(stderr: string): ProcessResult {
+    return { stdout: '', stderr, exitCode: 1, timedOut: false }
+  }
+
+  it('maps network failures to NetworkError', () => {
+    expect(toDownloadError(result('ERROR: Unable to download webpage: HTTP Error 404')).code).toBe(
+      'NetworkError'
+    )
+  })
+
+  it('maps filesystem failures to FilesystemError', () => {
+    expect(toDownloadError(result('ERROR: unable to write to file: No space left on device')).code).toBe(
+      'FilesystemError'
+    )
+  })
+
+  it('maps processing failures to ProcessingError', () => {
+    expect(
+      toDownloadError(result('ERROR: [Merger] ffmpeg exited with code 1')).code
+    ).toBe('ProcessingError')
+  })
+
+  it('falls back to ProcessError with the yt-dlp error line', () => {
+    expect(toDownloadError(result('ERROR: [foo] 123: Unexpected failure'))).toMatchObject({
+      code: 'ProcessError',
+      message: '[foo] 123: Unexpected failure'
+    })
+  })
+})
+
+describe('createYtDlpService.startDownload', () => {
+  function createStreamingProcesses(overrides: {
+    exitCode?: number | null
+    stdout?: string
+    stderr?: string
+    rejectWith?: Error
+  } = {}) {
+    const kill = vi.fn()
+    const result = overrides.rejectWith
+      ? Promise.reject(overrides.rejectWith)
+      : Promise.resolve({
+          stdout: overrides.stdout ?? '',
+          stderr: overrides.stderr ?? '',
+          exitCode: overrides.exitCode ?? 0,
+          timedOut: false
+        } satisfies ProcessResult)
+    const startStreaming = vi.fn().mockImplementation(
+      (_command: string, options?: StartStreamingOptions): StartedProcess => {
+        for (const line of (overrides.stdout ?? '').split(/\r?\n/)) {
+          if (line !== '') options?.onStdout?.(line)
+        }
+        for (const line of (overrides.stderr ?? '').split(/\r?\n/)) {
+          if (line !== '') options?.onStderr?.(line)
+        }
+        return { result, kill }
+      }
+    )
+    return {
+      processes: { startStreaming } as unknown as ProcessManager,
+      startStreaming,
+      kill
+    }
+  }
+
+  it('runs yt-dlp with the download arguments and resolves the process result', async () => {
+    const { processes, startStreaming } = createStreamingProcesses({
+      exitCode: 0,
+      stderr: '[download] 100% of 10.00MiB\n'
+    })
+    const service = createYtDlpService({ processes })
+
+    const handle = service.startDownload({
+      url: 'https://example.com/watch?v=1',
+      formatId: '137',
+      directory: 'D:\\Downloads'
+    })
+
+    expect(startStreaming).toHaveBeenCalledWith('yt-dlp', {
+      args: buildDownloadArgs('https://example.com/watch?v=1', '137', 'D:\\Downloads'),
+      onStdout: expect.any(Function),
+      onStderr: expect.any(Function)
+    })
+
+    const result = await handle.result
+    expect(result.exitCode).toBe(0)
+    expect(result.cancelled).toBe(false)
+  })
+
+  it('reports progress and the destination via callbacks', async () => {
+    const { processes } = createStreamingProcesses({
+      exitCode: 0,
+      stderr: '[download] Destination: D:\\Downloads\\Example.mp4\n[download]  50% of 10.00MiB\n'
+    })
+    const service = createYtDlpService({ processes })
+    const onProgress = vi.fn()
+    const onPhase = vi.fn()
+
+    const handle = service.startDownload(
+      { url: 'https://example.com/watch?v=1', formatId: '18', directory: 'D:\\Downloads' },
+      { onProgress, onPhase }
+    )
+
+    const result = await handle.result
+    expect(result.destination).toBe('D:\\Downloads\\Example.mp4')
+    expect(onProgress).toHaveBeenCalledWith({
+      percent: 50,
+      downloadedBytes: Math.round(0.5 * 10 * 1024 ** 2),
+      totalBytes: 10 * 1024 ** 2
+    })
+    expect(onPhase).toHaveBeenCalledWith('downloading')
+  })
+
+  it('reports the processing phase when post-processing lines appear', async () => {
+    const { processes } = createStreamingProcesses({
+      exitCode: 0,
+      stderr: '[Merger] Merging formats into "video.mp4"\n'
+    })
+    const service = createYtDlpService({ processes })
+    const onPhase = vi.fn()
+
+    await service
+      .startDownload(
+        { url: 'https://example.com/watch?v=1', formatId: '137', directory: 'D:\\Downloads' },
+        { onPhase }
+      )
+      .result
+
+    expect(onPhase).toHaveBeenCalledWith('processing')
+  })
+
+  it('kills the process and reports cancellation when cancel is called', async () => {
+    const { processes, kill } = createStreamingProcesses({
+      exitCode: null,
+      stderr: '[download]  10% of 10.00MiB\n'
+    })
+    const service = createYtDlpService({ processes })
+
+    const handle = service.startDownload({
+      url: 'https://example.com/watch?v=1',
+      formatId: '18',
+      directory: 'D:\\Downloads'
+    })
+
+    handle.cancel()
+
+    const result = await handle.result
+    expect(kill).toHaveBeenCalled()
+    expect(result.cancelled).toBe(true)
+  })
+
+  it('maps a missing executable to DependencyError', async () => {
+    const { processes } = createStreamingProcesses({
+      rejectWith: Object.assign(new Error('spawn yt-dlp ENOENT'), { code: 'ENOENT' })
+    })
+    const service = createYtDlpService({ processes })
+
+    const handle = service.startDownload({
+      url: 'https://example.com/watch?v=1',
+      formatId: '18',
+      directory: 'D:\\Downloads'
+    })
+
+    await expect(handle.result).rejects.toMatchObject({ code: 'DependencyError' })
   })
 })

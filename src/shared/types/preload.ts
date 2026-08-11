@@ -9,6 +9,7 @@ export interface PreloadApi {
   inspectUrl(url: string): Promise<IpcResult<MediaInfo>>
   startDownload(options: DownloadOptions): Promise<IpcResult<Download>>
   cancelDownload(id: string): Promise<IpcResult<Download>>
+  retryDownload(id: string): Promise<IpcResult<Download>>
   getDownload(id: string): Promise<IpcResult<Download>>
   listDownloads(): Promise<IpcResult<Download[]>>
   selectDirectory(): Promise<IpcResult<string | null>>
@@ -17,6 +18,5 @@ export interface PreloadApi {
   getSettings(): Promise<IpcResult<AppSettings>>
   updateSettings(settings: AppSettings): Promise<IpcResult<AppSettings>>
   getDependencies(): Promise<IpcResult<DependencyStatus[]>>
-  onDownloadProgress(listener: (download: Download) => void): () => void
   onDownloadStateChange(listener: (download: Download) => void): () => void
 }

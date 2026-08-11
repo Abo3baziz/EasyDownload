@@ -641,6 +641,7 @@ media:inspect
 download:create
 download:start
 download:cancel
+download:retry
 download:get
 download:list
 dialog:select-directory

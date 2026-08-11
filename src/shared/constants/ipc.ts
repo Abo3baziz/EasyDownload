@@ -5,13 +5,13 @@ export const IPC_CHANNELS = {
   downloadCancel: 'download:cancel',
   downloadGet: 'download:get',
   downloadList: 'download:list',
+  downloadRetry: 'download:retry',
   dialogSelectDirectory: 'dialog:select-directory',
   fileOpen: 'file:open',
   fileOpenDirectory: 'file:open-directory',
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update',
   dependenciesGet: 'dependencies:get',
-  downloadProgressEvent: 'download:progress',
   downloadStateEvent: 'download:state'
 } as const
 

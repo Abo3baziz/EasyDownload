@@ -5,8 +5,15 @@ import type { PreloadApi } from '../shared/types/preload'
 
 const api: PreloadApi = {
   inspectUrl: (url) => ipcRenderer.invoke(IPC_CHANNELS.mediaInspect, { url }),
-  startDownload: (options) => ipcRenderer.invoke(IPC_CHANNELS.downloadStart, options),
+  startDownload: async (options) => {
+    const created = await ipcRenderer.invoke(IPC_CHANNELS.downloadCreate, options)
+    if (!created.ok) {
+      return created
+    }
+    return ipcRenderer.invoke(IPC_CHANNELS.downloadStart, { id: created.data.id })
+  },
   cancelDownload: (id) => ipcRenderer.invoke(IPC_CHANNELS.downloadCancel, { id }),
+  retryDownload: (id) => ipcRenderer.invoke(IPC_CHANNELS.downloadRetry, { id }),
   getDownload: (id) => ipcRenderer.invoke(IPC_CHANNELS.downloadGet, { id }),
   listDownloads: () => ipcRenderer.invoke(IPC_CHANNELS.downloadList),
   selectDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.dialogSelectDirectory),
@@ -15,7 +22,6 @@ const api: PreloadApi = {
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.settingsGet),
   updateSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.settingsUpdate, settings),
   getDependencies: () => ipcRenderer.invoke(IPC_CHANNELS.dependenciesGet),
-  onDownloadProgress: (listener) => subscribe(IPC_CHANNELS.downloadProgressEvent, listener),
   onDownloadStateChange: (listener) => subscribe(IPC_CHANNELS.downloadStateEvent, listener)
 }
 

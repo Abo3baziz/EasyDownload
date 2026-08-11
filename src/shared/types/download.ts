@@ -24,6 +24,9 @@ export interface Download {
   status: DownloadStatus
   progress: DownloadProgress
   error?: AppError
+  fileName?: string
+  destination?: string
+  directory?: string
   createdAt: number
   updatedAt: number
 }

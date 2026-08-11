@@ -10,6 +10,7 @@ function createApiMock(): PreloadApi {
     inspectUrl: vi.fn(),
     startDownload: vi.fn(),
     cancelDownload: vi.fn(),
+    retryDownload: vi.fn(),
     getDownload: vi.fn(),
     listDownloads: vi.fn().mockResolvedValue({ ok: true, data: [] }),
     selectDirectory: vi.fn(),
@@ -18,7 +19,6 @@ function createApiMock(): PreloadApi {
     getSettings: vi.fn(),
     updateSettings: vi.fn(),
     getDependencies: vi.fn(),
-    onDownloadProgress: vi.fn(() => () => undefined),
     onDownloadStateChange: vi.fn(() => () => undefined)
   }
 }
@@ -78,5 +78,80 @@ describe('HomePage', () => {
     expect(screen.getByText('360p MP4')).toBeInTheDocument()
     expect(screen.getByText('640x360')).toBeInTheDocument()
     expect(screen.getByText('1.5 KB')).toBeInTheDocument()
+  })
+
+  it('starts a download for the selected format in the configured directory', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'abc',
+        title: 'Example Video',
+        website: 'www.youtube.com',
+        formats: [
+          {
+            id: '137',
+            label: '1080p MP4',
+            extension: 'mp4',
+            resolution: '1920x1080',
+            hasVideo: true,
+            hasAudio: true
+          }
+        ]
+      }
+    })
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.startDownload = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'dl-1',
+        url: 'https://www.youtube.com/watch?v=abc',
+        status: 'downloading',
+        progress: {},
+        createdAt: 1,
+        updatedAt: 1
+      }
+    })
+
+    await submitUrl('https://www.youtube.com/watch?v=abc')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Download started')
+    expect(window.mediaDownloader.startDownload).toHaveBeenCalledWith({
+      url: 'https://www.youtube.com/watch?v=abc',
+      formatId: '137',
+      directory: 'C:\\Downloads'
+    })
+  })
+
+  it('shows an error when starting a download fails', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'abc',
+        title: 'Example Video',
+        website: 'www.youtube.com',
+        formats: [
+          { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
+        ]
+      }
+    })
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.startDownload = vi.fn().mockResolvedValue({
+      ok: false,
+      error: { code: 'DependencyError', message: 'yt-dlp is not available.' }
+    })
+
+    await submitUrl('https://www.youtube.com/watch?v=abc')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('yt-dlp is not available.')
   })
 })

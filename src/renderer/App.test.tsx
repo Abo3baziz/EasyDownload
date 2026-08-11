@@ -10,6 +10,7 @@ function createApiMock(): PreloadApi {
     inspectUrl: vi.fn(),
     startDownload: vi.fn(),
     cancelDownload: vi.fn(),
+    retryDownload: vi.fn(),
     getDownload: vi.fn(),
     listDownloads: vi.fn().mockResolvedValue({ ok: true, data: [] }),
     selectDirectory: vi.fn(),
@@ -21,7 +22,6 @@ function createApiMock(): PreloadApi {
     }),
     updateSettings: vi.fn(),
     getDependencies: vi.fn(),
-    onDownloadProgress: vi.fn(() => () => undefined),
     onDownloadStateChange: vi.fn(() => () => undefined)
   }
 }

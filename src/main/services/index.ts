@@ -54,7 +54,7 @@ export function createServices(deps: ServicesDeps): Services {
   const settings = createSettingsManager({ dir: deps.userDataDir, defaults: settingsDefaults })
   const ytDlp: YtDlpService = createYtDlpService({ processes, ytDlpCommand })
   const media = createMediaService({ dependencies, ytDlp })
-  const downloads = createDownloadManager()
+  const downloads = createDownloadManager({ ytDlp })
 
   return { media, downloads, files, dependencies, settings }
 }

@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Phase:** Implementation — media inspection and yt-dlp distribution
+**Phase:** Implementation — download execution, progress, and cancellation
 
-**Status:** yt-dlp media inspection implemented; yt-dlp bundled at build time; download execution pending
+**Status:** Download execution implemented via the Download Manager (queue, progress, cancellation, retry); FFmpeg post-processing and desktop notifications pending
 
 ## Completed
 
@@ -16,6 +16,9 @@
 - Unit, integration, and renderer tests passing; production build succeeds.
 - yt-dlp-based media inspection: dedicated yt-dlp service with safe argument construction, output parsing, and error mapping; normalization into the application media model (FR-002, FR-003, FR-004); Home page media display with thumbnail, metadata, and format labels.
 - Build-time yt-dlp bundling: download script fetches the platform binary into `resources/bin/`; runtime resolver locates the bundled binary (packaged or dev tree) with PATH fallback; electron-builder packaging config added (ADR-001).
+- Download execution (FR-005, FR-006, FR-007, FR-008, FR-012): Download Manager lifecycle (create → inspect → download → complete/fail/cancel), single-concurrent download queue, cancel with temporary file cleanup, retry with original configuration, and normalized state broadcasting to the renderer.
+- yt-dlp download integration: streaming process support with line emission, `--newline` output parsing into normalized progress (percent, size, speed, ETA), download phase detection, and mapped download errors.
+- Download progress UI: Downloads page renders live progress (bar, size, speed, ETA) and per-download Cancel / Retry / Open file actions; Home page starts downloads into the configured directory.
 
 ## Current Decisions
 
@@ -26,17 +29,18 @@
 - Proxy configuration (FR-018) and application auto-updates (FR-019) deferred to a future version.
 - yt-dlp metadata inspection uses `--dump-json --no-playlist --skip-download`; format lists are deduplicated by label and sorted by resolution.
 - yt-dlp is bundled at build time into the packaged application; the runtime resolver falls back to PATH when no bundled binary is present (ADR-001).
+- Download progress uses a single `download:state` IPC event carrying the normalized download; the renderer never parses raw yt-dlp output. yt-dlp is launched with argument arrays (never shell strings) and progress is parsed with `--newline`.
 
 ## Pending
 
-- [ ] Implement download execution, progress, and cancellation via the Download Manager.
 - [ ] Implement FFmpeg post-processing integration where required.
-- [ ] Add desktop notifications wiring.
+- [ ] Add desktop notifications wiring (FR-015).
+- [ ] Persist download history (FR-013) and file-open of completed downloads.
 - [ ] Create ADRs for remaining significant decisions (FFmpeg integration, Electron security, etc.).
 
 ## Current Focus
 
-Implement download execution, progress, and cancellation via the Download Manager.
+FFmpeg post-processing integration and desktop notifications.
 
 ## Important References
 

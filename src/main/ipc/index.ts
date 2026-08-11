@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import { IPC_CHANNELS } from '../../shared/constants/ipc'
 import {
   downloadOptionsSchema,
@@ -23,6 +23,9 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.downloadCancel, idSchema, ({ id }) =>
     services.downloads.cancel(id)
   )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.downloadRetry, idSchema, ({ id }) =>
+    services.downloads.retry(id)
+  )
   registerIpcHandler(ipcMain, IPC_CHANNELS.downloadGet, idSchema, ({ id }) =>
     services.downloads.get(id)
   )
@@ -45,4 +48,10 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.dependenciesGet, undefined, () =>
     services.dependencies.checkAll()
   )
+
+  services.downloads.onUpdate((download) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send(IPC_CHANNELS.downloadStateEvent, download)
+    }
+  })
 }

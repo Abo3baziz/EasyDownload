@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-08-11
+
+### Added
+
+- Download execution (FR-005, FR-006, FR-007, FR-008, FR-012): Download Manager lifecycle with a single-concurrent-download queue, cancellation with temporary file cleanup, and retry using the original configuration.
+- yt-dlp download integration: streaming process support with line emission (`startStreaming`), `--newline` progress parsing into normalized progress data (percent, size, speed, ETA), download phase detection, destination capture, and mapped download errors.
+- Download progress UI: Downloads page shows live progress bars with size, speed, and ETA, plus per-download Cancel, Retry, and Open file actions; Home page starts downloads for a selected format into the configured directory.
+- New `download:retry` IPC channel and renderer `retryDownload` API; consolidated progress/state reporting into a single `download:state` event.
+
+### Changed
+
+- Download Manager responsibilities and concurrency notes remain per `docs/ARCHITECTURE.md`; example IPC channel list updated with `download:retry`.
+
 ## 2026-08-10
 
 ### Added

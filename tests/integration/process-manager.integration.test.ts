@@ -36,3 +36,46 @@ describe('ProcessManager.runToCompletion', () => {
     expect(result.timedOut).toBe(true)
   })
 })
+
+describe('ProcessManager.startStreaming', () => {
+  const processes = new ProcessManager()
+
+  it('emits stdout lines as they are produced', async () => {
+    const lines: string[] = []
+    const started = processes.startStreaming(process.execPath, {
+      args: ['-e', 'console.log("a"); console.log("b")'],
+      onStdout: (line) => lines.push(line)
+    })
+
+    const result = await started.result
+    expect(result.exitCode).toBe(0)
+    expect(lines).toEqual(['a', 'b'])
+  })
+
+  it('emits stderr lines separately', async () => {
+    const stderr: string[] = []
+    const started = processes.startStreaming(process.execPath, {
+      args: ['-e', 'console.error("boom")'],
+      onStderr: (line) => stderr.push(line)
+    })
+
+    const result = await started.result
+    expect(result.exitCode).toBe(0)
+    expect(stderr).toEqual(['boom'])
+  })
+
+  it('kills the process when kill is called', async () => {
+    const started = processes.startStreaming(process.execPath, {
+      args: ['-e', 'setInterval(() => {}, 1000)']
+    })
+    started.kill()
+
+    const result = await started.result
+    expect(result.exitCode).not.toBe(0)
+  })
+
+  it('rejects when the command cannot be launched', async () => {
+    const started = processes.startStreaming('definitely-not-a-real-command-xyz', {})
+    await expect(started.result).rejects.toThrow(/ENOENT/)
+  })
+})
