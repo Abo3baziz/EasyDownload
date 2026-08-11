@@ -10,7 +10,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 800,
     minHeight: 600,
     show: false,
-    title: 'Media Downloader',
+    title: 'EasyDownload',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

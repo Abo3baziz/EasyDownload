@@ -1,4 +1,4 @@
-# Requirements — Media Downloader
+# Requirements — EasyDownload
 
 ## 1. Overview
 

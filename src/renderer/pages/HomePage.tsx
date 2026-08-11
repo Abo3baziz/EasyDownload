@@ -70,7 +70,7 @@ export function HomePage() {
 
   return (
     <section className='page'>
-      <h1>Media Downloader</h1>
+      <h1>EasyDownload</h1>
       <form
         className='inspect-form'
         onSubmit={(event) => {

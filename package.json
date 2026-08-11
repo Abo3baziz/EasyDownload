@@ -1,5 +1,5 @@
 {
-  "name": "media-downloader",
+  "name": "easydownload",
   "version": "0.1.0",
   "description": "Cross-platform desktop media downloader built with Electron, React, and TypeScript.",
   "main": "./out/main/index.js",
@@ -27,8 +27,8 @@
     "dist:linux": "npm run download:yt-dlp && npm run download:ffmpeg && npm run build && electron-builder --linux"
   },
   "build": {
-    "appId": "com.easydownload.media-downloader",
-    "productName": "Media Downloader",
+    "appId": "com.easydownload.app",
+    "productName": "EasyDownload",
     "files": [
       "out/**",
       "package.json"

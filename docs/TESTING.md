@@ -1,8 +1,8 @@
-# Testing — Media Downloader
+# Testing — EasyDownload
 
 ## 1. Purpose
 
-This document defines the testing strategy for the Media Downloader desktop application.
+This document defines the testing strategy for the EasyDownload desktop application.
 
 It describes:
 

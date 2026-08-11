@@ -11,6 +11,7 @@
 ### Changed
 
 - `docs/ARCHITECTURE.md` service list updated with History Manager; Download Storage section documents download history persistence; preload and IPC example lists updated with `clearHistory` / `history:clear`.
+- App renamed to **EasyDownload**: package `name` and lockfile updated to `easydownload`, electron-builder `productName` set to `EasyDownload` and `appId` to `com.easydownload.app`, main window title and renderer HTML `<title>` updated, Home page heading and doc titles (`ARCHITECTURE`, `REQUIREMENTS`, `TESTING`) updated accordingly.
 
 ## 2026-08-11
 

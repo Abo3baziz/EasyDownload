@@ -1,8 +1,8 @@
-# Architecture — Media Downloader
+# Architecture — EasyDownload
 
 ## 1. Purpose
 
-This document defines the technical architecture of the Media Downloader desktop application.
+This document defines the technical architecture of the EasyDownload desktop application.
 
 It describes:
 
