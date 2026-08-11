@@ -13,6 +13,7 @@ function createApiMock(): PreloadApi {
     retryDownload: vi.fn(),
     getDownload: vi.fn(),
     listDownloads: vi.fn(),
+    clearHistory: vi.fn(),
     selectDirectory: vi.fn(),
     openFile: vi.fn(),
     openDirectory: vi.fn(),
@@ -140,5 +141,56 @@ describe('DownloadsPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open file' }))
 
     expect(window.mediaDownloader.openFile).toHaveBeenCalledWith('C:\\Downloads\\video.mp4')
+  })
+
+  it('shows the file name and size for a completed download', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'dl-3',
+          url: 'https://www.youtube.com/watch?v=abc',
+          title: 'Finished Video',
+          status: 'completed',
+          progress: { percent: 100 },
+          fileName: 'video.mp4',
+          fileSize: 100 * 1048576,
+          destination: 'C:\\Downloads\\video.mp4',
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ]
+    })
+
+    render(<DownloadsPage />)
+
+    expect(await screen.findByText(/video\.mp4 · 100 MB/)).toBeInTheDocument()
+  })
+
+  it('clears the history and updates the list', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'dl-1',
+          url: 'https://www.youtube.com/watch?v=abc',
+          title: 'Finished Video',
+          status: 'completed',
+          progress: { percent: 100 },
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ]
+    })
+    window.mediaDownloader.clearHistory = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: [] })
+
+    render(<DownloadsPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear history' }))
+
+    expect(window.mediaDownloader.clearHistory).toHaveBeenCalled()
+    expect(await screen.findByText(/No downloads yet/)).toBeInTheDocument()
   })
 })

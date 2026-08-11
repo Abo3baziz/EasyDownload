@@ -215,6 +215,7 @@ window.mediaDownloader.cancelDownload()
 window.mediaDownloader.selectDirectory()
 window.mediaDownloader.openFile()
 window.mediaDownloader.openDirectory()
+window.mediaDownloader.clearHistory()
 window.mediaDownloader.onDownloadProgress()
 ```
 
@@ -277,7 +278,9 @@ Main Process
 │
 ├── Dependency Manager
 │
-└── Settings Manager
+├── Settings Manager
+│
+└── History Manager
 ```
 
 ---
@@ -524,6 +527,18 @@ Temporary files should be cleaned after:
 * Cancellation.
 * Failure where cleanup is safe.
 
+## Download History Persistence
+
+Terminal downloads (completed, failed, cancelled) are persisted locally by a History Manager as a JSON file (`history.json`) in the application's user data directory, mirroring the Settings Manager pattern. The Download Manager:
+
+* Lazy-loads persisted history into the job list on first access.
+* Persists terminal downloads after each terminal state transition.
+* Exposes `clearHistory()` to remove only terminal records.
+* Captures the final file size of completed downloads for display.
+* Retries history-loaded downloads by reconstructing the download configuration from the persisted record (format ID and directory).
+
+The renderer never reads or writes the history file directly; it only uses the `history:clear` IPC channel.
+
 ---
 
 # 17. Dependency Management
@@ -646,6 +661,7 @@ download:cancel
 download:retry
 download:get
 download:list
+history:clear
 dialog:select-directory
 file:open
 file:open-directory

@@ -20,11 +20,13 @@ export interface DownloadProgress {
 export interface Download {
   id: string
   url: string
+  formatId?: string
   title?: string
   status: DownloadStatus
   progress: DownloadProgress
   error?: AppError
   fileName?: string
+  fileSize?: number
   destination?: string
   directory?: string
   createdAt: number

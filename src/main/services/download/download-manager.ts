@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { unlink } from 'node:fs/promises'
 import { basename } from 'node:path'
-import type { Download, DownloadOptions } from '../../../shared/types/download'
+import type { Download, DownloadOptions, DownloadStatus } from '../../../shared/types/download'
 import type { DependencyStatus } from '../../../shared/types/dependencies'
 import { AppError, toAppError } from '../../utils/errors'
+import type { HistoryManager } from '../history/history-manager'
 import { isRealCodec } from '../media/normalize'
 import type {
   DownloadMediaHandle,
@@ -20,15 +21,20 @@ export interface DownloadManager {
   retry(id: string): Promise<Download>
   get(id: string): Promise<Download>
   list(): Promise<Download[]>
+  clearHistory(): Promise<Download[]>
   onUpdate(listener: (download: Download) => void): () => void
 }
 
 export interface DownloadManagerOptions {
   ytDlp: YtDlpService
   checkFfmpeg?: () => Promise<Pick<DependencyStatus, 'available'>>
+  history?: HistoryManager
+  statFile?: (path: string) => Promise<{ size: number } | undefined>
   now?: () => number
   generateId?: () => string
 }
+
+const TERMINAL_STATUSES: DownloadStatus[] = ['completed', 'failed', 'cancelled']
 
 const ACTIVE_STATUSES: Download['status'][] = ['inspecting', 'downloading', 'processing']
 
@@ -42,6 +48,9 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
   const cancelRequests = new Set<string>()
   const listeners = new Set<(download: Download) => void>()
   let activeId: string | undefined
+  let historyLoaded = false
+  let loadingHistory: Promise<void> | undefined
+  let persistChain: Promise<void> = Promise.resolve()
 
   function getOrThrow(id: string): Download {
     const download = jobs.get(id)
@@ -51,11 +60,52 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     return download
   }
 
+  function isTerminal(status: DownloadStatus): boolean {
+    return TERMINAL_STATUSES.includes(status)
+  }
+
+  function ensureLoaded(): Promise<void> {
+    if (!options.history || historyLoaded) {
+      return Promise.resolve()
+    }
+    if (!loadingHistory) {
+      loadingHistory = options.history
+        .load()
+        .then((records) => {
+          for (const record of records) {
+            if (!jobs.has(record.id)) {
+              jobs.set(record.id, record)
+            }
+          }
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          historyLoaded = true
+        })
+    }
+    return loadingHistory
+  }
+
+  function persistHistory(): Promise<void> {
+    if (!options.history) {
+      return Promise.resolve()
+    }
+    const records = [...jobs.values()].filter((download) => isTerminal(download.status))
+    persistChain = persistChain
+      .catch(() => undefined)
+      .then(() => options.history?.save(records))
+      .catch(() => undefined)
+    return persistChain
+  }
+
   function update(id: string, changes: Partial<Download>): Download {
     const download = getOrThrow(id)
     const updated: Download = { ...download, ...changes, updatedAt: now() }
     jobs.set(id, updated)
     emit(updated)
+    if (isTerminal(updated.status)) {
+      void persistHistory()
+    }
     return updated
   }
 
@@ -160,11 +210,13 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       if (result.cancelled || cancelRequests.has(id)) {
         finishCancelled(id, result.destination)
       } else if (result.exitCode === 0) {
+        const fileSize = await readFileSize(result.destination)
         update(id, {
           status: 'completed',
           progress: { percent: 100 },
           fileName: result.destination ? basename(result.destination) : undefined,
-          destination: result.destination
+          destination: result.destination,
+          fileSize
         })
       } else {
         update(id, { status: 'failed', error: toDownloadError(result).toPayload() })
@@ -185,11 +237,30 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     update(id, { status: 'cancelled', progress: {} })
   }
 
+  async function readFileSize(path: string | undefined): Promise<number | undefined> {
+    if (!path || !options.statFile) {
+      return undefined
+    }
+    try {
+      return (await options.statFile(path))?.size
+    } catch {
+      return undefined
+    }
+  }
+
+  function configFromDownload(download: Download): DownloadOptions {
+    if (!download.formatId || !download.directory) {
+      throw new AppError('DownloadError', 'The original download configuration is missing.')
+    }
+    return { url: download.url, formatId: download.formatId, directory: download.directory }
+  }
+
   return {
     async create(optionsPayload: DownloadOptions): Promise<Download> {
       const download: Download = {
         id: generateId(),
         url: optionsPayload.url,
+        formatId: optionsPayload.formatId,
         status: 'queued',
         progress: {},
         directory: optionsPayload.directory,
@@ -204,6 +275,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     },
 
     async start(id: string): Promise<Download> {
+      await ensureLoaded()
       const download = getOrThrow(id)
       if (download.status !== 'queued') {
         throw new AppError('DownloadError', `Cannot start a download in state "${download.status}".`)
@@ -218,6 +290,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     },
 
     async cancel(id: string): Promise<Download> {
+      await ensureLoaded()
       const download = getOrThrow(id)
       if (download.status === 'queued') {
         const index = queue.indexOf(id)
@@ -241,6 +314,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     },
 
     async retry(id: string): Promise<Download> {
+      await ensureLoaded()
       const download = getOrThrow(id)
       if (download.status !== 'failed' && download.status !== 'cancelled') {
         throw new AppError(
@@ -248,11 +322,11 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
           `Cannot retry a download in state "${download.status}".`
         )
       }
-      if (!configs.has(id)) {
-        throw new AppError('DownloadError', 'The original download configuration is missing.')
-      }
+      const config = configs.get(id) ?? configFromDownload(download)
+      configs.set(id, config)
       update(id, { status: 'queued', progress: {}, error: undefined })
       queue.push(id)
+      void persistHistory()
       if (!activeId) {
         schedule()
       }
@@ -260,10 +334,23 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     },
 
     async get(id: string): Promise<Download> {
+      await ensureLoaded()
       return getOrThrow(id)
     },
 
     async list(): Promise<Download[]> {
+      await ensureLoaded()
+      return [...jobs.values()]
+    },
+
+    async clearHistory(): Promise<Download[]> {
+      await ensureLoaded()
+      for (const [id, download] of jobs) {
+        if (isTerminal(download.status)) {
+          jobs.delete(id)
+        }
+      }
+      await persistHistory()
       return [...jobs.values()]
     },
 

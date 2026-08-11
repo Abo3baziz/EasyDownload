@@ -16,6 +16,7 @@ const api: PreloadApi = {
   retryDownload: (id) => ipcRenderer.invoke(IPC_CHANNELS.downloadRetry, { id }),
   getDownload: (id) => ipcRenderer.invoke(IPC_CHANNELS.downloadGet, { id }),
   listDownloads: () => ipcRenderer.invoke(IPC_CHANNELS.downloadList),
+  clearHistory: () => ipcRenderer.invoke(IPC_CHANNELS.historyClear),
   selectDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.dialogSelectDirectory),
   openFile: (path) => ipcRenderer.invoke(IPC_CHANNELS.fileOpen, { path }),
   openDirectory: (path) => ipcRenderer.invoke(IPC_CHANNELS.fileOpenDirectory, { path }),

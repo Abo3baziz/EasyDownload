@@ -6,6 +6,7 @@ export const IPC_CHANNELS = {
   downloadGet: 'download:get',
   downloadList: 'download:list',
   downloadRetry: 'download:retry',
+  historyClear: 'history:clear',
   dialogSelectDirectory: 'dialog:select-directory',
   fileOpen: 'file:open',
   fileOpenDirectory: 'file:open-directory',

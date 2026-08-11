@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
-import type { DownloadOptions } from '../../../shared/types/download'
+import type { Download, DownloadOptions } from '../../../shared/types/download'
+import type { HistoryManager } from '../history/history-manager'
 import type { YtDlpMedia } from '../ytdlp/types'
 import type {
   DownloadMediaHandle,
@@ -55,6 +56,27 @@ const OPTIONS: DownloadOptions = {
   url: 'https://example.com/watch?v=1',
   formatId: '137',
   directory: 'D:\\Downloads'
+}
+
+function createMockHistory(records: Download[] = []) {
+  const load = vi.fn().mockResolvedValue(records)
+  const save = vi.fn().mockResolvedValue(undefined)
+  const history = { load, save } as unknown as HistoryManager
+  return { history, load, save }
+}
+
+function terminalRecord(overrides: Partial<Download> = {}): Download {
+  return {
+    id: 'dl-old',
+    url: OPTIONS.url,
+    formatId: OPTIONS.formatId,
+    directory: OPTIONS.directory,
+    status: 'completed',
+    progress: {},
+    createdAt: 0,
+    updatedAt: 0,
+    ...overrides
+  }
 }
 
 async function flush(): Promise<void> {
@@ -340,5 +362,122 @@ describe('createDownloadManager', () => {
     expect(download.status).toBe('failed')
     expect(download.error?.code).toBe('DependencyError')
     expect(ytDlp.startDownload).not.toHaveBeenCalled()
+  })
+
+  it('persists a completed download to history', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const { handle, completion } = downloadHandle({
+      exitCode: 0,
+      destination: 'D:\\Downloads\\Example [abc].mp4'
+    })
+    ytDlp.startDownload.mockReturnValue(handle)
+    const { history, save } = createMockHistory()
+    const manager = createDownloadManager({ ytDlp, history, generateId: () => 'dl-1' })
+    await manager.create(OPTIONS)
+
+    await manager.start('dl-1')
+    await flush()
+    completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\Example [abc].mp4'
+    })
+    await flush()
+    await flush()
+
+    expect((await manager.get('dl-1')).status).toBe('completed')
+    expect(save).toHaveBeenCalled()
+    const persisted = save.mock.calls.at(-1)?.[0] as Download[]
+    expect(persisted).toEqual([
+      expect.objectContaining({ id: 'dl-1', status: 'completed' })
+    ])
+  })
+
+  it('loads persisted history into the job list on startup', async () => {
+    const records = [terminalRecord()]
+    const { history } = createMockHistory(records)
+    const ytDlp = createMockYtDlp()
+    const manager = createDownloadManager({ ytDlp, history, generateId: () => 'dl-new' })
+
+    await expect(manager.list()).resolves.toHaveLength(1)
+    await expect(manager.get('dl-old')).resolves.toMatchObject({
+      id: 'dl-old',
+      status: 'completed'
+    })
+  })
+
+  it('records the file size of a completed download', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const { handle, completion } = downloadHandle({
+      exitCode: 0,
+      destination: 'D:\\Downloads\\Example [abc].mp4'
+    })
+    ytDlp.startDownload.mockReturnValue(handle)
+    const statFile = vi.fn().mockResolvedValue({ size: 12_345 })
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1', statFile })
+    await manager.create(OPTIONS)
+
+    await manager.start('dl-1')
+    await flush()
+    completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\Example [abc].mp4'
+    })
+    await flush()
+
+    const download = await manager.get('dl-1')
+    expect(download.status).toBe('completed')
+    expect(download.fileSize).toBe(12_345)
+    expect(statFile).toHaveBeenCalledWith('D:\\Downloads\\Example [abc].mp4')
+  })
+
+  it('retries a failed download restored from history', async () => {
+    const records = [
+      terminalRecord({
+        id: 'dl-old',
+        status: 'failed',
+        error: { code: 'NetworkError', message: 'The network request failed.' }
+      })
+    ]
+    const { history } = createMockHistory(records)
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const { handle, completion } = downloadHandle()
+    ytDlp.startDownload.mockReturnValue(handle)
+    const manager = createDownloadManager({ ytDlp, history, generateId: () => 'dl-new' })
+
+    await manager.retry('dl-old')
+    await flush()
+
+    expect(ytDlp.inspect).toHaveBeenCalledWith(OPTIONS.url)
+    await completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+
+    await expect(manager.get('dl-old')).resolves.toMatchObject({ status: 'completed' })
+  })
+
+  it('clears terminal downloads from history and keeps active ones', async () => {
+    const records = [terminalRecord({ id: 'dl-old' })]
+    const { history, save } = createMockHistory(records)
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const { handle } = downloadHandle()
+    ytDlp.startDownload.mockReturnValue(handle)
+    const manager = createDownloadManager({ ytDlp, history, generateId: () => 'dl-1' })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+
+    const remaining = await manager.clearHistory()
+
+    expect(remaining.map((download) => download.id)).toEqual(['dl-1'])
+    expect(save).toHaveBeenLastCalledWith([])
   })
 })

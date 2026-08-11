@@ -74,6 +74,15 @@ export function DownloadsPage() {
     }
   }
 
+  async function handleClearHistory() {
+    const result = await api.clearHistory()
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    setDownloads(result.data)
+  }
+
   if (error) {
     return (
       <section className="page">
@@ -94,9 +103,20 @@ export function DownloadsPage() {
     )
   }
 
+  const hasHistory = downloads.some((download) =>
+    ['completed', 'failed', 'cancelled'].includes(download.status)
+  )
+
   return (
     <section className="page">
-      <h1>Downloads</h1>
+      <div className="page-header">
+        <h1>Downloads</h1>
+        {hasHistory && (
+          <button type="button" className="btn" onClick={() => void handleClearHistory()}>
+            Clear history
+          </button>
+        )}
+      </div>
       <ul className="download-list">
         {downloads.map((download) => (
           <li key={download.id} className="download-item">
@@ -105,6 +125,13 @@ export function DownloadsPage() {
               <StatusBadge status={download.status} />
             </div>
             <DownloadProgressBar download={download} />
+            {download.status === 'completed' &&
+              download.fileName &&
+              download.fileSize !== undefined && (
+                <p className="download-meta">
+                  {download.fileName} · {formatBytes(download.fileSize)}
+                </p>
+              )}
             {download.error && (
               <p className="download-error">
                 {download.error.code}: {download.error.message}

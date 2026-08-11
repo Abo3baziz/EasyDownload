@@ -32,6 +32,9 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.downloadList, undefined, () =>
     services.downloads.list()
   )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.historyClear, undefined, () =>
+    services.downloads.clearHistory()
+  )
   registerIpcHandler(ipcMain, IPC_CHANNELS.dialogSelectDirectory, undefined, () =>
     services.files.selectDirectory()
   )

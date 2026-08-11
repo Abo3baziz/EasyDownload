@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { AppSettings } from '../../shared/types/settings'
 import { DEFAULT_SETTINGS } from '../../shared/constants/defaults'
@@ -8,6 +9,8 @@ import { createDownloadManager } from './download/download-manager'
 import { resolveFfmpegBinary } from './ffmpeg/ffmpeg-resolver'
 import type { FileManager } from './filesystem/file-manager'
 import { createFileManager } from './filesystem/file-manager'
+import type { HistoryManager } from './history/history-manager'
+import { createHistoryManager } from './history/history-manager'
 import type { MediaService } from './media/media-service'
 import { createMediaService } from './media/media-service'
 import { ProcessManager } from './process/process-manager'
@@ -23,6 +26,7 @@ export interface Services {
   files: FileManager
   dependencies: DependencyManager
   settings: SettingsManager
+  history: HistoryManager
 }
 
 export interface ServicesDeps {
@@ -61,9 +65,22 @@ export function createServices(deps: ServicesDeps): Services {
     concurrencyLimit: DEFAULT_SETTINGS.concurrencyLimit
   }
   const settings = createSettingsManager({ dir: deps.userDataDir, defaults: settingsDefaults })
+  const history = createHistoryManager({ dir: deps.userDataDir })
   const ytDlp: YtDlpService = createYtDlpService({ processes, ytDlpCommand, ffmpegLocation })
   const media = createMediaService({ dependencies, ytDlp })
-  const downloads = createDownloadManager({ ytDlp, checkFfmpeg: () => dependencies.checkFfmpeg() })
+  const downloads = createDownloadManager({
+    ytDlp,
+    checkFfmpeg: () => dependencies.checkFfmpeg(),
+    history,
+    statFile: async (path) => {
+      try {
+        const info = await stat(path)
+        return { size: info.size }
+      } catch {
+        return undefined
+      }
+    }
+  })
 
-  return { media, downloads, files, dependencies, settings }
+  return { media, downloads, files, dependencies, settings, history }
 }

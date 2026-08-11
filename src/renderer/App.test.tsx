@@ -13,6 +13,7 @@ function createApiMock(): PreloadApi {
     retryDownload: vi.fn(),
     getDownload: vi.fn(),
     listDownloads: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+    clearHistory: vi.fn(),
     selectDirectory: vi.fn(),
     openFile: vi.fn(),
     openDirectory: vi.fn(),

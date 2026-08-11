@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Phase:** Implementation — FFmpeg audio merging and notifications
+**Phase:** Implementation — FFmpeg audio merging, download history, and notifications
 
-**Status:** Download execution implemented via the Download Manager (queue, progress, cancellation, retry); video-only formats merge best audio via yt-dlp/FFmpeg; desktop notifications pending
+**Status:** Download execution implemented via the Download Manager (queue, progress, cancellation, retry); video-only formats merge best audio via yt-dlp/FFmpeg; download history persisted locally with clear-history support; desktop notifications pending
 
 ## Completed
 
@@ -22,6 +22,7 @@
 - FFmpeg audio merging for video-only formats: the Download Manager detects formats without audio during inspection, requests `-f <id>+bestaudio` with a merge container, and fails early with a clear `DependencyError` when FFmpeg is unavailable; the final merged file path is captured from yt-dlp output.
 - Build-time FFmpeg bundling: download script fetches the platform binary into `resources/bin/`; runtime resolver locates the bundled binary (packaged or dev tree) with PATH fallback; the yt-dlp service points post-processing at the bundled FFmpeg via `--ffmpeg-location` (ADR-002).
 - FFmpeg audio merging verified end-to-end with the bundled binaries: video-only formats download with `-f <id>+bestaudio`, merge into the requested container, produce a file with an audio stream, and report the final merged path as the download destination.
+- Download history persistence (FR-013): History Manager persists terminal downloads (completed/failed/cancelled) to `history.json` in the user data directory; the Download Manager lazy-loads history, persists terminal records on state change, captures final file size, retries history-loaded downloads via reconstructed configuration, and clears history through a `history:clear` IPC channel; Downloads page shows a Clear history button and file size/filename for completed downloads.
 
 ## Current Decisions
 
@@ -39,12 +40,11 @@
 
 - [ ] Implement a dedicated FFmpeg Service for conversion and audio extraction.
 - [ ] Add desktop notifications wiring (FR-015).
-- [ ] Persist download history (FR-013) and file-open of completed downloads.
 - [ ] Create ADRs for remaining significant decisions (Electron security, etc.).
 
 ## Current Focus
 
-Desktop notifications and download history persistence.
+Desktop notifications.
 
 ## Important References
 

@@ -4,6 +4,18 @@
 
 ### Added
 
+- Download history persistence (FR-013): new History Manager persists terminal downloads (completed/failed/cancelled) as JSON in the user data directory; the Download Manager lazy-loads history into the job list, persists terminal records after each terminal state transition, captures the final file size of completed downloads via an injected `statFile` callback, and retries history-loaded downloads by reconstructing the configuration (format ID and directory) from the persisted record.
+- New `history:clear` IPC channel and renderer `clearHistory` API; the Downloads page shows a Clear history button when terminal records exist and displays file name and size for completed downloads.
+- Shared `Download` model extended with `formatId` and `fileSize`; unit and renderer tests added for persistence, file size display, retry-from-history, and clear history.
+
+### Changed
+
+- `docs/ARCHITECTURE.md` service list updated with History Manager; Download Storage section documents download history persistence; preload and IPC example lists updated with `clearHistory` / `history:clear`.
+
+## 2026-08-11
+
+### Added
+
 - Download execution (FR-005, FR-006, FR-007, FR-008, FR-012): Download Manager lifecycle with a single-concurrent-download queue, cancellation with temporary file cleanup, and retry using the original configuration.
 - yt-dlp download integration: streaming process support with line emission (`startStreaming`), `--newline` progress parsing into normalized progress data (percent, size, speed, ETA), download phase detection, destination capture, and mapped download errors.
 - Download progress UI: Downloads page shows live progress bars with size, speed, and ETA, plus per-download Cancel, Retry, and Open file actions; Home page starts downloads for a selected format into the configured directory.
