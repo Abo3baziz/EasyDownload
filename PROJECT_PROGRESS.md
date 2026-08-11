@@ -39,14 +39,15 @@
 - Audio merging for video-only formats is delegated to yt-dlp (`-f <id>+bestaudio`) using the bundled FFmpeg (falling back to PATH); downloads fail early with a clear error when FFmpeg is unavailable (DEP-002).
 - Desktop notifications (FR-015) are driven by the download update stream and isolated from the download workflow: the Download Manager is unaware of notifications, and notification failures are swallowed.
 - The FFmpeg Service exposes structured operations (merge, convert, extractAudio) with safe argument construction and `-progress` parsing; codecs are a small structured set rather than raw codec argument strings. Download merging remains delegated to yt-dlp post-processing.
+- Architecture decisions are recorded as ADRs: Electron framework (ADR-003), local-first architecture (ADR-004), yt-dlp integration (ADR-005), FFmpeg integration (ADR-006), Electron security model (ADR-007), and Chrome extension integration constraints (ADR-008). ADR-008 remains Proposed pending the extension's communication-mechanism decision.
 
 ## Pending
 
-- [ ] Create ADRs for remaining significant decisions (Electron security, etc.).
+- [ ] Implement a conversion/audio-extraction feature using the FFmpeg Service (currently available but unused by any feature).
 
 ## Current Focus
 
-ADRs for remaining significant decisions (Electron security, etc.).
+No blocking pending work; next feature candidates include conversion/audio extraction UI or the future Chrome extension.
 
 ## Important References
 

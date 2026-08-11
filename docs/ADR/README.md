@@ -41,6 +41,21 @@ docs/ADR/
 
 ---
 
+## Index
+
+| ADR | Title |
+| --- | ----- |
+| [001](001-build-time-yt-dlp-bundling.md) | Build-time yt-dlp Bundling |
+| [002](002-build-time-ffmpeg-bundling.md) | Build-time FFmpeg Bundling |
+| [003](003-electron.md) | Electron as the Desktop Framework |
+| [004](004-local-first-architecture.md) | Local-First Architecture |
+| [005](005-yt-dlp-integration.md) | yt-dlp Integration |
+| [006](006-ffmpeg-integration.md) | FFmpeg Integration |
+| [007](007-electron-security.md) | Electron Security Model |
+| [008](008-chrome-extension-integration.md) | Chrome Extension Integration |
+
+---
+
 ## Template
 
 ```markdown

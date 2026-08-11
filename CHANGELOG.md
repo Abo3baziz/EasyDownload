@@ -2,6 +2,12 @@
 
 ## 2026-08-11
 
+### Documentation
+
+- Added architecture decision records for the remaining significant decisions: ADR-003 (Electron as the desktop framework), ADR-004 (local-first architecture), ADR-005 (yt-dlp integration), ADR-006 (FFmpeg integration), ADR-007 (Electron security model), and ADR-008 (Chrome extension integration, marked Proposed pending the communication-mechanism decision). The ADR README now includes an index of all records, and `docs/ARCHITECTURE.md` section 39 lists the recorded ADRs.
+
+## 2026-08-11
+
 ### Added
 
 - Dedicated FFmpeg Service: reusable FFmpeg abstraction with `merge`, `convert`, and `extractAudio` operations. Safe argument arrays (never shell strings), structured codec options, `-progress pipe:1` parsing into normalized progress, cancellation support, and mapped application errors (`FilesystemError`/`ProcessingError`/`DependencyError`). Wired into the main process service graph; the download workflow continues to use yt-dlp's built-in merging (ADR-002). Unit tests cover argument construction, progress parsing, error mapping, and operation lifecycle.

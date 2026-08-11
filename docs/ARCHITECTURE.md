@@ -1233,7 +1233,7 @@ The following constraints are mandatory:
 
 Important architectural decisions should be documented as ADRs.
 
-Suggested ADRs:
+Recorded ADRs:
 
 ```text
 docs/ADR/
@@ -1247,7 +1247,7 @@ docs/ADR/
 └── 008-chrome-extension-integration.md
 ```
 
-Not all ADRs need to be created immediately.
+Not all decisions need an ADR.
 
 Create an ADR when a decision is significant, difficult to reverse, or likely to affect future architecture.
 
