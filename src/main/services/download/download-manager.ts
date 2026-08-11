@@ -2,12 +2,16 @@ import { randomUUID } from 'node:crypto'
 import { unlink } from 'node:fs/promises'
 import { basename } from 'node:path'
 import type { Download, DownloadOptions } from '../../../shared/types/download'
+import type { DependencyStatus } from '../../../shared/types/dependencies'
 import { AppError, toAppError } from '../../utils/errors'
+import { isRealCodec } from '../media/normalize'
 import type {
   DownloadMediaHandle,
+  DownloadMediaOptions,
   YtDlpService
 } from '../ytdlp/ytdlp-service'
 import { toDownloadError } from '../ytdlp/ytdlp-service'
+import type { YtDlpMedia } from '../ytdlp/types'
 
 export interface DownloadManager {
   create(options: DownloadOptions): Promise<Download>
@@ -21,6 +25,7 @@ export interface DownloadManager {
 
 export interface DownloadManagerOptions {
   ytDlp: YtDlpService
+  checkFfmpeg?: () => Promise<Pick<DependencyStatus, 'available'>>
   now?: () => number
   generateId?: () => string
 }
@@ -100,12 +105,14 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
 
     update(id, { status: 'inspecting', progress: {}, error: undefined })
 
+    let mediaOptions: DownloadMediaOptions
     try {
       const media = await options.ytDlp.inspect(config.url)
       if (cancelRequests.has(id)) {
         finishCancelled(id)
         return
       }
+      mediaOptions = buildDownloadMediaOptions(config, media)
       update(id, { title: media.title, status: 'downloading' })
     } catch (err) {
       if (cancelRequests.has(id)) {
@@ -116,7 +123,27 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       return
     }
 
-    const handle = options.ytDlp.startDownload(config, {
+    if (mediaOptions.mergeAudio && options.checkFfmpeg) {
+      let ffmpegAvailable = false
+      try {
+        const ffmpeg = await options.checkFfmpeg()
+        ffmpegAvailable = ffmpeg.available
+      } catch {
+        ffmpegAvailable = false
+      }
+      if (!ffmpegAvailable) {
+        update(id, {
+          status: 'failed',
+          error: new AppError(
+            'DependencyError',
+            'FFmpeg is required to merge audio into this format, but it is not available.'
+          ).toPayload()
+        })
+        return
+      }
+    }
+
+    const handle = options.ytDlp.startDownload(mediaOptions, {
       onProgress: (progress) => {
         if (cancelRequests.has(id)) return
         update(id, { progress, status: 'downloading' })
@@ -247,4 +274,25 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       }
     }
   }
+}
+
+function buildDownloadMediaOptions(
+  config: DownloadOptions,
+  media: YtDlpMedia
+): DownloadMediaOptions {
+  const optionsPayload: DownloadMediaOptions = {
+    url: config.url,
+    formatId: config.formatId,
+    directory: config.directory
+  }
+  const format = (media.formats ?? []).find(
+    (candidate) => candidate.format_id === config.formatId
+  )
+  if (format && isRealCodec(format.vcodec) && !isRealCodec(format.acodec)) {
+    optionsPayload.mergeAudio = true
+    if (format.ext) {
+      optionsPayload.mergeOutputFormat = format.ext
+    }
+  }
+  return optionsPayload
 }

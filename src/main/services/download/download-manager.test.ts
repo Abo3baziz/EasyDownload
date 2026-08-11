@@ -266,4 +266,79 @@ describe('createDownloadManager', () => {
 
     await expect(manager.retry('dl-1')).rejects.toThrow('Cannot retry a download in state "queued"')
   })
+
+  it('requests a best-audio merge for a video-only format', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({
+      id: 'abc',
+      title: 'Example Video',
+      formats: [{ format_id: '137', vcodec: 'avc1.640028', acodec: 'none', ext: 'mp4' }]
+    })
+    const { handle } = downloadHandle({
+      exitCode: 0,
+      destination: 'D:\\Downloads\\Example [abc].mp4'
+    })
+    ytDlp.startDownload.mockReturnValue(handle)
+    const checkFfmpeg = vi.fn().mockResolvedValue({ name: 'ffmpeg', available: true })
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1', checkFfmpeg })
+
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+
+    expect(checkFfmpeg).toHaveBeenCalled()
+    expect(ytDlp.startDownload).toHaveBeenCalledWith(
+      {
+        url: OPTIONS.url,
+        formatId: '137',
+        directory: OPTIONS.directory,
+        mergeAudio: true,
+        mergeOutputFormat: 'mp4'
+      },
+      expect.objectContaining({ onProgress: expect.any(Function) })
+    )
+  })
+
+  it('does not request a merge for a format that already includes audio', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({
+      id: 'abc',
+      title: 'Example Video',
+      formats: [{ format_id: '18', vcodec: 'avc1.42001E', acodec: 'mp4a.40.2', ext: 'mp4' }]
+    })
+    const { handle } = downloadHandle({ exitCode: 0 })
+    ytDlp.startDownload.mockReturnValue(handle)
+    const checkFfmpeg = vi.fn()
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1', checkFfmpeg })
+
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-1')
+    await flush()
+
+    expect(ytDlp.startDownload).toHaveBeenCalledWith(
+      { url: OPTIONS.url, formatId: '18', directory: OPTIONS.directory },
+      expect.anything()
+    )
+    expect(checkFfmpeg).not.toHaveBeenCalled()
+  })
+
+  it('fails a video-only download when FFmpeg is unavailable', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({
+      id: 'abc',
+      title: 'Example Video',
+      formats: [{ format_id: '137', vcodec: 'avc1.640028', acodec: 'none', ext: 'mp4' }]
+    })
+    const checkFfmpeg = vi.fn().mockResolvedValue({ name: 'ffmpeg', available: false })
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1', checkFfmpeg })
+
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+
+    const download = await manager.get('dl-1')
+    expect(download.status).toBe('failed')
+    expect(download.error?.code).toBe('DependencyError')
+    expect(ytDlp.startDownload).not.toHaveBeenCalled()
+  })
 })

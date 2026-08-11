@@ -22,6 +22,8 @@ export interface DownloadMediaOptions {
   url: string
   formatId: string
   directory: string
+  mergeAudio?: boolean
+  mergeOutputFormat?: string
 }
 
 export type DownloadPhase = 'downloading' | 'processing'
@@ -53,18 +55,24 @@ export function buildInspectArgs(url: string): readonly string[] {
 export function buildDownloadArgs(
   url: string,
   formatId: string,
-  directory: string
+  directory: string,
+  merge?: { outputFormat?: string }
 ): readonly string[] {
-  return [
+  const formatSelector = merge ? `${formatId}+bestaudio` : formatId
+  const args = [
     '--newline',
     '--no-playlist',
     '--no-call-home',
     '-f',
-    formatId,
+    formatSelector,
     '-o',
-    join(directory, '%(title)s [%(id)s].%(ext)s'),
-    url
+    join(directory, '%(title)s [%(id)s].%(ext)s')
   ]
+  if (merge?.outputFormat) {
+    args.push('--merge-output-format', merge.outputFormat)
+  }
+  args.push(url)
+  return args
 }
 
 export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
@@ -108,7 +116,10 @@ export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
         args: buildDownloadArgs(
           downloadOptions.url,
           downloadOptions.formatId,
-          downloadOptions.directory
+          downloadOptions.directory,
+          downloadOptions.mergeAudio
+            ? { outputFormat: downloadOptions.mergeOutputFormat }
+            : undefined
         ),
         onStdout: (line) => handleLine(line),
         onStderr: (line) => handleLine(line)
@@ -118,6 +129,10 @@ export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
         const destinationMatch = /^\[download\] Destination: (.+)$/i.exec(line.trim())
         if (destinationMatch) {
           destination = destinationMatch[1].trim()
+        }
+        const mergerMatch = /^\[merger\] Merging formats into "(.+)"$/i.exec(line.trim())
+        if (mergerMatch) {
+          destination = mergerMatch[1].trim()
         }
         const progress = parseProgressLine(line)
         if (progress) {

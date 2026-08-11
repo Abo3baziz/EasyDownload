@@ -192,6 +192,38 @@ describe('buildDownloadArgs', () => {
       'https://example.com/watch?v=1'
     ])
   })
+
+  it('requests best audio and a merge container when merging is enabled', () => {
+    const args = buildDownloadArgs('https://example.com/watch?v=1', '137', 'D:\\Downloads', {
+      outputFormat: 'mp4'
+    })
+    expect(args).toEqual([
+      '--newline',
+      '--no-playlist',
+      '--no-call-home',
+      '-f',
+      '137+bestaudio',
+      '-o',
+      'D:\\Downloads\\%(title)s [%(id)s].%(ext)s',
+      '--merge-output-format',
+      'mp4',
+      'https://example.com/watch?v=1'
+    ])
+  })
+
+  it('selects best audio without forcing a container when merging has no output format', () => {
+    const args = buildDownloadArgs('https://example.com/watch?v=1', '248', 'D:\\Downloads', {})
+    expect(args).toEqual([
+      '--newline',
+      '--no-playlist',
+      '--no-call-home',
+      '-f',
+      '248+bestaudio',
+      '-o',
+      'D:\\Downloads\\%(title)s [%(id)s].%(ext)s',
+      'https://example.com/watch?v=1'
+    ])
+  })
 })
 
 describe('parseSize', () => {
@@ -335,6 +367,26 @@ describe('createYtDlpService.startDownload', () => {
     expect(result.cancelled).toBe(false)
   })
 
+  it('merges best audio into a video-only format when requested', async () => {
+    const { processes, startStreaming } = createStreamingProcesses({ exitCode: 0 })
+    const service = createYtDlpService({ processes })
+
+    service.startDownload({
+      url: 'https://example.com/watch?v=1',
+      formatId: '137',
+      directory: 'D:\\Downloads',
+      mergeAudio: true,
+      mergeOutputFormat: 'mp4'
+    })
+
+    expect(startStreaming).toHaveBeenCalledWith(
+      'yt-dlp',
+      expect.objectContaining({
+        args: expect.arrayContaining(['-f', '137+bestaudio', '--merge-output-format', 'mp4'])
+      })
+    )
+  })
+
   it('reports progress and the destination via callbacks', async () => {
     const { processes } = createStreamingProcesses({
       exitCode: 0,
@@ -357,6 +409,28 @@ describe('createYtDlpService.startDownload', () => {
       totalBytes: 10 * 1024 ** 2
     })
     expect(onPhase).toHaveBeenCalledWith('downloading')
+  })
+
+  it('reports the final merged file as the destination for merged downloads', async () => {
+    const { processes } = createStreamingProcesses({
+      exitCode: 0,
+      stderr:
+        '[download] Destination: D:\\Downloads\\Example.f137.mp4\n' +
+        '[download] Destination: D:\\Downloads\\Example.f251.webm\n' +
+        '[Merger] Merging formats into "D:\\Downloads\\Example.mp4"\n'
+    })
+    const service = createYtDlpService({ processes })
+
+    const result = await service
+      .startDownload({
+        url: 'https://example.com/watch?v=1',
+        formatId: '137',
+        directory: 'D:\\Downloads',
+        mergeAudio: true
+      })
+      .result
+
+    expect(result.destination).toBe('D:\\Downloads\\Example.mp4')
   })
 
   it('reports the processing phase when post-processing lines appear', async () => {

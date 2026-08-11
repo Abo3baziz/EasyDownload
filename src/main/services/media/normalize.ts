@@ -49,7 +49,7 @@ function isUsableFormat(format: YtDlpFormat): boolean {
   return isRealCodec(format.vcodec) || isRealCodec(format.acodec)
 }
 
-function isRealCodec(codec: string | undefined): boolean {
+export function isRealCodec(codec: string | undefined): boolean {
   return codec !== undefined && codec !== 'none'
 }
 

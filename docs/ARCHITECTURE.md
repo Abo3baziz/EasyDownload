@@ -416,6 +416,8 @@ FFmpeg may be required for operations such as:
 
 The application should not assume that every download requires FFmpeg.
 
+For the MVP, audio merging is delegated to yt-dlp's built-in post-processing: when the selected format is video-only, the Download Manager requests `-f <id>+bestaudio` (plus a merge container) and yt-dlp invokes FFmpeg from PATH. A dedicated FFmpeg Service remains future work for conversion and extraction use cases.
+
 ---
 
 # 14. Process Manager
