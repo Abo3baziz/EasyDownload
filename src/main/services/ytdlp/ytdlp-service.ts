@@ -15,6 +15,7 @@ export interface YtDlpService {
 export interface YtDlpServiceOptions {
   processes: ProcessManager
   ytDlpCommand?: string
+  ffmpegLocation?: string
   timeoutMs?: number
 }
 
@@ -56,9 +57,9 @@ export function buildDownloadArgs(
   url: string,
   formatId: string,
   directory: string,
-  merge?: { outputFormat?: string }
+  options: { merge?: { outputFormat?: string }; ffmpegLocation?: string } = {}
 ): readonly string[] {
-  const formatSelector = merge ? `${formatId}+bestaudio` : formatId
+  const formatSelector = options.merge ? `${formatId}+bestaudio` : formatId
   const args = [
     '--newline',
     '--no-playlist',
@@ -68,8 +69,11 @@ export function buildDownloadArgs(
     '-o',
     join(directory, '%(title)s [%(id)s].%(ext)s')
   ]
-  if (merge?.outputFormat) {
-    args.push('--merge-output-format', merge.outputFormat)
+  if (options.merge?.outputFormat) {
+    args.push('--merge-output-format', options.merge.outputFormat)
+  }
+  if (options.ffmpegLocation) {
+    args.push('--ffmpeg-location', options.ffmpegLocation)
   }
   args.push(url)
   return args
@@ -77,6 +81,7 @@ export function buildDownloadArgs(
 
 export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
   const ytDlpCommand = options.ytDlpCommand ?? 'yt-dlp'
+  const ffmpegLocation = options.ffmpegLocation
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
   return {
@@ -117,9 +122,12 @@ export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
           downloadOptions.url,
           downloadOptions.formatId,
           downloadOptions.directory,
-          downloadOptions.mergeAudio
-            ? { outputFormat: downloadOptions.mergeOutputFormat }
-            : undefined
+          {
+            merge: downloadOptions.mergeAudio
+              ? { outputFormat: downloadOptions.mergeOutputFormat }
+              : undefined,
+            ffmpegLocation
+          }
         ),
         onStdout: (line) => handleLine(line),
         onStderr: (line) => handleLine(line)

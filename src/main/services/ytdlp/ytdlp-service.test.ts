@@ -195,7 +195,7 @@ describe('buildDownloadArgs', () => {
 
   it('requests best audio and a merge container when merging is enabled', () => {
     const args = buildDownloadArgs('https://example.com/watch?v=1', '137', 'D:\\Downloads', {
-      outputFormat: 'mp4'
+      merge: { outputFormat: 'mp4' }
     })
     expect(args).toEqual([
       '--newline',
@@ -212,7 +212,9 @@ describe('buildDownloadArgs', () => {
   })
 
   it('selects best audio without forcing a container when merging has no output format', () => {
-    const args = buildDownloadArgs('https://example.com/watch?v=1', '248', 'D:\\Downloads', {})
+    const args = buildDownloadArgs('https://example.com/watch?v=1', '248', 'D:\\Downloads', {
+      merge: {}
+    })
     expect(args).toEqual([
       '--newline',
       '--no-playlist',
@@ -223,6 +225,32 @@ describe('buildDownloadArgs', () => {
       'D:\\Downloads\\%(title)s [%(id)s].%(ext)s',
       'https://example.com/watch?v=1'
     ])
+  })
+
+  it('points yt-dlp at the bundled ffmpeg location when provided', () => {
+    const args = buildDownloadArgs('https://example.com/watch?v=1', '137', 'D:\\Downloads', {
+      merge: { outputFormat: 'mp4' },
+      ffmpegLocation: 'D:\\app\\resources\\bin'
+    })
+    expect(args).toEqual([
+      '--newline',
+      '--no-playlist',
+      '--no-call-home',
+      '-f',
+      '137+bestaudio',
+      '-o',
+      'D:\\Downloads\\%(title)s [%(id)s].%(ext)s',
+      '--merge-output-format',
+      'mp4',
+      '--ffmpeg-location',
+      'D:\\app\\resources\\bin',
+      'https://example.com/watch?v=1'
+    ])
+  })
+
+  it('omits the ffmpeg location when none is provided', () => {
+    const args = buildDownloadArgs('https://example.com/watch?v=1', '137', 'D:\\Downloads')
+    expect(args).not.toContain('--ffmpeg-location')
   })
 })
 
@@ -383,6 +411,25 @@ describe('createYtDlpService.startDownload', () => {
       'yt-dlp',
       expect.objectContaining({
         args: expect.arrayContaining(['-f', '137+bestaudio', '--merge-output-format', 'mp4'])
+      })
+    )
+  })
+
+  it('passes the bundled ffmpeg location to yt-dlp', async () => {
+    const { processes, startStreaming } = createStreamingProcesses({ exitCode: 0 })
+    const service = createYtDlpService({ processes, ffmpegLocation: 'D:\\app\\resources\\bin' })
+
+    service.startDownload({
+      url: 'https://example.com/watch?v=1',
+      formatId: '137',
+      directory: 'D:\\Downloads',
+      mergeAudio: true
+    })
+
+    expect(startStreaming).toHaveBeenCalledWith(
+      'yt-dlp',
+      expect.objectContaining({
+        args: expect.arrayContaining(['--ffmpeg-location', 'D:\\app\\resources\\bin'])
       })
     )
   })

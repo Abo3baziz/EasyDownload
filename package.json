@@ -21,9 +21,10 @@
     "test:e2e": "node -e \"console.log('E2E tests are not yet configured.')\"",
     "test": "npm run test:unit && npm run test:integration && npm run test:renderer",
     "download:yt-dlp": "node scripts/download-ytdlp.mjs",
-    "dist:win": "npm run download:yt-dlp && npm run build && electron-builder --win",
-    "dist:mac": "npm run download:yt-dlp && npm run build && electron-builder --mac",
-    "dist:linux": "npm run download:yt-dlp && npm run build && electron-builder --linux"
+    "download:ffmpeg": "node scripts/download-ffmpeg.mjs",
+    "dist:win": "npm run download:yt-dlp && npm run download:ffmpeg && npm run build && electron-builder --win",
+    "dist:mac": "npm run download:yt-dlp && npm run download:ffmpeg && npm run build && electron-builder --mac",
+    "dist:linux": "npm run download:yt-dlp && npm run download:ffmpeg && npm run build && electron-builder --linux"
   },
   "build": {
     "appId": "com.easydownload.media-downloader",

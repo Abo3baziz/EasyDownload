@@ -1,9 +1,11 @@
+import { dirname } from 'node:path'
 import type { AppSettings } from '../../shared/types/settings'
 import { DEFAULT_SETTINGS } from '../../shared/constants/defaults'
 import type { DependencyManager } from './dependencies/dependency-manager'
 import { createDependencyManager } from './dependencies/dependency-manager'
 import type { DownloadManager } from './download/download-manager'
 import { createDownloadManager } from './download/download-manager'
+import { resolveFfmpegBinary } from './ffmpeg/ffmpeg-resolver'
 import type { FileManager } from './filesystem/file-manager'
 import { createFileManager } from './filesystem/file-manager'
 import type { MediaService } from './media/media-service'
@@ -41,7 +43,14 @@ export function createServices(deps: ServicesDeps): Services {
       resourcesPath: deps.resourcesPath,
       appPath: deps.appPath
     }) ?? 'yt-dlp'
-  const dependencies = createDependencyManager(processes, { ytDlpCommand })
+  const ffmpegBinary = resolveFfmpegBinary({
+    isPackaged: deps.isPackaged,
+    resourcesPath: deps.resourcesPath,
+    appPath: deps.appPath
+  })
+  const ffmpegCommand = ffmpegBinary ?? 'ffmpeg'
+  const ffmpegLocation = ffmpegBinary ? dirname(ffmpegBinary) : undefined
+  const dependencies = createDependencyManager(processes, { ytDlpCommand, ffmpegCommand })
   const files = createFileManager({
     selectDirectory: deps.selectDirectory,
     openPath: deps.openPath
@@ -52,7 +61,7 @@ export function createServices(deps: ServicesDeps): Services {
     concurrencyLimit: DEFAULT_SETTINGS.concurrencyLimit
   }
   const settings = createSettingsManager({ dir: deps.userDataDir, defaults: settingsDefaults })
-  const ytDlp: YtDlpService = createYtDlpService({ processes, ytDlpCommand })
+  const ytDlp: YtDlpService = createYtDlpService({ processes, ytDlpCommand, ffmpegLocation })
   const media = createMediaService({ dependencies, ytDlp })
   const downloads = createDownloadManager({ ytDlp, checkFfmpeg: () => dependencies.checkFfmpeg() })
 

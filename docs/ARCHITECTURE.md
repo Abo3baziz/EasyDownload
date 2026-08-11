@@ -416,7 +416,7 @@ FFmpeg may be required for operations such as:
 
 The application should not assume that every download requires FFmpeg.
 
-For the MVP, audio merging is delegated to yt-dlp's built-in post-processing: when the selected format is video-only, the Download Manager requests `-f <id>+bestaudio` (plus a merge container) and yt-dlp invokes FFmpeg from PATH. A dedicated FFmpeg Service remains future work for conversion and extraction use cases.
+For the MVP, audio merging is delegated to yt-dlp's built-in post-processing: when the selected format is video-only, the Download Manager requests `-f <id>+bestaudio` (plus a merge container) and yt-dlp invokes FFmpeg. FFmpeg is bundled with the application at build time and located at runtime by a binary resolver; the yt-dlp service passes the bundled binary's directory via `--ffmpeg-location`, falling back to FFmpeg from PATH when no bundled binary is present (see ADR-002). A dedicated FFmpeg Service remains future work for conversion and extraction use cases.
 
 ---
 
@@ -557,7 +557,7 @@ The Dependency Manager should be responsible for:
 * Selecting the correct platform binary.
 * Reporting missing dependencies.
 
-yt-dlp is bundled with the application at build time and located at runtime by a binary resolver; see ADR-001 for the distribution decision.
+yt-dlp and FFmpeg are bundled with the application at build time and located at runtime by binary resolvers; see ADR-001 and ADR-002 for the distribution decisions. The bundled FFmpeg directory is passed to yt-dlp via `--ffmpeg-location` so post-processing uses the bundled binary.
 
 Future versions may support automatic dependency updates.
 
@@ -1206,12 +1206,13 @@ Suggested ADRs:
 ```text
 docs/ADR/
 ├── 001-build-time-yt-dlp-bundling.md
-├── 002-electron.md
-├── 003-local-first-architecture.md
-├── 004-yt-dlp-integration.md
-├── 005-ffmpeg-integration.md
-├── 006-electron-security.md
-└── 007-chrome-extension-integration.md
+├── 002-build-time-ffmpeg-bundling.md
+├── 003-electron.md
+├── 004-local-first-architecture.md
+├── 005-yt-dlp-integration.md
+├── 006-ffmpeg-integration.md
+├── 007-electron-security.md
+└── 008-chrome-extension-integration.md
 ```
 
 Not all ADRs need to be created immediately.

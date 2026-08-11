@@ -9,11 +9,17 @@
 - Download progress UI: Downloads page shows live progress bars with size, speed, and ETA, plus per-download Cancel, Retry, and Open file actions; Home page starts downloads for a selected format into the configured directory.
 - New `download:retry` IPC channel and renderer `retryDownload` API; consolidated progress/state reporting into a single `download:state` event.
 - FFmpeg audio merging for video-only formats: the Download Manager detects formats without audio during inspection and requests `-f <id>+bestaudio` with a merge container; downloads fail early with a clear `DependencyError` when FFmpeg is unavailable; the final merged file path is captured from yt-dlp output.
+- Build-time FFmpeg bundling: `scripts/download-ffmpeg.mjs` downloads the platform-specific FFmpeg binary (decompressed from gzip) into `resources/bin/`; runtime resolver `resolveFfmpegBinary` locates the bundled binary in packaged and dev builds with PATH fallback; the yt-dlp service passes the bundled FFmpeg directory via `--ffmpeg-location` (ADR-002).
 
 ### Changed
 
 - Download Manager responsibilities and concurrency notes remain per `docs/ARCHITECTURE.md`; example IPC channel list updated with `download:retry`.
-- `docs/ARCHITECTURE.md` FFmpeg section notes that MVP audio merging is delegated to yt-dlp using FFmpeg from PATH.
+- `docs/ARCHITECTURE.md` FFmpeg and Dependency Management sections note that FFmpeg is bundled at build time and passed to yt-dlp via `--ffmpeg-location`; ADR index updated for ADR-002.
+- `download:yt-dlp` packaging flow extended with `download:ffmpeg` across the `dist:<platform>` scripts.
+
+### Fixed
+
+- FFmpeg availability check used `--version`, which FFmpeg treats as an error (exit code 8, output on stderr), so the bundled FFmpeg was always reported as unavailable and audio merging failed with a `DependencyError`. The check now uses `-version`, matching how yt-dlp is checked with `--version`; dependency manager unit tests added.
 
 ## 2026-08-10
 

@@ -20,6 +20,8 @@
 - yt-dlp download integration: streaming process support with line emission, `--newline` output parsing into normalized progress (percent, size, speed, ETA), download phase detection, and mapped download errors.
 - Download progress UI: Downloads page renders live progress (bar, size, speed, ETA) and per-download Cancel / Retry / Open file actions; Home page starts downloads into the configured directory.
 - FFmpeg audio merging for video-only formats: the Download Manager detects formats without audio during inspection, requests `-f <id>+bestaudio` with a merge container, and fails early with a clear `DependencyError` when FFmpeg is unavailable; the final merged file path is captured from yt-dlp output.
+- Build-time FFmpeg bundling: download script fetches the platform binary into `resources/bin/`; runtime resolver locates the bundled binary (packaged or dev tree) with PATH fallback; the yt-dlp service points post-processing at the bundled FFmpeg via `--ffmpeg-location` (ADR-002).
+- FFmpeg audio merging verified end-to-end with the bundled binaries: video-only formats download with `-f <id>+bestaudio`, merge into the requested container, produce a file with an audio stream, and report the final merged path as the download destination.
 
 ## Current Decisions
 
@@ -29,16 +31,16 @@
 - Filename collision default behavior is an implementation decision (FR-017).
 - Proxy configuration (FR-018) and application auto-updates (FR-019) deferred to a future version.
 - yt-dlp metadata inspection uses `--dump-json --no-playlist --skip-download`; format lists are deduplicated by label and sorted by resolution.
-- yt-dlp is bundled at build time into the packaged application; the runtime resolver falls back to PATH when no bundled binary is present (ADR-001).
+- yt-dlp is bundled at build time into the packaged application; the runtime resolver falls back to PATH when no bundled binary is present (ADR-001). FFmpeg is bundled the same way, and its directory is passed to yt-dlp via `--ffmpeg-location` when present (ADR-002).
 - Download progress uses a single `download:state` IPC event carrying the normalized download; the renderer never parses raw yt-dlp output. yt-dlp is launched with argument arrays (never shell strings) and progress is parsed with `--newline`.
-- Audio merging for video-only formats is delegated to yt-dlp (`-f <id>+bestaudio`) using FFmpeg from PATH; downloads fail early with a clear error when FFmpeg is unavailable (DEP-002).
+- Audio merging for video-only formats is delegated to yt-dlp (`-f <id>+bestaudio`) using the bundled FFmpeg (falling back to PATH); downloads fail early with a clear error when FFmpeg is unavailable (DEP-002).
 
 ## Pending
 
 - [ ] Implement a dedicated FFmpeg Service for conversion and audio extraction.
 - [ ] Add desktop notifications wiring (FR-015).
 - [ ] Persist download history (FR-013) and file-open of completed downloads.
-- [ ] Create ADRs for remaining significant decisions (FFmpeg integration, Electron security, etc.).
+- [ ] Create ADRs for remaining significant decisions (Electron security, etc.).
 
 ## Current Focus
 
