@@ -4,6 +4,12 @@
 
 ### Added
 
+- Desktop notifications (FR-015): new Notification Manager in the main process observes the Download Manager update stream and, when notifications are enabled in settings, shows OS notifications for download completion and failure (using the media title, file name, or URL, and the mapped error message on failure). Notification behavior is isolated from the core download workflow: the Download Manager is unaware of notifications and notification failures are swallowed. The existing `notificationsEnabled` setting and Settings page checkbox control the feature.
+
+## 2026-08-11
+
+### Added
+
 - Application icon set: `electron-icon-builder` and `sharp` dev dependencies with an `icon:generate` script that turns a square 1024×1024 source PNG (`resources/logo.png`) into `build/icons/` (Windows `.ico`, macOS `.icns`, and a Linux PNG set); electron-builder config points `win`/`mac`/`linux` at the generated icons, and the main window uses the icon in development. A `scripts/extract-ico-png.mjs` helper extracts the largest embedded PNG from an ICO source and upscales it to the required 1024×1024 source. Verified end-to-end with an unpacked Windows build (`EasyDownload.exe` carries the icon).
 
 ## 2026-08-11

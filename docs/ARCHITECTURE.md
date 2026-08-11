@@ -280,8 +280,12 @@ Main Process
 │
 ├── Settings Manager
 │
-└── History Manager
+├── History Manager
+│
+└── Notification Manager
 ```
+
+The Notification Manager owns desktop notifications (FR-015). It observes the Download Manager's update stream and, when notifications are enabled in settings, surfaces download completion and failure to the user. Notification behavior is isolated from the core download workflow: the Download Manager is unaware of notifications, and notification failures are swallowed so they never affect downloads.
 
 ---
 

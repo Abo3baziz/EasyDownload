@@ -4,7 +4,7 @@
 
 **Phase:** Implementation — FFmpeg audio merging, download history, and notifications
 
-**Status:** Download execution implemented via the Download Manager (queue, progress, cancellation, retry); video-only formats merge best audio via yt-dlp/FFmpeg; download history persisted locally with clear-history support; desktop notifications pending
+**Status:** Download execution implemented via the Download Manager (queue, progress, cancellation, retry); video-only formats merge best audio via yt-dlp/FFmpeg; download history persisted locally with clear-history support; desktop notifications implemented for download completion and failure, controlled by the notifications setting
 
 ## Completed
 
@@ -23,6 +23,7 @@
 - Build-time FFmpeg bundling: download script fetches the platform binary into `resources/bin/`; runtime resolver locates the bundled binary (packaged or dev tree) with PATH fallback; the yt-dlp service points post-processing at the bundled FFmpeg via `--ffmpeg-location` (ADR-002).
 - FFmpeg audio merging verified end-to-end with the bundled binaries: video-only formats download with `-f <id>+bestaudio`, merge into the requested container, produce a file with an audio stream, and report the final merged path as the download destination.
 - Download history persistence (FR-013): History Manager persists terminal downloads (completed/failed/cancelled) to `history.json` in the user data directory; the Download Manager lazy-loads history, persists terminal records on state change, captures final file size, retries history-loaded downloads via reconstructed configuration, and clears history through a `history:clear` IPC channel; Downloads page shows a Clear history button and file size/filename for completed downloads.
+- Desktop notifications (FR-015): Notification Manager observes the download update stream and, when enabled in settings, shows OS notifications for download completion and failure; notification behavior is isolated from the core download workflow.
 
 ## Current Decisions
 
@@ -35,16 +36,16 @@
 - yt-dlp is bundled at build time into the packaged application; the runtime resolver falls back to PATH when no bundled binary is present (ADR-001). FFmpeg is bundled the same way, and its directory is passed to yt-dlp via `--ffmpeg-location` when present (ADR-002).
 - Download progress uses a single `download:state` IPC event carrying the normalized download; the renderer never parses raw yt-dlp output. yt-dlp is launched with argument arrays (never shell strings) and progress is parsed with `--newline`.
 - Audio merging for video-only formats is delegated to yt-dlp (`-f <id>+bestaudio`) using the bundled FFmpeg (falling back to PATH); downloads fail early with a clear error when FFmpeg is unavailable (DEP-002).
+- Desktop notifications (FR-015) are driven by the download update stream and isolated from the download workflow: the Download Manager is unaware of notifications, and notification failures are swallowed.
 
 ## Pending
 
 - [ ] Implement a dedicated FFmpeg Service for conversion and audio extraction.
-- [ ] Add desktop notifications wiring (FR-015).
 - [ ] Create ADRs for remaining significant decisions (Electron security, etc.).
 
 ## Current Focus
 
-Desktop notifications.
+Dedicated FFmpeg Service for conversion and audio extraction.
 
 ## Important References
 
