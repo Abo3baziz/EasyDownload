@@ -1,3 +1,4 @@
+import type { Conversion, ConversionStartOptions } from './conversion'
 import type { DependencyStatus } from './dependencies'
 import type { Download, DownloadOptions } from './download'
 import type { AppError } from './errors'
@@ -19,5 +20,8 @@ export interface PreloadApi {
   getSettings(): Promise<IpcResult<AppSettings>>
   updateSettings(settings: AppSettings): Promise<IpcResult<AppSettings>>
   getDependencies(): Promise<IpcResult<DependencyStatus[]>>
+  startConversion(options: ConversionStartOptions): Promise<IpcResult<Conversion>>
+  cancelConversion(id: string): Promise<IpcResult<Conversion>>
   onDownloadStateChange(listener: (download: Download) => void): () => void
+  onConversionStateChange(listener: (conversion: Conversion) => void): () => void
 }

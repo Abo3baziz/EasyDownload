@@ -2,6 +2,12 @@
 
 ## 2026-08-11
 
+### Added
+
+- Media conversion feature: a new Conversion Manager runs post-download conversions through the FFmpeg Service (convert to MP4/WebM, or extract MP3/AAC/Opus/FLAC audio), deriving an output path next to the source (never overwriting it), verifying the source exists, and broadcasting `conversion:state` events with normalized progress. New `conversion:start` / `conversion:cancel` IPC channels and preload APIs; the Downloads page shows per-download conversion controls with progress, cancel, and open-converted-file actions. Unit and renderer tests added; verified end-to-end against the bundled FFmpeg binary.
+
+## 2026-08-11
+
 ### Documentation
 
 - Added architecture decision records for the remaining significant decisions: ADR-003 (Electron as the desktop framework), ADR-004 (local-first architecture), ADR-005 (yt-dlp integration), ADR-006 (FFmpeg integration), ADR-007 (Electron security model), and ADR-008 (Chrome extension integration, marked Proposed pending the communication-mechanism decision). The ADR README now includes an index of all records, and `docs/ARCHITECTURE.md` section 39 lists the recorded ADRs.

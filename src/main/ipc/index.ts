@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import { IPC_CHANNELS } from '../../shared/constants/ipc'
 import {
+  conversionStartSchema,
   downloadOptionsSchema,
   idSchema,
   inspectUrlSchema,
@@ -51,11 +52,23 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.dependenciesGet, undefined, () =>
     services.dependencies.checkAll()
   )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.conversionStart, conversionStartSchema, (options) =>
+    services.conversions.start(options)
+  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.conversionCancel, idSchema, ({ id }) =>
+    services.conversions.cancel(id)
+  )
 
   services.downloads.onUpdate((download) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(IPC_CHANNELS.downloadStateEvent, download)
     }
     void services.notifications.notify(download)
+  })
+
+  services.conversions.onUpdate((conversion) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send(IPC_CHANNELS.conversionStateEvent, conversion)
+    }
   })
 }

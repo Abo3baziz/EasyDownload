@@ -1,8 +1,9 @@
 import { AppError } from '../../utils/errors'
+import type { AudioCodec, VideoCodec } from '../../../shared/types/conversion'
 import type { ProcessManager, ProcessResult } from '../process/process-manager'
 
-export type FfmpegVideoCodec = 'copy' | 'h264' | 'hevc' | 'vp9'
-export type FfmpegAudioCodec = 'copy' | 'mp3' | 'aac' | 'opus' | 'flac' | 'vorbis'
+export type FfmpegVideoCodec = VideoCodec
+export type FfmpegAudioCodec = AudioCodec
 
 export interface FfmpegMergeOptions {
   videoInput: string

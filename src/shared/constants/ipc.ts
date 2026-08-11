@@ -13,7 +13,10 @@ export const IPC_CHANNELS = {
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update',
   dependenciesGet: 'dependencies:get',
-  downloadStateEvent: 'download:state'
+  downloadStateEvent: 'download:state',
+  conversionStart: 'conversion:start',
+  conversionCancel: 'conversion:cancel',
+  conversionStateEvent: 'conversion:state'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

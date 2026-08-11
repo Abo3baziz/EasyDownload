@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import type { Conversion, ConversionStartOptions } from '../../shared/types/conversion'
 import type { AppError } from '../../shared/types/errors'
 import type { Download } from '../../shared/types/download'
+import { ConversionControl } from '../components/ConversionControl'
 import { EmptyState } from '../components/EmptyState'
 import { StatusBadge } from '../components/StatusBadge'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
@@ -9,6 +11,7 @@ import { formatBytes, formatDuration } from '../../shared/utils/format'
 export function DownloadsPage() {
   const api = useMediaDownloader()
   const [downloads, setDownloads] = useState<Download[]>([])
+  const [conversions, setConversions] = useState<Record<string, Conversion>>({})
   const [error, setError] = useState<AppError | null>(null)
   const [loaded, setLoaded] = useState(false)
 
@@ -46,9 +49,14 @@ export function DownloadsPage() {
       })
     })
 
+    const unsubscribeConversions = api.onConversionStateChange((conversion) => {
+      setConversions((previous) => ({ ...previous, [conversion.id]: conversion }))
+    })
+
     return () => {
       cancelled = true
       unsubscribe()
+      unsubscribeConversions()
     }
   }, [api])
 
@@ -69,6 +77,31 @@ export function DownloadsPage() {
   async function handleOpenFile(download: Download) {
     if (!download.destination) return
     const result = await api.openFile(download.destination)
+    if (!result.ok) {
+      setError(result.error)
+    }
+  }
+
+  async function handleStartConversion(
+    download: Download,
+    options: Omit<ConversionStartOptions, 'input'>
+  ) {
+    if (!download.destination) return
+    const result = await api.startConversion({ ...options, input: download.destination })
+    if (!result.ok) {
+      setError(result.error)
+    }
+  }
+
+  async function handleCancelConversion(id: string) {
+    const result = await api.cancelConversion(id)
+    if (!result.ok) {
+      setError(result.error)
+    }
+  }
+
+  async function handleOpenConversion(path: string) {
+    const result = await api.openFile(path)
     if (!result.ok) {
       setError(result.error)
     }
@@ -118,51 +151,82 @@ export function DownloadsPage() {
         )}
       </div>
       <ul className="download-list">
-        {downloads.map((download) => (
-          <li key={download.id} className="download-item">
-            <div className="download-main">
-              <span className="download-title">{download.title ?? download.url}</span>
-              <StatusBadge status={download.status} />
-            </div>
-            <DownloadProgressBar download={download} />
-            {download.status === 'completed' &&
-              download.fileName &&
-              download.fileSize !== undefined && (
-                <p className="download-meta">
-                  {download.fileName} · {formatBytes(download.fileSize)}
+        {downloads.map((download) => {
+          const conversion = latestConversionFor(conversions, download.destination)
+          return (
+            <li key={download.id} className="download-item">
+              <div className="download-main">
+                <span className="download-title">{download.title ?? download.url}</span>
+                <StatusBadge status={download.status} />
+              </div>
+              <DownloadProgressBar download={download} />
+              {download.status === 'completed' &&
+                download.fileName &&
+                download.fileSize !== undefined && (
+                  <p className="download-meta">
+                    {download.fileName} · {formatBytes(download.fileSize)}
+                  </p>
+                )}
+              {download.error && (
+                <p className="download-error">
+                  {download.error.code}: {download.error.message}
                 </p>
               )}
-            {download.error && (
-              <p className="download-error">
-                {download.error.code}: {download.error.message}
-              </p>
-            )}
-            <div className="download-actions">
-              {canCancel(download) && (
-                <button type="button" className="btn" onClick={() => void handleCancel(download)}>
-                  Cancel
-                </button>
-              )}
-              {canRetry(download) && (
-                <button type="button" className="btn" onClick={() => void handleRetry(download)}>
-                  Retry
-                </button>
-              )}
+              <div className="download-actions">
+                {canCancel(download) && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => void handleCancel(download)}
+                  >
+                    Cancel
+                  </button>
+                )}
+                {canRetry(download) && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => void handleRetry(download)}
+                  >
+                    Retry
+                  </button>
+                )}
+                {download.status === 'completed' && download.destination && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => void handleOpenFile(download)}
+                  >
+                    Open file
+                  </button>
+                )}
+              </div>
               {download.status === 'completed' && download.destination && (
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => void handleOpenFile(download)}
-                >
-                  Open file
-                </button>
+                <ConversionControl
+                  conversion={conversion}
+                  onStart={(options) => void handleStartConversion(download, options)}
+                  onCancel={(id) => void handleCancelConversion(id)}
+                  onOpen={(path) => void handleOpenConversion(path)}
+                />
               )}
-            </div>
-          </li>
-        ))}
+            </li>
+          )
+        })}
       </ul>
     </section>
   )
+}
+
+function latestConversionFor(
+  conversions: Record<string, Conversion>,
+  input: string | undefined
+): Conversion | undefined {
+  if (!input) {
+    return undefined
+  }
+  return Object.values(conversions)
+    .filter((conversion) => conversion.input === input)
+    .sort((a, b) => b.createdAt - a.createdAt)[0]
 }
 
 function DownloadProgressBar({ download }: { download: Download }) {

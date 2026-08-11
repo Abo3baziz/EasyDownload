@@ -23,7 +23,10 @@ function createApiMock(): PreloadApi {
     }),
     updateSettings: vi.fn(),
     getDependencies: vi.fn(),
-    onDownloadStateChange: vi.fn(() => () => undefined)
+    startConversion: vi.fn(),
+    cancelConversion: vi.fn(),
+    onDownloadStateChange: vi.fn(() => () => undefined),
+    onConversionStateChange: vi.fn(() => () => undefined)
   }
 }
 

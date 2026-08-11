@@ -352,6 +352,37 @@ button:disabled {
   gap: 8px;
 }
 
+.conversion-control {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.conversion-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.conversion-form select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.conversion-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
 .status-badge {
   flex-shrink: 0;
   padding: 2px 8px;

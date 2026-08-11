@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Conversion } from '../../shared/types/conversion'
 import type { PreloadApi } from '../../shared/types/preload'
 import { DownloadsPage } from './DownloadsPage'
 
@@ -20,7 +21,25 @@ function createApiMock(): PreloadApi {
     getSettings: vi.fn(),
     updateSettings: vi.fn(),
     getDependencies: vi.fn(),
-    onDownloadStateChange: vi.fn(() => () => undefined)
+    startConversion: vi.fn(),
+    cancelConversion: vi.fn(),
+    onDownloadStateChange: vi.fn(() => () => undefined),
+    onConversionStateChange: vi.fn(() => () => undefined)
+  }
+}
+
+function completedDownload() {
+  return {
+    id: 'dl-3',
+    url: 'https://www.youtube.com/watch?v=abc',
+    title: 'Finished Video',
+    status: 'completed' as const,
+    progress: { percent: 100 },
+    fileName: 'video.mp4',
+    fileSize: 100 * 1048576,
+    destination: 'C:\\Downloads\\video.mp4',
+    createdAt: 1,
+    updatedAt: 1
   }
 }
 
@@ -182,9 +201,7 @@ describe('DownloadsPage', () => {
         }
       ]
     })
-    window.mediaDownloader.clearHistory = vi
-      .fn()
-      .mockResolvedValue({ ok: true, data: [] })
+    window.mediaDownloader.clearHistory = vi.fn().mockResolvedValue({ ok: true, data: [] })
 
     render(<DownloadsPage />)
 
@@ -192,5 +209,114 @@ describe('DownloadsPage', () => {
 
     expect(window.mediaDownloader.clearHistory).toHaveBeenCalled()
     expect(await screen.findByText(/No downloads yet/)).toBeInTheDocument()
+  })
+
+  it('starts a conversion from a completed download', async () => {
+    window.mediaDownloader.listDownloads = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: [completedDownload()] })
+    window.mediaDownloader.startConversion = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: {} })
+
+    render(<DownloadsPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Convert' }))
+
+    expect(window.mediaDownloader.startConversion).toHaveBeenCalledWith({
+      type: 'convert',
+      videoCodec: 'h264',
+      audioCodec: 'copy',
+      input: 'C:\\Downloads\\video.mp4'
+    })
+  })
+
+  it('starts an audio extraction from a completed download', async () => {
+    window.mediaDownloader.listDownloads = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: [completedDownload()] })
+    window.mediaDownloader.startConversion = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: {} })
+
+    render(<DownloadsPage />)
+
+    const select = await screen.findByLabelText('Conversion format')
+    fireEvent.change(select, { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert' }))
+
+    expect(window.mediaDownloader.startConversion).toHaveBeenCalledWith({
+      type: 'extractAudio',
+      audioCodec: 'mp3',
+      input: 'C:\\Downloads\\video.mp4'
+    })
+  })
+
+  it('shows conversion progress and cancels it', async () => {
+    let listener: ((conversion: Conversion) => void) | undefined
+    window.mediaDownloader.listDownloads = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: [completedDownload()] })
+    window.mediaDownloader.onConversionStateChange = vi.fn((cb) => {
+      listener = cb
+      return () => undefined
+    })
+    window.mediaDownloader.cancelConversion = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: {} })
+
+    render(<DownloadsPage />)
+
+    await act(async () => {
+      listener?.({
+        id: 'cv-1',
+        type: 'extractAudio',
+        input: 'C:\\Downloads\\video.mp4',
+        output: 'C:\\Downloads\\video.mp3',
+        status: 'running',
+        progress: { processedMs: 0 },
+        createdAt: 2,
+        updatedAt: 2
+      })
+    })
+
+    expect(screen.getByText(/Converting…/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(window.mediaDownloader.cancelConversion).toHaveBeenCalledWith('cv-1')
+  })
+
+  it('shows the converted output and opens it', async () => {
+    let listener: ((conversion: Conversion) => void) | undefined
+    window.mediaDownloader.listDownloads = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: [completedDownload()] })
+    window.mediaDownloader.onConversionStateChange = vi.fn((cb) => {
+      listener = cb
+      return () => undefined
+    })
+    window.mediaDownloader.openFile = vi.fn().mockResolvedValue({ ok: true, data: undefined })
+
+    render(<DownloadsPage />)
+
+    await act(async () => {
+      listener?.({
+        id: 'cv-1',
+        type: 'extractAudio',
+        input: 'C:\\Downloads\\video.mp4',
+        output: 'C:\\Downloads\\video.mp3',
+        status: 'completed',
+        progress: { processedMs: 0 },
+        createdAt: 2,
+        updatedAt: 2
+      })
+    })
+
+    expect(screen.getByText(/Converted to video\.mp3/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open converted file' }))
+
+    expect(window.mediaDownloader.openFile).toHaveBeenCalledWith('C:\\Downloads\\video.mp3')
   })
 })

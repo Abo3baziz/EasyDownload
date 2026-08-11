@@ -1,6 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '../shared/constants/ipc'
-import type { Download } from '../shared/types/download'
 import type { PreloadApi } from '../shared/types/preload'
 
 const api: PreloadApi = {
@@ -23,12 +22,15 @@ const api: PreloadApi = {
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.settingsGet),
   updateSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.settingsUpdate, settings),
   getDependencies: () => ipcRenderer.invoke(IPC_CHANNELS.dependenciesGet),
-  onDownloadStateChange: (listener) => subscribe(IPC_CHANNELS.downloadStateEvent, listener)
+  startConversion: (options) => ipcRenderer.invoke(IPC_CHANNELS.conversionStart, options),
+  cancelConversion: (id) => ipcRenderer.invoke(IPC_CHANNELS.conversionCancel, { id }),
+  onDownloadStateChange: (listener) => subscribe(IPC_CHANNELS.downloadStateEvent, listener),
+  onConversionStateChange: (listener) => subscribe(IPC_CHANNELS.conversionStateEvent, listener)
 }
 
-function subscribe(channel: string, listener: (download: Download) => void): () => void {
-  const handler = (_event: Electron.IpcRendererEvent, download: Download): void => {
-    listener(download)
+function subscribe<T>(channel: string, listener: (data: T) => void): () => void {
+  const handler = (_event: Electron.IpcRendererEvent, data: T): void => {
+    listener(data)
   }
   ipcRenderer.on(channel, handler)
   return () => {
