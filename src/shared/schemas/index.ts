@@ -36,7 +36,21 @@ export const settingsSchema = z
   })
   .strict()
 
+export const videoCodecSchema = z.enum(['copy', 'h264', 'hevc', 'vp9'])
+
+export const audioCodecSchema = z.enum(['copy', 'mp3', 'aac', 'opus', 'flac', 'vorbis'])
+
+export const conversionStartSchema = z
+  .object({
+    type: z.enum(['convert', 'extractAudio']),
+    input: z.string().min(1),
+    videoCodec: videoCodecSchema.optional(),
+    audioCodec: audioCodecSchema.optional()
+  })
+  .strict()
+
 export type InspectUrlPayload = z.infer<typeof inspectUrlSchema>
 export type DownloadOptionsPayload = z.infer<typeof downloadOptionsSchema>
 export type IdPayload = z.infer<typeof idSchema>
 export type PathPayload = z.infer<typeof pathSchema>
+export type ConversionStartPayload = z.infer<typeof conversionStartSchema>

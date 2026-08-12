@@ -3,6 +3,8 @@ import { stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { AppSettings } from '../../shared/types/settings'
 import { DEFAULT_SETTINGS } from '../../shared/constants/defaults'
+import type { ConversionManager } from './conversion/conversion-manager'
+import { createConversionManager } from './conversion/conversion-manager'
 import type { DependencyManager } from './dependencies/dependency-manager'
 import { createDependencyManager } from './dependencies/dependency-manager'
 import type { DownloadManager } from './download/download-manager'
@@ -34,6 +36,7 @@ export interface Services {
   history: HistoryManager
   notifications: NotificationManager
   ffmpeg: FfmpegService
+  conversions: ConversionManager
 }
 
 export interface ServicesDeps {
@@ -82,6 +85,17 @@ export function createServices(deps: ServicesDeps): Services {
   })
   const ytDlp: YtDlpService = createYtDlpService({ processes, ytDlpCommand, ffmpegLocation })
   const ffmpeg: FfmpegService = createFfmpegService({ processes, ffmpegCommand })
+  const conversions = createConversionManager({
+    ffmpeg,
+    statFile: async (path) => {
+      try {
+        const info = await stat(path)
+        return { size: info.size }
+      } catch {
+        return undefined
+      }
+    }
+  })
   const media = createMediaService({ dependencies, ytDlp })
   const downloads = createDownloadManager({
     ytDlp,
@@ -105,6 +119,7 @@ export function createServices(deps: ServicesDeps): Services {
     settings,
     history,
     notifications,
-    ffmpeg
+    ffmpeg,
+    conversions
   }
 }

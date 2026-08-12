@@ -59,6 +59,7 @@ Cover:
 * Format normalization.
 * yt-dlp output parsing.
 * FFmpeg argument construction and progress parsing.
+* Conversion output path derivation.
 * Progress parsing.
 * Download state transitions.
 * Error mapping.
@@ -85,6 +86,7 @@ Cover:
 * Retry behavior (FR-014).
 * Settings persistence (FR-016).
 * Notification Manager behavior (FR-015).
+* Conversion Manager behavior (convert / audio extraction, progress, cancellation).
 
 External executables must be represented by test doubles.
 
