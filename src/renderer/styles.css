@@ -295,7 +295,38 @@ button:disabled {
   background: var(--bg-elevated);
 }
 
+.download-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.download-thumbnail {
+  width: 96px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+.download-thumbnail-fallback {
+  width: 96px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
 .download-main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -318,6 +349,30 @@ button:disabled {
   margin: 8px 0 0;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+.download-metadata {
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.download-metadata-item {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.download-metadata-item dt {
+  color: var(--text-muted);
+}
+
+.download-metadata-item dd {
+  margin: 0;
+  font-weight: 500;
 }
 
 .download-progress {

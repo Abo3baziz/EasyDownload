@@ -4,6 +4,13 @@
 
 ### Added
 
+- Downloaded video metadata and thumbnail persistence: the Download Manager now captures the video's thumbnail, duration, and selected-format metadata (resolution, extension, video/audio codecs, FPS) from the inspection result and stores them on the download record, so they are persisted to `history.json` with the terminal record. The Downloads page renders the persisted thumbnail (with a fallback box and graceful handling of load failures) and a metadata section (duration, resolution, format, codecs, FPS, download date) for completed downloads; legacy records without metadata render with fallbacks and remain fully functional.
+- New `formatDate` shared helper that formats download timestamps as `YYYY-MM-DD`.
+
+## 2026-08-12
+
+### Added
+
 - Download button state on the Home page: clicking Download immediately changes the format button to a disabled `Downloading` state that persists across page navigation, prevents duplicate download requests on rapid clicks, disables only the format whose download is in progress, and restores to `Download` when the download completes or fails. Download state is tracked per `(url, formatId)` in the existing `HomeStateProvider` via the download update stream.
 
 ## 2026-08-12

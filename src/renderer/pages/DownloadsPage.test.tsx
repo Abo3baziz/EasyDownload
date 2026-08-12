@@ -38,8 +38,15 @@ function completedDownload() {
     fileName: 'video.mp4',
     fileSize: 100 * 1048576,
     destination: 'C:\\Downloads\\video.mp4',
-    createdAt: 1,
-    updatedAt: 1
+    thumbnail: 'https://img.example.com/thumb.jpg',
+    duration: 754,
+    resolution: '1920x1080',
+    extension: 'mp4',
+    videoCodec: 'avc1.640028',
+    audioCodec: 'mp4a.40.2',
+    fps: 30,
+    createdAt: Date.UTC(2026, 7, 12),
+    updatedAt: Date.UTC(2026, 7, 12)
   }
 }
 
@@ -184,6 +191,90 @@ describe('DownloadsPage', () => {
     render(<DownloadsPage />)
 
     expect(await screen.findByText(/video\.mp4 · 100 MB/)).toBeInTheDocument()
+  })
+
+  it('shows the thumbnail and metadata for a completed download', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [completedDownload()]
+    })
+
+    render(<DownloadsPage />)
+
+    const image = await screen.findByRole('img', { name: 'Finished Video' })
+    expect(image).toHaveAttribute('src', 'https://img.example.com/thumb.jpg')
+    expect(screen.getByText('Duration')).toBeInTheDocument()
+    expect(screen.getByText('12:34')).toBeInTheDocument()
+    expect(screen.getByText('Resolution')).toBeInTheDocument()
+    expect(screen.getByText('1920x1080')).toBeInTheDocument()
+    expect(screen.getByText('Format')).toBeInTheDocument()
+    expect(screen.getByText('MP4')).toBeInTheDocument()
+    expect(screen.getByText('Video codec')).toBeInTheDocument()
+    expect(screen.getByText('avc1.640028')).toBeInTheDocument()
+    expect(screen.getByText('Audio codec')).toBeInTheDocument()
+    expect(screen.getByText('mp4a.40.2')).toBeInTheDocument()
+    expect(screen.getByText('FPS')).toBeInTheDocument()
+    expect(screen.getByText('30')).toBeInTheDocument()
+    expect(screen.getByText('Downloaded')).toBeInTheDocument()
+    expect(screen.getByText('2026-08-12')).toBeInTheDocument()
+  })
+
+  it('shows a fallback when a completed download has no thumbnail', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [{ ...completedDownload(), thumbnail: undefined }]
+    })
+
+    render(<DownloadsPage />)
+
+    expect(await screen.findByText('No thumbnail')).toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.getByText('Finished Video')).toBeInTheDocument()
+  })
+
+  it('hides the thumbnail when it fails to load', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [completedDownload()]
+    })
+
+    render(<DownloadsPage />)
+
+    const image = await screen.findByRole('img', { name: 'Finished Video' })
+    fireEvent.error(image)
+
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.getByText('No thumbnail')).toBeInTheDocument()
+  })
+
+  it('renders a completed download missing metadata and thumbnail', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'dl-3',
+          url: 'https://www.youtube.com/watch?v=abc',
+          title: 'Finished Video',
+          status: 'completed',
+          progress: { percent: 100 },
+          fileName: 'video.mp4',
+          fileSize: 100 * 1048576,
+          destination: 'C:\\Downloads\\video.mp4',
+          createdAt: Date.UTC(2026, 7, 12),
+          updatedAt: Date.UTC(2026, 7, 12)
+        }
+      ]
+    })
+
+    render(<DownloadsPage />)
+
+    expect(await screen.findByText('Finished Video')).toBeInTheDocument()
+    expect(screen.getByText(/video\.mp4 · 100 MB/)).toBeInTheDocument()
+    expect(screen.getByText('No thumbnail')).toBeInTheDocument()
+    expect(screen.getByText('Downloaded')).toBeInTheDocument()
+    expect(screen.getByText('2026-08-12')).toBeInTheDocument()
+    expect(screen.queryByText('Duration')).not.toBeInTheDocument()
+    expect(screen.queryByText('Resolution')).not.toBeInTheDocument()
   })
 
   it('clears the history and updates the list', async () => {

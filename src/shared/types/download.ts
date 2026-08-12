@@ -29,6 +29,13 @@ export interface Download {
   fileSize?: number
   destination?: string
   directory?: string
+  thumbnail?: string
+  duration?: number
+  resolution?: string
+  extension?: string
+  videoCodec?: string
+  audioCodec?: string
+  fps?: number
   createdAt: number
   updatedAt: number
 }

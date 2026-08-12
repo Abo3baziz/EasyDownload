@@ -396,6 +396,101 @@ describe('createDownloadManager', () => {
     ])
   })
 
+  it('captures and persists video metadata and thumbnail', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({
+      id: 'abc',
+      title: 'Example Video',
+      thumbnail: 'https://img.example.com/thumb.jpg',
+      duration: 754,
+      formats: [
+        {
+          format_id: '137',
+          vcodec: 'avc1.640028',
+          acodec: 'none',
+          ext: 'mp4',
+          width: 1920,
+          height: 1080,
+          fps: 30
+        }
+      ]
+    })
+    const { handle, completion } = downloadHandle({
+      exitCode: 0,
+      destination: 'D:\\Downloads\\Example [abc].mp4'
+    })
+    ytDlp.startDownload.mockReturnValue(handle)
+    const { history, save } = createMockHistory()
+    const manager = createDownloadManager({ ytDlp, history, generateId: () => 'dl-1' })
+    await manager.create(OPTIONS)
+
+    await manager.start('dl-1')
+    await flush()
+    completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\Example [abc].mp4'
+    })
+    await flush()
+    await flush()
+
+    const download = await manager.get('dl-1')
+    expect(download).toMatchObject({
+      title: 'Example Video',
+      thumbnail: 'https://img.example.com/thumb.jpg',
+      duration: 754,
+      resolution: '1920x1080',
+      extension: 'mp4',
+      videoCodec: 'avc1.640028',
+      audioCodec: undefined,
+      fps: 30
+    })
+    const persisted = save.mock.calls.at(-1)?.[0] as Download[]
+    expect(persisted[0]).toMatchObject({
+      thumbnail: 'https://img.example.com/thumb.jpg',
+      duration: 754,
+      resolution: '1920x1080',
+      extension: 'mp4',
+      videoCodec: 'avc1.640028',
+      fps: 30
+    })
+  })
+
+  it('captures audio metadata for an audio-only format', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({
+      id: 'abc',
+      title: 'Example Audio',
+      formats: [{ format_id: '18', vcodec: 'none', acodec: 'mp4a.40.2', ext: 'm4a' }]
+    })
+    const { handle, completion } = downloadHandle({
+      exitCode: 0,
+      destination: 'D:\\Downloads\\audio.m4a'
+    })
+    ytDlp.startDownload.mockReturnValue(handle)
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
+    await manager.create({ ...OPTIONS, formatId: '18' })
+
+    await manager.start('dl-1')
+    await flush()
+    completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\audio.m4a'
+    })
+    await flush()
+
+    const download = await manager.get('dl-1')
+    expect(download.extension).toBe('m4a')
+    expect(download.audioCodec).toBe('mp4a.40.2')
+    expect(download.videoCodec).toBeUndefined()
+    expect(download.resolution).toBeUndefined()
+  })
+
   it('loads persisted history into the job list on startup', async () => {
     const records = [terminalRecord()]
     const { history } = createMockHistory(records)

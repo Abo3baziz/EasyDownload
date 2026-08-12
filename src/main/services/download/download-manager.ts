@@ -5,7 +5,7 @@ import type { Download, DownloadOptions, DownloadStatus } from '../../../shared/
 import type { DependencyStatus } from '../../../shared/types/dependencies'
 import { AppError, toAppError } from '../../utils/errors'
 import type { HistoryManager } from '../history/history-manager'
-import { isRealCodec } from '../media/normalize'
+import { buildResolution, isRealCodec } from '../media/normalize'
 import type {
   DownloadMediaHandle,
   DownloadMediaOptions,
@@ -163,7 +163,13 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
         return
       }
       mediaOptions = buildDownloadMediaOptions(config, media)
-      update(id, { title: media.title, status: 'downloading' })
+      update(id, {
+        title: media.title,
+        thumbnail: media.thumbnail,
+        duration: media.duration,
+        ...formatMetadata(media, config.formatId),
+        status: 'downloading'
+      })
     } catch (err) {
       if (cancelRequests.has(id)) {
         finishCancelled(id)
@@ -382,4 +388,32 @@ function buildDownloadMediaOptions(
     }
   }
   return optionsPayload
+}
+
+function formatMetadata(
+  media: YtDlpMedia,
+  formatId: string
+): Pick<
+  Download,
+  'resolution' | 'extension' | 'videoCodec' | 'audioCodec' | 'fps'
+> {
+  const format = (media.formats ?? []).find(
+    (candidate) => candidate.format_id === formatId
+  )
+  if (!format) {
+    return {
+      resolution: undefined,
+      extension: undefined,
+      videoCodec: undefined,
+      audioCodec: undefined,
+      fps: undefined
+    }
+  }
+  return {
+    resolution: buildResolution(format),
+    extension: format.ext,
+    videoCodec: isRealCodec(format.vcodec) ? format.vcodec : undefined,
+    audioCodec: isRealCodec(format.acodec) ? format.acodec : undefined,
+    fps: format.fps
+  }
 }

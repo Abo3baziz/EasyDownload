@@ -82,7 +82,7 @@ function buildFormatLabel(format: YtDlpFormat, hasVideo: boolean, hasAudio: bool
   return ext ? `Unknown ${ext}` : 'Unknown'
 }
 
-function buildResolution(format: YtDlpFormat): string | undefined {
+export function buildResolution(format: YtDlpFormat): string | undefined {
   if (format.width && format.height) {
     return `${format.width}x${format.height}`
   }
