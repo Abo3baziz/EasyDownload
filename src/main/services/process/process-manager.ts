@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
+import { StringDecoder } from 'node:string_decoder'
 
 export interface RunOptions {
   args?: readonly string[]
@@ -32,6 +33,8 @@ export class ProcessManager {
   runToCompletion(command: string, options: RunOptions = {}): Promise<ProcessResult> {
     return new Promise((resolve, reject) => {
       const child = spawn(command, [...(options.args ?? [])], { windowsHide: true })
+      const stdoutDecoder = new StringDecoder('utf8')
+      const stderrDecoder = new StringDecoder('utf8')
       let stdout = ''
       let stderr = ''
       let settled = false
@@ -46,11 +49,11 @@ export class ProcessManager {
           : undefined
 
       child.stdout.on('data', (chunk: Buffer) => {
-        stdout += chunk.toString()
+        stdout += stdoutDecoder.write(chunk)
       })
 
       child.stderr.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString()
+        stderr += stderrDecoder.write(chunk)
       })
 
       child.on('error', (err: Error) => {
@@ -64,6 +67,8 @@ export class ProcessManager {
         if (settled) return
         settled = true
         if (timer) clearTimeout(timer)
+        stdout += stdoutDecoder.end()
+        stderr += stderrDecoder.end()
         resolve({ stdout, stderr, exitCode: code, timedOut })
       })
     })
@@ -85,6 +90,8 @@ export class ProcessManager {
     const child: ChildProcessWithoutNullStreams = spawn(command, [...(options.args ?? [])], {
       windowsHide: true
     })
+    const stdoutDecoder = new StringDecoder('utf8')
+    const stderrDecoder = new StringDecoder('utf8')
     let stdout = ''
     let stderr = ''
     let stdoutPending = ''
@@ -92,13 +99,13 @@ export class ProcessManager {
     let settled = false
 
     child.stdout.on('data', (chunk: Buffer) => {
-      const text = chunk.toString()
+      const text = stdoutDecoder.write(chunk)
       stdout += text
       stdoutPending = emitLines(stdoutPending, text, options.onStdout)
     })
 
     child.stderr.on('data', (chunk: Buffer) => {
-      const text = chunk.toString()
+      const text = stderrDecoder.write(chunk)
       stderr += text
       stderrPending = emitLines(stderrPending, text, options.onStderr)
     })
@@ -113,6 +120,12 @@ export class ProcessManager {
       child.on('close', (code: number | null) => {
         if (settled) return
         settled = true
+        const stdoutTail = stdoutDecoder.end()
+        const stderrTail = stderrDecoder.end()
+        stdout += stdoutTail
+        stderr += stderrTail
+        stdoutPending = emitLines(stdoutPending, stdoutTail, options.onStdout)
+        stderrPending = emitLines(stderrPending, stderrTail, options.onStderr)
         resolve({ stdout, stderr, exitCode: code, timedOut: false })
       })
     })
