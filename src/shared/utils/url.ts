@@ -9,3 +9,12 @@ export function isValidMediaUrl(value: string): boolean {
   }
   return SUPPORTED_PROTOCOLS.includes(parsed.protocol)
 }
+
+export function normalizeUrl(value: string): string {
+  const trimmed = value.trim()
+  try {
+    return new URL(trimmed).toString()
+  } catch {
+    return trimmed
+  }
+}

@@ -3,25 +3,27 @@ import type { AppError } from '../../shared/types/errors'
 import type { MediaFormat, MediaInfo } from '../../shared/types/media'
 import { formatBytes, formatDuration } from '../../shared/utils/format'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
+import { useHomeState } from '../state/homeState'
 
 export function HomePage() {
   const api = useMediaDownloader()
-  const [url, setUrl] = useState('')
+  const { url, setUrl, clearUrl, getInspection, setInspection } = useHomeState()
   const [busy, setBusy] = useState(false)
-  const [media, setMedia] = useState<MediaInfo | null>(null)
   const [error, setError] = useState<AppError | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [startingFormatId, setStartingFormatId] = useState<string | null>(null)
 
+  const media = url.trim() === '' ? null : (getInspection(url) ?? null)
+
   async function handleInspect() {
+    const targetUrl = url
     setBusy(true)
     setError(null)
-    setMedia(null)
     setNotice(null)
     try {
-      const result = await api.inspectUrl(url)
+      const result = await api.inspectUrl(targetUrl)
       if (result.ok) {
-        setMedia(result.data)
+        setInspection(targetUrl, result.data)
       } else {
         setError(result.error)
       }
@@ -93,6 +95,12 @@ export function HomePage() {
             type='submit'
             disabled={busy || url.trim() === ''}>
             {busy ? 'Inspecting…' : 'Inspect'}
+          </button>
+          <button
+            type='button'
+            disabled={busy || url.trim() === ''}
+            onClick={clearUrl}>
+            Clear
           </button>
         </div>
       </form>
