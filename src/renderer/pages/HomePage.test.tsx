@@ -162,6 +162,169 @@ describe('HomePage', () => {
     })
   })
 
+  it('shows the format button as disabled Downloading while the download is in progress', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
+      inspectResult({
+        id: 'abc',
+        title: 'Example Video',
+        website: 'www.youtube.com',
+        formats: [
+          { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
+        ]
+      })
+    )
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.startDownload = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'dl-1',
+        url: 'https://example.com/video-a',
+        formatId: '18',
+        status: 'queued',
+        progress: {},
+        createdAt: 1,
+        updatedAt: 1
+      }
+    })
+
+    await submitUrl('https://example.com/video-a')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }))
+
+    expect(await screen.findByRole('button', { name: 'Downloading' })).toBeDisabled()
+  })
+
+  it('does not trigger duplicate download requests on rapid clicks', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
+      inspectResult({
+        id: 'abc',
+        title: 'Example Video',
+        website: 'www.youtube.com',
+        formats: [
+          { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
+        ]
+      })
+    )
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.startDownload = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'dl-1',
+        url: 'https://example.com/video-a',
+        formatId: '18',
+        status: 'queued',
+        progress: {},
+        createdAt: 1,
+        updatedAt: 1
+      }
+    })
+
+    await submitUrl('https://example.com/video-a')
+
+    const button = await screen.findByRole('button', { name: 'Download' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+
+    await screen.findByRole('button', { name: 'Downloading' })
+    expect(window.mediaDownloader.startDownload).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables only the format whose download is in progress', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
+      inspectResult({
+        id: 'abc',
+        title: 'Example Video',
+        website: 'www.youtube.com',
+        formats: [
+          { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true },
+          { id: '137', label: '1080p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
+        ]
+      })
+    )
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.startDownload = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'dl-1',
+        url: 'https://example.com/video-a',
+        formatId: '18',
+        status: 'queued',
+        progress: {},
+        createdAt: 1,
+        updatedAt: 1
+      }
+    })
+
+    await submitUrl('https://example.com/video-a')
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Download' }))[0])
+
+    expect(screen.getByRole('button', { name: 'Downloading' })).toBeDisabled()
+    const remaining = screen.getAllByRole('button', { name: 'Download' })
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0]).toBeEnabled()
+  })
+
+  it('restores the Download button when the download completes', async () => {
+    let listener: ((download: import('../../shared/types/download').Download) => void) | undefined
+    window.mediaDownloader.onDownloadStateChange = vi.fn((callback) => {
+      listener = callback
+      return () => undefined
+    })
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
+      inspectResult({
+        id: 'abc',
+        title: 'Example Video',
+        website: 'www.youtube.com',
+        formats: [
+          { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
+        ]
+      })
+    )
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.startDownload = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'dl-1',
+        url: 'https://example.com/video-a',
+        formatId: '18',
+        status: 'queued',
+        progress: {},
+        createdAt: 1,
+        updatedAt: 1
+      }
+    })
+
+    await submitUrl('https://example.com/video-a')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }))
+    await screen.findByRole('button', { name: 'Downloading' })
+
+    listener?.({
+      id: 'dl-1',
+      url: 'https://example.com/video-a',
+      formatId: '18',
+      status: 'completed',
+      progress: {},
+      createdAt: 1,
+      updatedAt: 2
+    })
+
+    expect(await screen.findByRole('button', { name: 'Download' })).toBeEnabled()
+  })
+
   it('shows an error when starting a download fails', async () => {
     window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
       inspectResult({
@@ -187,6 +350,7 @@ describe('HomePage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Download' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('yt-dlp is not available.')
+    expect(screen.getByRole('button', { name: 'Download' })).toBeEnabled()
   })
 
   it('clears the URL input and the displayed inspection when Clear is clicked', async () => {

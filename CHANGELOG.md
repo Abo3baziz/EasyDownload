@@ -4,6 +4,12 @@
 
 ### Added
 
+- Download button state on the Home page: clicking Download immediately changes the format button to a disabled `Downloading` state that persists across page navigation, prevents duplicate download requests on rapid clicks, disables only the format whose download is in progress, and restores to `Download` when the download completes or fails. Download state is tracked per `(url, formatId)` in the existing `HomeStateProvider` via the download update stream.
+
+## 2026-08-12
+
+### Added
+
 - Home page state persistence: Home page state now lives in a renderer-level `HomeStateProvider` context mounted above the tab navigation, so the entered URL and inspection results survive navigating Home → Downloads → Home and Home → Settings → Home without re-inspecting the URL.
 - A new `Clear` button clears the current URL input and the active inspection view without deleting the cached inspection result; re-entering the same URL restores the previous metadata and formats, while entering a different URL never displays stale data.
 - Inspection results are cached per normalized URL (`Record<normalizedUrl, MediaInfo>`), so switching between previously inspected URLs restores each result; results are always associated with the URL that produced them.

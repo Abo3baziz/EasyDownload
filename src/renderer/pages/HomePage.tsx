@@ -7,11 +7,19 @@ import { useHomeState } from '../state/homeState'
 
 export function HomePage() {
   const api = useMediaDownloader()
-  const { url, setUrl, clearUrl, getInspection, setInspection } = useHomeState()
+  const {
+    url,
+    setUrl,
+    clearUrl,
+    getInspection,
+    setInspection,
+    isDownloading,
+    markDownloading,
+    unmarkDownloading
+  } = useHomeState()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<AppError | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [startingFormatId, setStartingFormatId] = useState<string | null>(null)
 
   const media = url.trim() === '' ? null : (getInspection(url) ?? null)
 
@@ -41,12 +49,15 @@ export function HomePage() {
     if (!media) {
       return
     }
-    setStartingFormatId(format.id)
+    if (!markDownloading(url, format.id)) {
+      return
+    }
     setError(null)
     setNotice(null)
     try {
       const settings = await api.getSettings()
       if (!settings.ok) {
+        unmarkDownloading(url, format.id)
         setError(settings.error)
         return
       }
@@ -58,15 +69,15 @@ export function HomePage() {
       if (result.ok) {
         setNotice('Download started. Track its progress on the Downloads page.')
       } else {
+        unmarkDownloading(url, format.id)
         setError(result.error)
       }
     } catch (err) {
+      unmarkDownloading(url, format.id)
       setError({
         code: 'UnknownError',
         message: err instanceof Error ? err.message : String(err),
       })
-    } finally {
-      setStartingFormatId(null)
     }
   }
 
@@ -124,7 +135,7 @@ export function HomePage() {
       {media && (
         <MediaDetails
           media={media}
-          startingFormatId={startingFormatId}
+          isFormatDownloading={(formatId) => isDownloading(url, formatId)}
           onDownload={(format) => void handleDownload(format)}
         />
       )}
@@ -134,11 +145,11 @@ export function HomePage() {
 
 function MediaDetails({
   media,
-  startingFormatId,
+  isFormatDownloading,
   onDownload,
 }: {
   media: MediaInfo
-  startingFormatId: string | null
+  isFormatDownloading: (formatId: string) => boolean
   onDownload: (format: MediaFormat) => void
 }) {
   const meta: string[] = []
@@ -170,28 +181,31 @@ function MediaDetails({
 
       <h3>Formats</h3>
       <ul className='format-list'>
-        {media.formats.map((format) => (
-          <li
-            key={format.id}
-            className='format-item'>
-            <div className='format-info'>
-              <span className='format-label'>{format.label}</span>
-              <span className='format-details'>
-                {format.hasVideo && format.resolution && <span>{format.resolution}</span>}
-                {format.videoCodec && <span>{format.videoCodec}</span>}
-                {format.audioCodec && <span>{format.audioCodec}</span>}
-                {format.filesize !== undefined && <span>{formatBytes(format.filesize)}</span>}
-              </span>
-            </div>
-            <button
-              type='button'
-              className='btn'
-              disabled={startingFormatId !== null}
-              onClick={() => onDownload(format)}>
-              {startingFormatId === format.id ? 'Starting…' : 'Download'}
-            </button>
-          </li>
-        ))}
+        {media.formats.map((format) => {
+          const downloading = isFormatDownloading(format.id)
+          return (
+            <li
+              key={format.id}
+              className='format-item'>
+              <div className='format-info'>
+                <span className='format-label'>{format.label}</span>
+                <span className='format-details'>
+                  {format.hasVideo && format.resolution && <span>{format.resolution}</span>}
+                  {format.videoCodec && <span>{format.videoCodec}</span>}
+                  {format.audioCodec && <span>{format.audioCodec}</span>}
+                  {format.filesize !== undefined && <span>{formatBytes(format.filesize)}</span>}
+                </span>
+              </div>
+              <button
+                type='button'
+                className='btn'
+                disabled={downloading}
+                onClick={() => onDownload(format)}>
+                {downloading ? 'Downloading' : 'Download'}
+              </button>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )
