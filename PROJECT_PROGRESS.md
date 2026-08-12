@@ -4,7 +4,7 @@
 
 **Phase:** Implementation — download workflow, history, notifications, FFmpeg service, and media conversion
 
-**Status:** Download execution implemented via the Download Manager (queue, progress, cancellation, retry); video-only formats merge best audio via yt-dlp/FFmpeg; download history persisted locally with clear-history support; desktop notifications implemented for download completion and failure, controlled by the notifications setting; conversion/audio-extraction feature implemented for completed downloads via the Conversion Manager and FFmpeg Service
+**Status:** Download execution implemented via the Download Manager (queue, progress, cancellation, retry); video-only formats merge best audio via yt-dlp/FFmpeg; download history persisted locally with clear-history support; desktop notifications implemented for download completion and failure, controlled by the notifications setting; conversion/audio-extraction feature implemented for completed downloads via the Conversion Manager and FFmpeg Service; Home page URL and inspection state persist across page navigation via a renderer-level state provider
 
 ## Completed
 
@@ -26,6 +26,7 @@
 - Desktop notifications (FR-015): Notification Manager observes the download update stream and, when enabled in settings, shows OS notifications for download completion and failure; notification behavior is isolated from the core download workflow.
 - Dedicated FFmpeg Service: reusable FFmpeg abstraction with merge, convert, and audio-extraction operations; safe argument construction, `-progress` parsing into normalized progress, cancellation support, and mapped application errors; wired into the main process service graph for future features while downloads continue to use yt-dlp's built-in merging.
 - Media conversion feature: Conversion Manager runs convert/audio-extraction operations on completed downloads via the FFmpeg Service, derives an output path next to the source (never overwriting it), verifies the source exists, and broadcasts `conversion:state` events; Downloads page offers MP4/WebM conversion and MP3/AAC/Opus/FLAC extraction with progress, cancel, and open-converted-file actions. Verified end-to-end against the bundled FFmpeg binary.
+- Home page state persistence: the Home page URL input and inspection results (metadata, thumbnail, formats) are held in a renderer-level `HomeStateProvider` context mounted above the tab navigation, so they survive Home → Downloads → Home and Home → Settings → Home without re-inspecting. Inspection results are cached per normalized URL (via a new shared `normalizeUrl` helper); `Clear` clears the current input/view but keeps the cache so re-entering the same URL restores it, entering a different URL never shows stale data, and switching between previously inspected URLs restores each result.
 
 ## Current Decisions
 
@@ -41,6 +42,7 @@
 - Desktop notifications (FR-015) are driven by the download update stream and isolated from the download workflow: the Download Manager is unaware of notifications, and notification failures are swallowed.
 - The FFmpeg Service exposes structured operations (merge, convert, extractAudio) with safe argument construction and `-progress` parsing; codecs are a small structured set rather than raw codec argument strings. Download merging remains delegated to yt-dlp post-processing.
 - Media conversions run through the FFmpeg Service via a Conversion Manager: the renderer sends only the source file and a structured operation, and the main process derives the output path, so conversions cannot write outside the source's directory or use raw codec argument strings.
+- Home page state is persisted in renderer memory via a React context (`HomeStateProvider`) rather than a new state-management library; inspection results are cached keyed by `normalizeUrl` (trim + `new URL(...).toString()`), a conservative normalization that never changes URL meaning. State survives page navigation but is intentionally not persisted across app restarts.
 - Architecture decisions are recorded as ADRs: Electron framework (ADR-003), local-first architecture (ADR-004), yt-dlp integration (ADR-005), FFmpeg integration (ADR-006), Electron security model (ADR-007), and Chrome extension integration constraints (ADR-008). ADR-008 remains Proposed pending the extension's communication-mechanism decision.
 
 ## Pending

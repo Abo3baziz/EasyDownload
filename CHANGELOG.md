@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-12
+
+### Added
+
+- Home page state persistence: Home page state now lives in a renderer-level `HomeStateProvider` context mounted above the tab navigation, so the entered URL and inspection results survive navigating Home → Downloads → Home and Home → Settings → Home without re-inspecting the URL.
+- A new `Clear` button clears the current URL input and the active inspection view without deleting the cached inspection result; re-entering the same URL restores the previous metadata and formats, while entering a different URL never displays stale data.
+- Inspection results are cached per normalized URL (`Record<normalizedUrl, MediaInfo>`), so switching between previously inspected URLs restores each result; results are always associated with the URL that produced them.
+- New `normalizeUrl` helper in `src/shared/utils/url.ts` (trim + `new URL(...).toString()` normalization of host/scheme case and root trailing slash) defines consistent URL comparison. Unit, renderer, and navigation tests added.
+
 ## 2026-08-11
 
 ### Added
