@@ -2,6 +2,12 @@
 
 ## 2026-08-12
 
+### Fixed
+
+- Non-ASCII download paths on Windows: yt-dlp writes its output (including the `[download] Destination:` path line and inspection JSON) in the Windows ANSI code page rather than UTF-8, so videos with Arabic (or other non-ASCII) titles recorded a garbled destination path that no longer matched the real file and "Open file" failed. Child processes are now forced to emit UTF-8 (`PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8`), and the Process Manager decodes streamed output with a `StringDecoder` so multi-byte characters split across chunks are not corrupted.
+
+## 2026-08-12
+
 ### Added
 
 - Converted audio persistence: completed audio extractions (MP3/AAC/Opus/FLAC) are now persisted to a new `conversions.json` file alongside download history, so they survive navigation, renderer reload, and app restart. The Conversion Manager lazy-loads and saves only completed `extractAudio` records (failed, cancelled, and video conversions are not persisted), captures the output file size on completion, and clears them through the existing `history:clear` flow. The Downloads page loads persisted conversions on mount and renders them inline under their source download with thumbnail, title, duration, format, file size, date, and an "Open audio file" action.

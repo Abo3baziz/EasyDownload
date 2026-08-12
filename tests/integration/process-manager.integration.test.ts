@@ -28,6 +28,22 @@ describe('ProcessManager.runToCompletion', () => {
     expect(result.stderr.trim()).toBe('boom')
   })
 
+  it('decodes non-ASCII stdout as UTF-8', async () => {
+    const result = await processes.runToCompletion(process.execPath, {
+      args: ['-e', 'console.log("مرحبا")']
+    })
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout.trim()).toBe('مرحبا')
+  })
+
+  it('forces child processes to emit UTF-8', async () => {
+    const result = await processes.runToCompletion(process.execPath, {
+      args: ['-e', 'console.log(process.env.PYTHONIOENCODING); console.log(process.env.PYTHONUTF8)']
+    })
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout.split(/\r?\n/).filter(Boolean)).toEqual(['utf-8', '1'])
+  })
+
   it('times out long-running processes', async () => {
     const result = await processes.runToCompletion(process.execPath, {
       args: ['-e', 'setTimeout(() => {}, 60_000)'],
@@ -62,6 +78,18 @@ describe('ProcessManager.startStreaming', () => {
     const result = await started.result
     expect(result.exitCode).toBe(0)
     expect(stderr).toEqual(['boom'])
+  })
+
+  it('decodes non-ASCII streamed lines as UTF-8', async () => {
+    const lines: string[] = []
+    const started = processes.startStreaming(process.execPath, {
+      args: ['-e', 'console.log("مرحبا"); console.log("مرحبا")'],
+      onStdout: (line) => lines.push(line)
+    })
+
+    const result = await started.result
+    expect(result.exitCode).toBe(0)
+    expect(lines).toEqual(['مرحبا', 'مرحبا'])
   })
 
   it('kills the process when kill is called', async () => {
