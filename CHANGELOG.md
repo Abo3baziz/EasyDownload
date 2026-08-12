@@ -2,6 +2,12 @@
 
 ## 2026-08-12
 
+### Infrastructure
+
+- GitHub Actions release workflow (`.github/workflows/release.yml`): when a semantic version tag (e.g. `v0.1.0`) is pushed, a `windows-latest` job checks out the repo, sets up Node.js 22 with npm dependency caching, installs dependencies from the lockfile (`npm ci`), verifies the tag matches the `package.json` version (failing with a clear message otherwise, since the installer version comes from `package.json`), runs typecheck and tests, packages the Windows x64 installer via the existing `npm run dist:win` script, verifies the installer exists, and creates a normal (non-draft, non-prerelease) GitHub Release with auto-generated release notes, uploading only the `EasyDownload Setup <version>.exe` installer. The workflow uses the repository `GITHUB_TOKEN` with `contents: write` permissions; no secrets are required. The design keeps the packaging step isolated so macOS/Linux can be added later.
+
+## 2026-08-12
+
 ### Fixed
 
 - Non-ASCII download paths on Windows: yt-dlp writes its streaming output (including the `[download] Destination:` path line) in the Windows ANSI code page rather than UTF-8, so videos with Arabic (or other non-ASCII) titles recorded a garbled destination path that no longer matched the real file and "Open file" failed. yt-dlp is now invoked with `--encoding utf-8` so its output is always UTF-8, and the Process Manager decodes streamed output with a `StringDecoder` so multi-byte characters split across chunks are not corrupted.

@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and release Windows installer
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify version tag matches package.json
+        run: |
+          node -e "const p=require('./package.json');const tag=process.env.GITHUB_REF_NAME;const expected='v'+p.version;if(tag!==expected){console.error('Tag '+tag+' does not match package.json version '+expected);process.exit(1)}console.log('Version verified: '+p.version)"
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build and package Windows installer
+        run: npm run dist:win
+
+      - name: Verify installer exists
+        run: |
+          node -e "const fs=require('fs');const files=fs.readdirSync('dist').filter(f=>f.endsWith('.exe'));if(files.length===0){console.error('No Windows installer found in dist/');process.exit(1)}console.log('Installer found: '+files.join(', '))"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: false
