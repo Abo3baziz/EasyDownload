@@ -28,3 +28,10 @@ export function formatBytes(bytes?: number): string {
   const rounded = value >= 100 ? Math.round(value) : Math.round(value * 10) / 10
   return `${rounded} ${units[unitIndex]}`
 }
+
+export function formatDate(timestamp?: number): string {
+  if (timestamp === undefined || Number.isNaN(timestamp) || timestamp < 0) {
+    return ''
+  }
+  return new Date(timestamp).toISOString().slice(0, 10)
+}

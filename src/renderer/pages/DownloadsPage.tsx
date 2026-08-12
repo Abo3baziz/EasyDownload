@@ -6,7 +6,7 @@ import { ConversionControl } from '../components/ConversionControl'
 import { EmptyState } from '../components/EmptyState'
 import { StatusBadge } from '../components/StatusBadge'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
-import { formatBytes, formatDuration } from '../../shared/utils/format'
+import { formatBytes, formatDate, formatDuration } from '../../shared/utils/format'
 
 export function DownloadsPage() {
   const api = useMediaDownloader()
@@ -155,9 +155,12 @@ export function DownloadsPage() {
           const conversion = latestConversionFor(conversions, download.destination)
           return (
             <li key={download.id} className="download-item">
-              <div className="download-main">
-                <span className="download-title">{download.title ?? download.url}</span>
-                <StatusBadge status={download.status} />
+              <div className="download-header">
+                <DownloadThumbnail download={download} />
+                <div className="download-main">
+                  <span className="download-title">{download.title ?? download.url}</span>
+                  <StatusBadge status={download.status} />
+                </div>
               </div>
               <DownloadProgressBar download={download} />
               {download.status === 'completed' &&
@@ -167,6 +170,7 @@ export function DownloadsPage() {
                     {download.fileName} · {formatBytes(download.fileSize)}
                   </p>
                 )}
+              <DownloadMetadata download={download} />
               {download.error && (
                 <p className="download-error">
                   {download.error.code}: {download.error.message}
@@ -227,6 +231,73 @@ function latestConversionFor(
   return Object.values(conversions)
     .filter((conversion) => conversion.input === input)
     .sort((a, b) => b.createdAt - a.createdAt)[0]
+}
+
+function DownloadThumbnail({ download }: { download: Download }) {
+  const [failed, setFailed] = useState(false)
+  if (download.status !== 'completed') {
+    return null
+  }
+  if (failed || !download.thumbnail) {
+    return (
+      <div className="download-thumbnail-fallback" aria-hidden="true">
+        No thumbnail
+      </div>
+    )
+  }
+  return (
+    <img
+      className="download-thumbnail"
+      src={download.thumbnail}
+      alt={download.title ?? 'Video thumbnail'}
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
+function DownloadMetadata({ download }: { download: Download }) {
+  if (download.status !== 'completed') {
+    return null
+  }
+  const items: Array<{ label: string; value: string }> = []
+  if (download.duration !== undefined) {
+    const duration = formatDuration(download.duration)
+    if (duration) {
+      items.push({ label: 'Duration', value: duration })
+    }
+  }
+  if (download.resolution) {
+    items.push({ label: 'Resolution', value: download.resolution })
+  }
+  if (download.extension) {
+    items.push({ label: 'Format', value: download.extension.toUpperCase() })
+  }
+  if (download.videoCodec) {
+    items.push({ label: 'Video codec', value: download.videoCodec })
+  }
+  if (download.audioCodec) {
+    items.push({ label: 'Audio codec', value: download.audioCodec })
+  }
+  if (download.fps !== undefined) {
+    items.push({ label: 'FPS', value: String(download.fps) })
+  }
+  const downloaded = formatDate(download.createdAt)
+  if (downloaded) {
+    items.push({ label: 'Downloaded', value: downloaded })
+  }
+  if (items.length === 0) {
+    return null
+  }
+  return (
+    <dl className="download-metadata">
+      {items.map((item) => (
+        <div key={item.label} className="download-metadata-item">
+          <dt>{item.label}</dt>
+          <dd>{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
 }
 
 function DownloadProgressBar({ download }: { download: Download }) {
