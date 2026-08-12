@@ -3,17 +3,20 @@ import { basename, dirname, extname, join } from 'node:path'
 import type { Conversion, ConversionStartOptions } from '../../../shared/types/conversion'
 import { AppError, toAppError } from '../../utils/errors'
 import type { FfmpegHandle, FfmpegService } from '../ffmpeg/ffmpeg-service'
+import type { JsonStore } from '../history/json-store'
 
 export interface ConversionManager {
   start(options: ConversionStartOptions): Promise<Conversion>
   cancel(id: string): Promise<Conversion>
-  list(): Conversion[]
+  list(): Promise<Conversion[]>
+  clearHistory(): Promise<Conversion[]>
   onUpdate(listener: (conversion: Conversion) => void): () => void
 }
 
 export interface ConversionManagerOptions {
   ffmpeg: FfmpegService
   statFile?: (path: string) => Promise<{ size: number } | undefined>
+  history?: JsonStore<Conversion>
   now?: () => number
   generateId?: () => string
 }
@@ -24,11 +27,50 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
   const conversions = new Map<string, Conversion>()
   const handles = new Map<string, FfmpegHandle>()
   const listeners = new Set<(conversion: Conversion) => void>()
+  let historyLoaded = false
+  let loadingHistory: Promise<void> | undefined
+  let persistChain: Promise<void> = Promise.resolve()
 
   function emit(conversion: Conversion): void {
     for (const listener of listeners) {
       listener(conversion)
     }
+  }
+
+  function ensureLoaded(): Promise<void> {
+    if (!options.history || historyLoaded) {
+      return Promise.resolve()
+    }
+    if (!loadingHistory) {
+      loadingHistory = options.history
+        .load()
+        .then((records) => {
+          for (const record of records) {
+            if (!conversions.has(record.id)) {
+              conversions.set(record.id, record)
+            }
+          }
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          historyLoaded = true
+        })
+    }
+    return loadingHistory
+  }
+
+  function persistHistory(): Promise<void> {
+    if (!options.history) {
+      return Promise.resolve()
+    }
+    const records = [...conversions.values()].filter(
+      (conversion) => conversion.type === 'extractAudio' && conversion.status === 'completed'
+    )
+    persistChain = persistChain
+      .catch(() => undefined)
+      .then(() => options.history?.save(records))
+      .catch(() => undefined)
+    return persistChain
   }
 
   function update(id: string, changes: Partial<Conversion>): Conversion {
@@ -39,6 +81,9 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
     const updated: Conversion = { ...conversion, ...changes, updatedAt: now() }
     conversions.set(id, updated)
     emit(updated)
+    if (updated.status === 'completed' && updated.type === 'extractAudio') {
+      void persistHistory()
+    }
     return updated
   }
 
@@ -48,6 +93,17 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       throw new AppError('DownloadError', 'The conversion was not found.')
     }
     return conversion
+  }
+
+  async function readOutputFileSize(output: string): Promise<number | undefined> {
+    if (!options.statFile) {
+      return undefined
+    }
+    try {
+      return (await options.statFile(output))?.size
+    } catch {
+      return undefined
+    }
   }
 
   async function run(
@@ -81,7 +137,12 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       if (result.cancelled) {
         update(conversion.id, { status: 'cancelled' })
       } else {
-        update(conversion.id, { status: 'completed', progress: { processedMs: 0 } })
+        const fileSize = await readOutputFileSize(conversion.output)
+        update(conversion.id, {
+          status: 'completed',
+          progress: { processedMs: 0 },
+          fileSize
+        })
       }
     } catch (err) {
       update(conversion.id, { status: 'failed', error: toAppError(err).toPayload() })
@@ -92,6 +153,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
 
   return {
     async start(startOptions: ConversionStartOptions): Promise<Conversion> {
+      await ensureLoaded()
       if (options.statFile) {
         const info = await options.statFile(startOptions.input).catch(() => undefined)
         if (!info) {
@@ -106,6 +168,9 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
         output,
         status: 'running',
         progress: { processedMs: 0 },
+        title: startOptions.title,
+        thumbnail: startOptions.thumbnail,
+        duration: startOptions.duration,
         createdAt: now(),
         updatedAt: now()
       }
@@ -116,6 +181,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
     },
 
     async cancel(id: string): Promise<Conversion> {
+      await ensureLoaded()
       const conversion = getOrThrow(id)
       if (conversion.status !== 'running') {
         throw new AppError(
@@ -130,7 +196,19 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       return conversion
     },
 
-    list(): Conversion[] {
+    async list(): Promise<Conversion[]> {
+      await ensureLoaded()
+      return [...conversions.values()]
+    },
+
+    async clearHistory(): Promise<Conversion[]> {
+      await ensureLoaded()
+      for (const [id, conversion] of conversions) {
+        if (conversion.type === 'extractAudio' && conversion.status === 'completed') {
+          conversions.delete(id)
+        }
+      }
+      await persistHistory()
       return [...conversions.values()]
     },
 

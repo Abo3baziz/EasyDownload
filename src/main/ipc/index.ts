@@ -33,9 +33,11 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.downloadList, undefined, () =>
     services.downloads.list()
   )
-  registerIpcHandler(ipcMain, IPC_CHANNELS.historyClear, undefined, () =>
-    services.downloads.clearHistory()
-  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.historyClear, undefined, async () => {
+    const downloads = await services.downloads.clearHistory()
+    await services.conversions.clearHistory()
+    return downloads
+  })
   registerIpcHandler(ipcMain, IPC_CHANNELS.dialogSelectDirectory, undefined, () =>
     services.files.selectDirectory()
   )
@@ -57,6 +59,9 @@ export function registerIpc(services: Services): void {
   )
   registerIpcHandler(ipcMain, IPC_CHANNELS.conversionCancel, idSchema, ({ id }) =>
     services.conversions.cancel(id)
+  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.conversionList, undefined, () =>
+    services.conversions.list()
   )
 
   services.downloads.onUpdate((download) => {

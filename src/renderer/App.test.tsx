@@ -25,6 +25,7 @@ function createApiMock(): PreloadApi {
     getDependencies: vi.fn(),
     startConversion: vi.fn(),
     cancelConversion: vi.fn(),
+    listConversions: vi.fn().mockResolvedValue({ ok: true, data: [] }),
     onDownloadStateChange: vi.fn(() => () => undefined),
     onConversionStateChange: vi.fn(() => () => undefined)
   }

@@ -1,6 +1,7 @@
 import { Notification } from 'electron'
 import { stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import type { Conversion } from '../../shared/types/conversion'
 import type { AppSettings } from '../../shared/types/settings'
 import { DEFAULT_SETTINGS } from '../../shared/constants/defaults'
 import type { ConversionManager } from './conversion/conversion-manager'
@@ -16,6 +17,7 @@ import type { FileManager } from './filesystem/file-manager'
 import { createFileManager } from './filesystem/file-manager'
 import type { HistoryManager } from './history/history-manager'
 import { createHistoryManager } from './history/history-manager'
+import { createJsonStore } from './history/json-store'
 import type { MediaService } from './media/media-service'
 import { createMediaService } from './media/media-service'
 import type { NotificationManager } from './notifications/notification-manager'
@@ -76,6 +78,10 @@ export function createServices(deps: ServicesDeps): Services {
   }
   const settings = createSettingsManager({ dir: deps.userDataDir, defaults: settingsDefaults })
   const history = createHistoryManager({ dir: deps.userDataDir })
+  const conversionHistory = createJsonStore<Conversion>({
+    dir: deps.userDataDir,
+    fileName: 'conversions.json'
+  })
   const notifications = createNotificationManager({
     isSupported: () => Notification.isSupported(),
     getSettings: () => settings.load(),
@@ -87,6 +93,7 @@ export function createServices(deps: ServicesDeps): Services {
   const ffmpeg: FfmpegService = createFfmpegService({ processes, ffmpegCommand })
   const conversions = createConversionManager({
     ffmpeg,
+    history: conversionHistory,
     statFile: async (path) => {
       try {
         const info = await stat(path)

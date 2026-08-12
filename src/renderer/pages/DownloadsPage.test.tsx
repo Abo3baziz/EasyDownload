@@ -23,6 +23,7 @@ function createApiMock(): PreloadApi {
     getDependencies: vi.fn(),
     startConversion: vi.fn(),
     cancelConversion: vi.fn(),
+    listConversions: vi.fn().mockResolvedValue({ ok: true, data: [] }),
     onDownloadStateChange: vi.fn(() => () => undefined),
     onConversionStateChange: vi.fn(() => () => undefined)
   }
@@ -318,7 +319,10 @@ describe('DownloadsPage', () => {
       type: 'convert',
       videoCodec: 'h264',
       audioCodec: 'copy',
-      input: 'C:\\Downloads\\video.mp4'
+      input: 'C:\\Downloads\\video.mp4',
+      title: 'Finished Video',
+      thumbnail: 'https://img.example.com/thumb.jpg',
+      duration: 754
     })
   })
 
@@ -339,7 +343,10 @@ describe('DownloadsPage', () => {
     expect(window.mediaDownloader.startConversion).toHaveBeenCalledWith({
       type: 'extractAudio',
       audioCodec: 'mp3',
-      input: 'C:\\Downloads\\video.mp4'
+      input: 'C:\\Downloads\\video.mp4',
+      title: 'Finished Video',
+      thumbnail: 'https://img.example.com/thumb.jpg',
+      duration: 754
     })
   })
 
@@ -378,7 +385,7 @@ describe('DownloadsPage', () => {
     expect(window.mediaDownloader.cancelConversion).toHaveBeenCalledWith('cv-1')
   })
 
-  it('shows the converted output and opens it', async () => {
+  it('shows the converted audio output and opens it', async () => {
     let listener: ((conversion: Conversion) => void) | undefined
     window.mediaDownloader.listDownloads = vi
       .fn()
@@ -399,14 +406,64 @@ describe('DownloadsPage', () => {
         output: 'C:\\Downloads\\video.mp3',
         status: 'completed',
         progress: { processedMs: 0 },
+        title: 'Finished Video',
+        thumbnail: 'https://img.example.com/thumb.jpg',
+        duration: 754,
+        fileSize: 5 * 1048576,
         createdAt: 2,
         updatedAt: 2
       })
     })
 
-    expect(screen.getByText(/Converted to video\.mp3/)).toBeInTheDocument()
+    expect(screen.getByText('Converted audio')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Converted audio thumbnail' })).toHaveAttribute(
+      'src',
+      'https://img.example.com/thumb.jpg'
+    )
+    expect(screen.getByText('MP3')).toBeInTheDocument()
+    expect(screen.getByText('5 MB')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open converted file' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open audio file' }))
+
+    expect(window.mediaDownloader.openFile).toHaveBeenCalledWith('C:\\Downloads\\video.mp3')
+  })
+
+  it('restores persisted converted audio under its source download', async () => {
+    window.mediaDownloader.listDownloads = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: [completedDownload()] })
+    window.mediaDownloader.listConversions = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'cv-1',
+          type: 'extractAudio',
+          input: 'C:\\Downloads\\video.mp4',
+          output: 'C:\\Downloads\\video.mp3',
+          status: 'completed',
+          progress: { processedMs: 0 },
+          title: 'Finished Video',
+          thumbnail: 'https://img.example.com/thumb.jpg',
+          duration: 754,
+          fileSize: 5 * 1048576,
+          createdAt: Date.UTC(2026, 7, 12),
+          updatedAt: Date.UTC(2026, 7, 12)
+        }
+      ]
+    })
+    window.mediaDownloader.openFile = vi.fn().mockResolvedValue({ ok: true, data: undefined })
+
+    render(<DownloadsPage />)
+
+    expect(await screen.findByText('Converted audio')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Converted audio thumbnail' })).toHaveAttribute(
+      'src',
+      'https://img.example.com/thumb.jpg'
+    )
+    expect(screen.getByText('MP3')).toBeInTheDocument()
+    expect(screen.getAllByText('2026-08-12').length).toBeGreaterThanOrEqual(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open audio file' }))
 
     expect(window.mediaDownloader.openFile).toHaveBeenCalledWith('C:\\Downloads\\video.mp3')
   })

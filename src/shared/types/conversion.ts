@@ -18,6 +18,10 @@ export interface Conversion {
   status: ConversionStatus
   progress: ConversionProgress
   error?: AppError
+  title?: string
+  thumbnail?: string
+  duration?: number
+  fileSize?: number
   createdAt: number
   updatedAt: number
 }
@@ -27,4 +31,7 @@ export interface ConversionStartOptions {
   input: string
   videoCodec?: VideoCodec
   audioCodec?: AudioCodec
+  title?: string
+  thumbnail?: string
+  duration?: number
 }
