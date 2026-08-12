@@ -114,4 +114,52 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Example Video' })).toBeInTheDocument()
     expect(screen.getByText('360p MP4')).toBeInTheDocument()
   })
+
+  it('keeps the format button in Downloading state when navigating away and back', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'abc',
+        title: 'Example Video',
+        website: 'www.example.com',
+        formats: [
+          { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
+        ]
+      }
+    })
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.startDownload = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'dl-1',
+        url: 'https://example.com/video-a',
+        formatId: '18',
+        status: 'queued',
+        progress: {},
+        createdAt: 1,
+        updatedAt: 1
+      }
+    })
+
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('Media URL'), {
+      target: { value: 'https://example.com/video-a' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect' }))
+    await screen.findByRole('heading', { name: 'Example Video' })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }))
+    await screen.findByRole('button', { name: 'Downloading' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Downloads' }))
+    expect(screen.getByRole('heading', { name: 'Downloads' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }))
+
+    expect(screen.getByRole('button', { name: 'Downloading' })).toBeDisabled()
+  })
 })
