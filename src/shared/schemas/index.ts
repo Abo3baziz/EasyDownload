@@ -45,7 +45,10 @@ export const conversionStartSchema = z
     type: z.enum(['convert', 'extractAudio']),
     input: z.string().min(1),
     videoCodec: videoCodecSchema.optional(),
-    audioCodec: audioCodecSchema.optional()
+    audioCodec: audioCodecSchema.optional(),
+    title: z.string().optional(),
+    thumbnail: z.string().optional(),
+    duration: z.number().optional()
   })
   .strict()
 

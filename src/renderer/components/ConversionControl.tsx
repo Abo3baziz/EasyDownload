@@ -33,15 +33,9 @@ interface ConversionControlProps {
   conversion?: Conversion
   onStart: (options: Omit<ConversionStartOptions, 'input'>) => void
   onCancel: (id: string) => void
-  onOpen: (path: string) => void
 }
 
-export function ConversionControl({
-  conversion,
-  onStart,
-  onCancel,
-  onOpen
-}: ConversionControlProps) {
+export function ConversionControl({ conversion, onStart, onCancel }: ConversionControlProps) {
   const [selected, setSelected] = useState(0)
 
   if (conversion?.status === 'running') {
@@ -62,14 +56,6 @@ export function ConversionControl({
     <div className="conversion-control">
       {conversion && (
         <div className="conversion-result">
-          {conversion.status === 'completed' && (
-            <>
-              <span className="download-meta">Converted to {fileName(conversion.output)}</span>
-              <button type="button" className="btn" onClick={() => onOpen(conversion.output)}>
-                Open converted file
-              </button>
-            </>
-          )}
           {conversion.status === 'failed' && (
             <span className="download-error">
               {conversion.error?.code}: {conversion.error?.message}
@@ -102,10 +88,4 @@ export function ConversionControl({
       </div>
     </div>
   )
-}
-
-function fileName(path: string): string {
-  const normalized = path.replace(/\\/g, '/')
-  const index = normalized.lastIndexOf('/')
-  return index === -1 ? path : normalized.slice(index + 1)
 }

@@ -16,6 +16,7 @@ export const IPC_CHANNELS = {
   downloadStateEvent: 'download:state',
   conversionStart: 'conversion:start',
   conversionCancel: 'conversion:cancel',
+  conversionList: 'conversion:list',
   conversionStateEvent: 'conversion:state'
 } as const
 

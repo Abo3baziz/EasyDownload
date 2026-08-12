@@ -375,6 +375,50 @@ button:disabled {
   font-weight: 500;
 }
 
+.converted-list {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.converted-list-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.converted-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.converted-item .download-thumbnail,
+.converted-item .download-thumbnail-fallback {
+  width: 64px;
+  height: 36px;
+}
+
+.converted-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.converted-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .download-progress {
   margin-top: 8px;
   display: flex;

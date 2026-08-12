@@ -22,6 +22,7 @@ export interface PreloadApi {
   getDependencies(): Promise<IpcResult<DependencyStatus[]>>
   startConversion(options: ConversionStartOptions): Promise<IpcResult<Conversion>>
   cancelConversion(id: string): Promise<IpcResult<Conversion>>
+  listConversions(): Promise<IpcResult<Conversion[]>>
   onDownloadStateChange(listener: (download: Download) => void): () => void
   onConversionStateChange(listener: (conversion: Conversion) => void): () => void
 }

@@ -24,6 +24,7 @@ const api: PreloadApi = {
   getDependencies: () => ipcRenderer.invoke(IPC_CHANNELS.dependenciesGet),
   startConversion: (options) => ipcRenderer.invoke(IPC_CHANNELS.conversionStart, options),
   cancelConversion: (id) => ipcRenderer.invoke(IPC_CHANNELS.conversionCancel, { id }),
+  listConversions: () => ipcRenderer.invoke(IPC_CHANNELS.conversionList),
   onDownloadStateChange: (listener) => subscribe(IPC_CHANNELS.downloadStateEvent, listener),
   onConversionStateChange: (listener) => subscribe(IPC_CHANNELS.conversionStateEvent, listener)
 }

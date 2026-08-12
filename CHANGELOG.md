@@ -4,6 +4,15 @@
 
 ### Added
 
+- Converted audio persistence: completed audio extractions (MP3/AAC/Opus/FLAC) are now persisted to a new `conversions.json` file alongside download history, so they survive navigation, renderer reload, and app restart. The Conversion Manager lazy-loads and saves only completed `extractAudio` records (failed, cancelled, and video conversions are not persisted), captures the output file size on completion, and clears them through the existing `history:clear` flow. The Downloads page loads persisted conversions on mount and renders them inline under their source download with thumbnail, title, duration, format, file size, date, and an "Open audio file" action.
+- New `conversion:list` IPC channel and renderer `listConversions` API.
+- Reusable `createJsonStore<T>` persistence helper in the main process; the History Manager now delegates its load/save logic to it.
+- Source metadata (title, thumbnail, duration) is passed from the Downloads page when starting an audio extraction, so persisted converted-audio records display correctly.
+
+## 2026-08-12
+
+### Added
+
 - Downloaded video metadata and thumbnail persistence: the Download Manager now captures the video's thumbnail, duration, and selected-format metadata (resolution, extension, video/audio codecs, FPS) from the inspection result and stores them on the download record, so they are persisted to `history.json` with the terminal record. The Downloads page renders the persisted thumbnail (with a fallback box and graceful handling of load failures) and a metadata section (duration, resolution, format, codecs, FPS, download date) for completed downloads; legacy records without metadata render with fallbacks and remain fully functional.
 - New `formatDate` shared helper that formats download timestamps as `YYYY-MM-DD`.
 

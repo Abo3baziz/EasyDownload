@@ -19,12 +19,24 @@ export function DownloadsPage() {
     let cancelled = false
     void (async () => {
       try {
-        const result = await api.listDownloads()
+        const [downloadResult, conversionResult] = await Promise.all([
+          api.listDownloads(),
+          api.listConversions()
+        ])
         if (cancelled) return
-        if (result.ok) {
-          setDownloads(result.data)
+        if (downloadResult.ok) {
+          setDownloads(downloadResult.data)
         } else {
-          setError(result.error)
+          setError(downloadResult.error)
+        }
+        if (conversionResult.ok) {
+          setConversions((previous) => {
+            const next = { ...previous }
+            for (const conversion of conversionResult.data) {
+              next[conversion.id] = conversion
+            }
+            return next
+          })
         }
       } catch (err) {
         if (cancelled) return
@@ -87,7 +99,13 @@ export function DownloadsPage() {
     options: Omit<ConversionStartOptions, 'input'>
   ) {
     if (!download.destination) return
-    const result = await api.startConversion({ ...options, input: download.destination })
+    const result = await api.startConversion({
+      ...options,
+      input: download.destination,
+      title: download.title,
+      thumbnail: download.thumbnail,
+      duration: download.duration
+    })
     if (!result.ok) {
       setError(result.error)
     }
@@ -114,6 +132,7 @@ export function DownloadsPage() {
       return
     }
     setDownloads(result.data)
+    setConversions({})
   }
 
   if (error) {
@@ -206,11 +225,17 @@ export function DownloadsPage() {
                 )}
               </div>
               {download.status === 'completed' && download.destination && (
+                <ConvertedAudioList
+                  conversions={conversions}
+                  source={download.destination}
+                  onOpen={(path) => void handleOpenConversion(path)}
+                />
+              )}
+              {download.status === 'completed' && download.destination && (
                 <ConversionControl
                   conversion={conversion}
                   onStart={(options) => void handleStartConversion(download, options)}
                   onCancel={(id) => void handleCancelConversion(id)}
-                  onOpen={(path) => void handleOpenConversion(path)}
                 />
               )}
             </li>
@@ -234,11 +259,15 @@ function latestConversionFor(
 }
 
 function DownloadThumbnail({ download }: { download: Download }) {
-  const [failed, setFailed] = useState(false)
   if (download.status !== 'completed') {
     return null
   }
-  if (failed || !download.thumbnail) {
+  return <MediaThumbnail src={download.thumbnail} alt={download.title ?? 'Video thumbnail'} />
+}
+
+function MediaThumbnail({ src, alt }: { src?: string; alt: string }) {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) {
     return (
       <div className="download-thumbnail-fallback" aria-hidden="true">
         No thumbnail
@@ -248,11 +277,65 @@ function DownloadThumbnail({ download }: { download: Download }) {
   return (
     <img
       className="download-thumbnail"
-      src={download.thumbnail}
-      alt={download.title ?? 'Video thumbnail'}
+      src={src}
+      alt={alt}
       onError={() => setFailed(true)}
     />
   )
+}
+
+function ConvertedAudioList({
+  conversions,
+  source,
+  onOpen
+}: {
+  conversions: Record<string, Conversion>
+  source: string
+  onOpen: (path: string) => void
+}) {
+  const items = Object.values(conversions)
+    .filter(
+      (conversion) =>
+        conversion.type === 'extractAudio' &&
+        conversion.status === 'completed' &&
+        conversion.input === source
+    )
+    .sort((a, b) => b.createdAt - a.createdAt)
+  if (items.length === 0) {
+    return null
+  }
+  return (
+    <div className="converted-list">
+      <span className="converted-list-label">Converted audio</span>
+      {items.map((item) => (
+        <div key={item.id} className="converted-item">
+          <MediaThumbnail src={item.thumbnail} alt="Converted audio thumbnail" />
+          <div className="converted-main">
+            <span className="download-title">{item.title ?? 'Converted audio'}</span>
+            <span className="converted-metadata">
+              {formatDuration(item.duration) && <span>{formatDuration(item.duration)}</span>}
+              {outputFormat(item.output) && <span>{outputFormat(item.output)}</span>}
+              {item.fileSize !== undefined && <span>{formatBytes(item.fileSize)}</span>}
+              {formatDate(item.createdAt) && <span>{formatDate(item.createdAt)}</span>}
+            </span>
+          </div>
+          <button type="button" className="btn" onClick={() => onOpen(item.output)}>
+            Open audio file
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function outputFormat(path: string): string {
+  const normalized = path.replace(/\\/g, '/')
+  const fileName = normalized.slice(normalized.lastIndexOf('/') + 1)
+  const dot = fileName.lastIndexOf('.')
+  if (dot === -1) {
+    return ''
+  }
+  return fileName.slice(dot + 1).toUpperCase()
 }
 
 function DownloadMetadata({ download }: { download: Download }) {

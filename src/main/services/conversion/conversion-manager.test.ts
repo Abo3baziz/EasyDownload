@@ -7,6 +7,7 @@ import type {
   Conversion,
   ConversionProgress
 } from '../../../shared/types/conversion'
+import type { JsonStore } from '../history/json-store'
 import type {
   FfmpegHandle,
   FfmpegService
@@ -49,6 +50,31 @@ const OPTIONS: ConversionStartOptions = {
   type: 'extractAudio',
   input: 'C:\\Downloads\\Example [abc].mp4',
   audioCodec: 'mp3'
+}
+
+function completedConversionRecord(overrides: Partial<Conversion> = {}): Conversion {
+  return {
+    id: 'cv-old',
+    type: 'extractAudio',
+    input: 'C:\\Downloads\\Example [abc].mp4',
+    output: 'C:\\Downloads\\Example [abc].mp3',
+    status: 'completed',
+    progress: { processedMs: 0 },
+    title: 'Example Video',
+    thumbnail: 'https://img.example.com/thumb.jpg',
+    duration: 754,
+    fileSize: 5 * 1048576,
+    createdAt: 0,
+    updatedAt: 0,
+    ...overrides
+  }
+}
+
+function createMockHistory(records: Conversion[] = []) {
+  const load = vi.fn().mockResolvedValue(records)
+  const save = vi.fn().mockResolvedValue(undefined)
+  const history = { load, save } as unknown as JsonStore<Conversion>
+  return { history, load, save }
 }
 
 async function flush(): Promise<void> {
@@ -149,7 +175,7 @@ describe('createConversionManager', () => {
     completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
     await flush()
 
-    expect(manager.list()).toEqual([
+    expect(await manager.list()).toEqual([
       expect.objectContaining({ id: 'cv-1', status: 'completed' })
     ])
   })
@@ -187,7 +213,7 @@ describe('createConversionManager', () => {
     completion.reject(new AppError('ProcessingError', 'FFmpeg could not process the media file.'))
     await flush()
 
-    const conversion = manager.list()[0]
+    const [conversion] = await manager.list()
     expect(conversion.status).toBe('failed')
     expect(conversion.error?.code).toBe('ProcessingError')
   })
@@ -204,7 +230,7 @@ describe('createConversionManager', () => {
     completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
     await flush()
 
-    const conversion = manager.list()[0]
+    const [conversion] = await manager.list()
     expect(conversion.status).toBe('cancelled')
   })
   it('cancels a running conversion through its handle', async () => {
@@ -251,6 +277,133 @@ describe('createConversionManager', () => {
     await manager.start(OPTIONS)
     await manager.start({ ...OPTIONS, audioCodec: 'flac' })
 
-    expect(manager.list().map((conversion) => conversion.id)).toEqual(['cv-1', 'cv-2'])
+    expect((await manager.list()).map((conversion) => conversion.id)).toEqual(['cv-1', 'cv-2'])
+  })
+
+  it('persists a completed audio extraction to history', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle, completion } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const { history, save } = createMockHistory()
+    const manager = createConversionManager({ ffmpeg, history, generateId: () => 'cv-1' })
+    await manager.start(OPTIONS)
+
+    completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+    await flush()
+
+    expect(save).toHaveBeenCalled()
+    const persisted = save.mock.calls.at(-1)?.[0] as Conversion[]
+    expect(persisted).toEqual([
+      expect.objectContaining({ id: 'cv-1', type: 'extractAudio', status: 'completed' })
+    ])
+  })
+
+  it('captures the metadata and file size passed from the source download', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle, completion } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const statFile = vi
+      .fn()
+      .mockResolvedValueOnce({ size: 100 })
+      .mockResolvedValueOnce({ size: 5_000 })
+    const manager = createConversionManager({ ffmpeg, generateId: () => 'cv-1', statFile })
+    const options: ConversionStartOptions = {
+      ...OPTIONS,
+      title: 'Example Video',
+      thumbnail: 'https://img.example.com/thumb.jpg',
+      duration: 754
+    }
+
+    const created = await manager.start(options)
+    expect(created).toMatchObject({
+      title: 'Example Video',
+      thumbnail: 'https://img.example.com/thumb.jpg',
+      duration: 754
+    })
+
+    completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+
+    const [conversion] = await manager.list()
+    expect(conversion.fileSize).toBe(5_000)
+  })
+
+  it('does not persist a failed audio extraction', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle, completion } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const { history, save } = createMockHistory()
+    const manager = createConversionManager({ ffmpeg, history, generateId: () => 'cv-1' })
+    await manager.start(OPTIONS)
+
+    completion.reject(new AppError('ProcessingError', 'FFmpeg could not process the media file.'))
+    await flush()
+    await flush()
+
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('does not persist a cancelled audio extraction', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle, completion } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const { history, save } = createMockHistory()
+    const manager = createConversionManager({ ffmpeg, history, generateId: () => 'cv-1' })
+    await manager.start(OPTIONS)
+
+    await manager.cancel('cv-1')
+    completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
+    await flush()
+    await flush()
+
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('does not persist video conversions', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle, completion } = mockHandle()
+    ffmpeg.convert.mockReturnValue(handle)
+    const { history, save } = createMockHistory()
+    const manager = createConversionManager({ ffmpeg, history, generateId: () => 'cv-1' })
+    await manager.start({
+      type: 'convert',
+      input: 'C:\\Downloads\\in.mkv',
+      videoCodec: 'h264',
+      audioCodec: 'copy'
+    })
+
+    completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+    await flush()
+
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('loads persisted conversions on startup', async () => {
+    const { history } = createMockHistory([completedConversionRecord()])
+    const ffmpeg = createMockFfmpeg()
+    const manager = createConversionManager({ ffmpeg, history, generateId: () => 'cv-new' })
+
+    await expect(manager.list()).resolves.toEqual([
+      expect.objectContaining({ id: 'cv-old', status: 'completed' })
+    ])
+  })
+
+  it('clears persisted conversion history', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle, completion } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const { history, save } = createMockHistory()
+    const manager = createConversionManager({ ffmpeg, history, generateId: () => 'cv-1' })
+    await manager.start(OPTIONS)
+    completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+    await flush()
+
+    const remaining = await manager.clearHistory()
+
+    expect(remaining).toEqual([])
+    expect(save).toHaveBeenLastCalledWith([])
   })
 })
