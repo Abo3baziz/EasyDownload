@@ -50,7 +50,16 @@ export interface DownloadMediaHandle {
 const DEFAULT_TIMEOUT_MS = 60_000
 
 export function buildInspectArgs(url: string): readonly string[] {
-  return ['--dump-json', '--no-playlist', '--skip-download', '--no-warnings', '--no-call-home', url]
+  return [
+    '--dump-json',
+    '--no-playlist',
+    '--skip-download',
+    '--no-warnings',
+    '--no-call-home',
+    '--encoding',
+    'utf-8',
+    url
+  ]
 }
 
 export function buildDownloadArgs(
@@ -64,6 +73,8 @@ export function buildDownloadArgs(
     '--newline',
     '--no-playlist',
     '--no-call-home',
+    '--encoding',
+    'utf-8',
     '-f',
     formatSelector,
     '-o',

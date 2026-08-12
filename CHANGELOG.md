@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Non-ASCII download paths on Windows: yt-dlp writes its output (including the `[download] Destination:` path line and inspection JSON) in the Windows ANSI code page rather than UTF-8, so videos with Arabic (or other non-ASCII) titles recorded a garbled destination path that no longer matched the real file and "Open file" failed. Child processes are now forced to emit UTF-8 (`PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8`), and the Process Manager decodes streamed output with a `StringDecoder` so multi-byte characters split across chunks are not corrupted.
+- Non-ASCII download paths on Windows: yt-dlp writes its streaming output (including the `[download] Destination:` path line) in the Windows ANSI code page rather than UTF-8, so videos with Arabic (or other non-ASCII) titles recorded a garbled destination path that no longer matched the real file and "Open file" failed. yt-dlp is now invoked with `--encoding utf-8` so its output is always UTF-8, and the Process Manager decodes streamed output with a `StringDecoder` so multi-byte characters split across chunks are not corrupted.
 
 ## 2026-08-12
 

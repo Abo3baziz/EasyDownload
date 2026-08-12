@@ -32,10 +32,7 @@ export interface StartedProcess {
 export class ProcessManager {
   runToCompletion(command: string, options: RunOptions = {}): Promise<ProcessResult> {
     return new Promise((resolve, reject) => {
-      const child = spawn(command, [...(options.args ?? [])], {
-        windowsHide: true,
-        env: buildSpawnEnv()
-      })
+      const child = spawn(command, [...(options.args ?? [])], { windowsHide: true })
       const stdoutDecoder = new StringDecoder('utf8')
       const stderrDecoder = new StringDecoder('utf8')
       let stdout = ''
@@ -79,8 +76,7 @@ export class ProcessManager {
 
   spawnProcess(command: string, args: readonly string[]): RunningProcess {
     const child: ChildProcessWithoutNullStreams = spawn(command, [...args], {
-      windowsHide: true,
-      env: buildSpawnEnv()
+      windowsHide: true
     })
     return {
       kill: () => child.kill(),
@@ -92,8 +88,7 @@ export class ProcessManager {
 
   startStreaming(command: string, options: StartStreamingOptions = {}): StartedProcess {
     const child: ChildProcessWithoutNullStreams = spawn(command, [...(options.args ?? [])], {
-      windowsHide: true,
-      env: buildSpawnEnv()
+      windowsHide: true
     })
     const stdoutDecoder = new StringDecoder('utf8')
     const stderrDecoder = new StringDecoder('utf8')
@@ -139,14 +134,6 @@ export class ProcessManager {
       result,
       kill: () => child.kill()
     }
-  }
-}
-
-function buildSpawnEnv(): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    PYTHONUTF8: '1',
-    PYTHONIOENCODING: 'utf-8'
   }
 }
 
