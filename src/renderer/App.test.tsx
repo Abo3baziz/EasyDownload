@@ -9,6 +9,8 @@ function createApiMock(): PreloadApi {
   return {
     inspectUrl: vi.fn(),
     startDownload: vi.fn(),
+    pauseDownload: vi.fn(),
+    resumeDownload: vi.fn(),
     cancelDownload: vi.fn(),
     retryDownload: vi.fn(),
     getDownload: vi.fn(),

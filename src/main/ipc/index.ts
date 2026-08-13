@@ -21,6 +21,12 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.downloadStart, idSchema, ({ id }) =>
     services.downloads.start(id)
   )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.downloadPause, idSchema, ({ id }) =>
+    services.downloads.pause(id)
+  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.downloadResume, idSchema, ({ id }) =>
+    services.downloads.resume(id)
+  )
   registerIpcHandler(ipcMain, IPC_CHANNELS.downloadCancel, idSchema, ({ id }) =>
     services.downloads.cancel(id)
   )

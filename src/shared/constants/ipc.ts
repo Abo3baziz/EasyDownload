@@ -2,6 +2,8 @@ export const IPC_CHANNELS = {
   mediaInspect: 'media:inspect',
   downloadCreate: 'download:create',
   downloadStart: 'download:start',
+  downloadPause: 'download:pause',
+  downloadResume: 'download:resume',
   downloadCancel: 'download:cancel',
   downloadGet: 'download:get',
   downloadList: 'download:list',

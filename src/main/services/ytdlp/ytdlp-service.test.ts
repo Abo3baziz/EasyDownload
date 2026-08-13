@@ -528,6 +528,23 @@ describe('createYtDlpService.startDownload', () => {
     expect(result.cancelled).toBe(true)
   })
 
+  it('kills the process and reports pause without cancellation', async () => {
+    const { processes, kill } = createStreamingProcesses({ exitCode: null })
+    const service = createYtDlpService({ processes })
+    const handle = service.startDownload({
+      url: 'https://example.com/watch?v=1',
+      formatId: '18',
+      directory: 'D:\\Downloads'
+    })
+
+    handle.pause?.()
+
+    const result = await handle.result
+    expect(kill).toHaveBeenCalled()
+    expect(result.paused).toBe(true)
+    expect(result.cancelled).toBe(false)
+  })
+
   it('maps a missing executable to DependencyError', async () => {
     const { processes } = createStreamingProcesses({
       rejectWith: Object.assign(new Error('spawn yt-dlp ENOENT'), { code: 'ENOENT' })

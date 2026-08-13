@@ -5,6 +5,7 @@ export type DownloadStatus =
   | 'inspecting'
   | 'downloading'
   | 'processing'
+  | 'paused'
   | 'completed'
   | 'failed'
   | 'cancelled'

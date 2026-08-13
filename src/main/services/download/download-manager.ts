@@ -17,6 +17,8 @@ import type { YtDlpMedia } from '../ytdlp/types'
 export interface DownloadManager {
   create(options: DownloadOptions): Promise<Download>
   start(id: string): Promise<Download>
+  pause(id: string): Promise<Download>
+  resume(id: string): Promise<Download>
   cancel(id: string): Promise<Download>
   retry(id: string): Promise<Download>
   get(id: string): Promise<Download>
@@ -45,6 +47,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
   const configs = new Map<string, DownloadOptions>()
   const queue: string[] = []
   const handles = new Map<string, DownloadMediaHandle>()
+  const mediaOptionsById = new Map<string, DownloadMediaOptions>()
+  const pauseRequests = new Set<string>()
   const cancelRequests = new Set<string>()
   const listeners = new Set<(download: Download) => void>()
   let activeId: string | undefined
@@ -153,31 +157,41 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       return
     }
 
-    update(id, { status: 'inspecting', progress: {}, error: undefined })
-
-    let mediaOptions: DownloadMediaOptions
-    try {
-      const media = await options.ytDlp.inspect(config.url)
-      if (cancelRequests.has(id)) {
-        finishCancelled(id)
+    let mediaOptions = mediaOptionsById.get(id)
+    if (!mediaOptions) {
+      update(id, { status: 'inspecting', progress: {}, error: undefined })
+      try {
+        const media = await options.ytDlp.inspect(config.url)
+        if (cancelRequests.has(id)) {
+          await finishCancelled(id)
+          return
+        }
+        if (pauseRequests.has(id)) {
+          update(id, { status: 'paused' })
+          return
+        }
+        mediaOptions = buildDownloadMediaOptions(config, media)
+        mediaOptionsById.set(id, mediaOptions)
+        update(id, {
+          title: media.title,
+          thumbnail: media.thumbnail,
+          duration: media.duration,
+          ...formatMetadata(media, config.formatId),
+          status: 'downloading'
+        })
+      } catch (err) {
+        if (cancelRequests.has(id)) {
+          await finishCancelled(id)
+        } else if (!pauseRequests.has(id)) {
+          update(id, { status: 'failed', error: toAppError(err).toPayload() })
+        }
         return
       }
-      mediaOptions = buildDownloadMediaOptions(config, media)
-      update(id, {
-        title: media.title,
-        thumbnail: media.thumbnail,
-        duration: media.duration,
-        ...formatMetadata(media, config.formatId),
-        status: 'downloading'
-      })
-    } catch (err) {
-      if (cancelRequests.has(id)) {
-        finishCancelled(id)
-        return
-      }
-      update(id, { status: 'failed', error: toAppError(err).toPayload() })
-      return
+    } else {
+      update(id, { status: 'downloading', error: undefined })
     }
+
+    if (cancelRequests.has(id) || pauseRequests.has(id)) return
 
     if (mediaOptions.mergeAudio && options.checkFfmpeg) {
       let ffmpegAvailable = false
@@ -201,11 +215,11 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
 
     const handle = options.ytDlp.startDownload(mediaOptions, {
       onProgress: (progress) => {
-        if (cancelRequests.has(id)) return
+        if (cancelRequests.has(id) || pauseRequests.has(id)) return
         update(id, { progress, status: 'downloading' })
       },
       onPhase: (phase) => {
-        if (cancelRequests.has(id)) return
+        if (cancelRequests.has(id) || pauseRequests.has(id)) return
         update(id, { status: phase === 'processing' ? 'processing' : 'downloading' })
       }
     })
@@ -214,7 +228,12 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     try {
       const result = await handle.result
       if (result.cancelled || cancelRequests.has(id)) {
-        finishCancelled(id, result.destination)
+        await finishCancelled(id, result.destination)
+      } else if (result.paused || pauseRequests.has(id)) {
+        pauseRequests.delete(id)
+        if (result.destination) {
+          update(id, { destination: result.destination })
+        }
       } else if (result.exitCode === 0) {
         const fileSize = await readFileSize(result.destination)
         update(id, {
@@ -229,7 +248,9 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       }
     } catch (err) {
       if (cancelRequests.has(id)) {
-        finishCancelled(id)
+        await finishCancelled(id)
+      } else if (pauseRequests.has(id)) {
+        pauseRequests.delete(id)
       } else {
         update(id, { status: 'failed', error: toAppError(err).toPayload() })
       }
@@ -240,7 +261,9 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
 
   async function finishCancelled(id: string, destination?: string): Promise<void> {
     await cleanupFiles(destination)
-    update(id, { status: 'cancelled', progress: {} })
+    if (getOrThrow(id).status !== 'cancelled') {
+      update(id, { status: 'cancelled', progress: {} })
+    }
   }
 
   async function readFileSize(path: string | undefined): Promise<number | undefined> {
@@ -295,6 +318,35 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       return getOrThrow(id)
     },
 
+    async pause(id: string): Promise<Download> {
+      await ensureLoaded()
+      const download = getOrThrow(id)
+      if (!ACTIVE_STATUSES.includes(download.status)) {
+        throw new AppError('DownloadError', `Cannot pause a download in state "${download.status}".`)
+      }
+      pauseRequests.add(id)
+      handles.get(id)?.pause?.()
+      return update(id, { status: 'paused' })
+    },
+
+    async resume(id: string): Promise<Download> {
+      await ensureLoaded()
+      const download = getOrThrow(id)
+      if (download.status !== 'paused') {
+        throw new AppError('DownloadError', `Cannot resume a download in state "${download.status}".`)
+      }
+      pauseRequests.delete(id)
+      cancelRequests.delete(id)
+      const existingOptions = mediaOptionsById.get(id)
+      if (existingOptions) {
+        mediaOptionsById.set(id, { ...existingOptions, resume: true })
+      }
+      update(id, { status: 'queued', error: undefined })
+      queue.push(id)
+      if (!activeId) schedule()
+      return getOrThrow(id)
+    },
+
     async cancel(id: string): Promise<Download> {
       await ensureLoaded()
       const download = getOrThrow(id)
@@ -305,13 +357,20 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
         }
         return update(id, { status: 'cancelled', progress: {} })
       }
+      if (download.status === 'paused') {
+        cancelRequests.add(id)
+        pauseRequests.delete(id)
+        await finishCancelled(id, download.destination)
+        return getOrThrow(id)
+      }
       if (ACTIVE_STATUSES.includes(download.status)) {
         cancelRequests.add(id)
+        pauseRequests.delete(id)
         const handle = handles.get(id)
         if (handle) {
           handle.cancel()
         }
-        return getOrThrow(id)
+        return update(id, { status: 'cancelled', progress: {} })
       }
       throw new AppError(
         'CancellationError',
@@ -330,6 +389,9 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       }
       const config = configs.get(id) ?? configFromDownload(download)
       configs.set(id, config)
+      cancelRequests.delete(id)
+      pauseRequests.delete(id)
+      mediaOptionsById.delete(id)
       update(id, { status: 'queued', progress: {}, error: undefined })
       queue.push(id)
       void persistHistory()
