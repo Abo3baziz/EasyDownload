@@ -553,6 +553,74 @@ describe('createDownloadManager', () => {
     })
   })
 
+  it('removes a completed download from history when its file no longer exists', async () => {
+    const records = [
+      terminalRecord({ id: 'dl-old', destination: 'D:\\Downloads\\gone.mp4' })
+    ]
+    const { history, save } = createMockHistory(records)
+    const ytDlp = createMockYtDlp()
+    const manager = createDownloadManager({
+      ytDlp,
+      history,
+      fileExists: () => false,
+      generateId: () => 'dl-new'
+    })
+
+    await expect(manager.list()).resolves.toEqual([])
+    expect(save).toHaveBeenCalled()
+    expect(save.mock.calls.at(-1)?.[0]).toEqual([])
+  })
+
+  it('keeps a completed download whose file still exists', async () => {
+    const records = [
+      terminalRecord({ id: 'dl-old', destination: 'D:\\Downloads\\video.mp4' })
+    ]
+    const { history, save } = createMockHistory(records)
+    const ytDlp = createMockYtDlp()
+    const manager = createDownloadManager({
+      ytDlp,
+      history,
+      fileExists: () => true,
+      generateId: () => 'dl-new'
+    })
+
+    await expect(manager.list()).resolves.toHaveLength(1)
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('keeps legacy completed downloads without a stored path', async () => {
+    const records = [terminalRecord({ id: 'dl-old' })]
+    const { history, save } = createMockHistory(records)
+    const ytDlp = createMockYtDlp()
+    const manager = createDownloadManager({
+      ytDlp,
+      history,
+      fileExists: () => false,
+      generateId: () => 'dl-new'
+    })
+
+    await expect(manager.list()).resolves.toHaveLength(1)
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('does not remove failed or cancelled downloads when files are missing', async () => {
+    const records = [
+      terminalRecord({ id: 'dl-failed', status: 'failed' }),
+      terminalRecord({ id: 'dl-cancelled', status: 'cancelled' })
+    ]
+    const { history, save } = createMockHistory(records)
+    const ytDlp = createMockYtDlp()
+    const manager = createDownloadManager({
+      ytDlp,
+      history,
+      fileExists: () => false,
+      generateId: () => 'dl-new'
+    })
+
+    await expect(manager.list()).resolves.toHaveLength(2)
+    expect(save).not.toHaveBeenCalled()
+  })
+
   it('records the file size of a completed download', async () => {
     const ytDlp = createMockYtDlp()
     ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })

@@ -4,6 +4,12 @@
 
 ### Added
 
+- Download file location and existence tracking: the Download Manager now prunes completed downloads whose persisted file path no longer exists on disk whenever the download list is loaded or refreshed (including after an app restart). The full path remains the source of truth on each record, checks run entirely in the main process via `existsSync`, the pruned result is re-persisted to download history, and legacy completed records without a stored path are kept because they cannot be verified.
+
+## 2026-08-13
+
+### Added
+
 - Downloads page navigation sections: the Downloads page now acts as a section selector with navigation cards (Completed, Queue, Cancelled, Failed) showing live download counts. Clicking a card opens a dedicated full-page view for that status (filtered by the existing status model, reusing the same download item card), with a "← Downloads" button back to the selector. Empty section pages show an appropriate empty message, and counts update automatically when statuses change.
 
 ## 2026-08-13

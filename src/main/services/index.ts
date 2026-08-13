@@ -1,4 +1,5 @@
 import { Notification } from 'electron'
+import { existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { Conversion } from '../../shared/types/conversion'
@@ -110,6 +111,7 @@ export function createServices(deps: ServicesDeps): Services {
     ytDlp,
     checkFfmpeg: () => dependencies.checkFfmpeg(),
     history,
+    fileExists: existsSync,
     statFile: async (path) => {
       try {
         const info = await stat(path)
