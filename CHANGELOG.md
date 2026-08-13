@@ -2,6 +2,12 @@
 
 ## 2026-08-13
 
+### Fixed
+
+- Ghost downloads for the same video at different qualities: the yt-dlp output template now embeds the selected format id (`%(title)s [%(id)s] [<format>].%(ext)s`), so each download of the same video gets its own output file instead of colliding on `Title [id].mp4`. Downloads keep their unique id-based identity; the fix removes the ambiguous file/path association that made two same-video downloads appear as a ghost/duplicate entry.
+
+## 2026-08-13
+
 ### Changed
 
 - Removed WebM as a supported format: WebM video and audio formats are no longer offered as download options (filtered from the inspected format list), the "WebM video (VP9)" conversion option, the `vp9` video codec (type, zod schema, and FFmpeg argument map), and the `.webm` output-extension mapping were removed. Download formats are now the non-WebM formats reported by yt-dlp; video conversion is MP4 (H.264/HEVC) or MKV; audio extraction (MP3/AAC/Opus/FLAC) is unchanged. WebM references that reflect real yt-dlp inspection output or download fixtures are retained.

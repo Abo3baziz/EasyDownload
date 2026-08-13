@@ -174,6 +174,88 @@ describe('createDownloadManager', () => {
     expect((await manager.get('dl-2')).status).not.toBe('queued')
   })
 
+  it('keeps two same-video downloads with different formats independent', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      now: () => 0
+    })
+    await manager.create(OPTIONS)
+    await manager.create({ ...OPTIONS, formatId: '18' })
+
+    await manager.start('dl-1')
+    await flush()
+    await manager.start('dl-2')
+    await flush()
+
+    first.completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\Example Video [abc] [137].mp4'
+    })
+    await flush()
+    second.completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\Example Video [abc] [18].mp4'
+    })
+    await flush()
+
+    const firstDownload = await manager.get('dl-1')
+    const secondDownload = await manager.get('dl-2')
+    expect(firstDownload.id).not.toBe(secondDownload.id)
+    expect(firstDownload.status).toBe('completed')
+    expect(secondDownload.status).toBe('completed')
+    expect(firstDownload.destination).toBe('D:\\Downloads\\Example Video [abc] [137].mp4')
+    expect(secondDownload.destination).toBe('D:\\Downloads\\Example Video [abc] [18].mp4')
+  })
+
+  it('cancels one of two same-video downloads without affecting the other', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      now: () => 0
+    })
+    await manager.create(OPTIONS)
+    await manager.create({ ...OPTIONS, formatId: '18' })
+
+    await manager.start('dl-1')
+    await flush()
+    await manager.start('dl-2')
+    await flush()
+
+    await manager.cancel('dl-1')
+    first.completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
+    await flush()
+    second.completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\Example Video [abc] [18].mp4'
+    })
+    await flush()
+
+    expect((await manager.get('dl-1')).status).toBe('cancelled')
+    expect((await manager.get('dl-2')).status).toBe('completed')
+  })
+
   it('cancels an active download and cleans up the destination', async () => {
     const ytDlp = createMockYtDlp()
     ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
