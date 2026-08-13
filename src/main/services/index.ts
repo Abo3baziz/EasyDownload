@@ -46,6 +46,7 @@ export interface ServicesDeps {
   defaultDownloadDirectory: string
   selectDirectory: () => Promise<string | null>
   openPath: (path: string) => Promise<string>
+  showItemInFolder: (path: string) => void
   isPackaged: boolean
   resourcesPath: string
   appPath: string
@@ -69,7 +70,8 @@ export function createServices(deps: ServicesDeps): Services {
   const dependencies = createDependencyManager(processes, { ytDlpCommand, ffmpegCommand })
   const files = createFileManager({
     selectDirectory: deps.selectDirectory,
-    openPath: deps.openPath
+    openPath: deps.openPath,
+    showItemInFolder: deps.showItemInFolder
   })
   const settingsDefaults: AppSettings = {
     downloadDirectory: deps.defaultDownloadDirectory,

@@ -19,6 +19,7 @@ export interface PreloadApi {
   selectDirectory(): Promise<IpcResult<string | null>>
   openFile(path: string): Promise<IpcResult<void>>
   openDirectory(path: string): Promise<IpcResult<void>>
+  openFileLocation(path: string): Promise<IpcResult<void>>
   getSettings(): Promise<IpcResult<AppSettings>>
   updateSettings(settings: AppSettings): Promise<IpcResult<AppSettings>>
   getDependencies(): Promise<IpcResult<DependencyStatus[]>>

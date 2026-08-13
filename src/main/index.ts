@@ -59,6 +59,7 @@ function setupServices(): void {
       return result.filePaths[0] ?? null
     },
     openPath: (path) => shell.openPath(path),
+    showItemInFolder: (path) => shell.showItemInFolder(path),
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
     appPath: app.getAppPath()

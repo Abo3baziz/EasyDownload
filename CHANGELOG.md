@@ -2,6 +2,12 @@
 
 ## 2026-08-13
 
+### Added
+
+- Open File Location action for completed downloads and converted audio items on the Downloads page. The action uses the persisted file path (`Download.destination` / `Conversion.output`) via a new `file:open-location` IPC channel, verifies the file exists before opening, and opens the OS file manager with the file selected (`shell.showItemInFolder`). Missing or invalid paths fail gracefully with a `FilesystemError` instead of crashing.
+
+## 2026-08-13
+
 ### Fixed
 
 - Cancelled download retries now clear stale cancellation and pause markers and recreate per-attempt yt-dlp options, so retry immediately starts a fresh download instead of stalling.

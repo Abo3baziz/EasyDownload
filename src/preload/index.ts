@@ -21,6 +21,7 @@ const api: PreloadApi = {
   selectDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.dialogSelectDirectory),
   openFile: (path) => ipcRenderer.invoke(IPC_CHANNELS.fileOpen, { path }),
   openDirectory: (path) => ipcRenderer.invoke(IPC_CHANNELS.fileOpenDirectory, { path }),
+  openFileLocation: (path) => ipcRenderer.invoke(IPC_CHANNELS.fileOpenLocation, { path }),
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.settingsGet),
   updateSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.settingsUpdate, settings),
   getDependencies: () => ipcRenderer.invoke(IPC_CHANNELS.dependenciesGet),

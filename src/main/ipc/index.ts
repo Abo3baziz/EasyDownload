@@ -53,6 +53,9 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.fileOpenDirectory, pathSchema, ({ path }) =>
     services.files.openDirectory(path)
   )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.fileOpenLocation, pathSchema, ({ path }) =>
+    services.files.openFileLocation(path)
+  )
   registerIpcHandler(ipcMain, IPC_CHANNELS.settingsGet, undefined, () => services.settings.load())
   registerIpcHandler(ipcMain, IPC_CHANNELS.settingsUpdate, settingsSchema, (settings) =>
     services.settings.save(settings)

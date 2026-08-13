@@ -139,6 +139,13 @@ export function DownloadsPage() {
     }
   }
 
+  async function handleOpenFileLocation(path: string) {
+    const result = await api.openFileLocation(path)
+    if (!result.ok) {
+      setError(result.error)
+    }
+  }
+
   async function handleClearHistory() {
     const result = await api.clearHistory()
     if (!result.ok) {
@@ -247,13 +254,22 @@ export function DownloadsPage() {
                   </button>
                 )}
                 {download.status === 'completed' && download.destination && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => void handleOpenFile(download)}
-                  >
-                    Open file
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => void handleOpenFile(download)}
+                    >
+                      Open file
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => void handleOpenFileLocation(download.destination!)}
+                    >
+                      Open File Location
+                    </button>
+                  </>
                 )}
               </div>
               {download.status === 'completed' && download.destination && (
@@ -261,6 +277,7 @@ export function DownloadsPage() {
                   conversions={conversions}
                   source={download.destination}
                   onOpen={(path) => void handleOpenConversion(path)}
+                  onOpenLocation={(path) => void handleOpenFileLocation(path)}
                 />
               )}
               {download.status === 'completed' && download.destination && (
@@ -319,11 +336,13 @@ function MediaThumbnail({ src, alt }: { src?: string; alt: string }) {
 function ConvertedAudioList({
   conversions,
   source,
-  onOpen
+  onOpen,
+  onOpenLocation
 }: {
   conversions: Record<string, Conversion>
   source: string
   onOpen: (path: string) => void
+  onOpenLocation: (path: string) => void
 }) {
   const items = Object.values(conversions)
     .filter(
@@ -353,6 +372,9 @@ function ConvertedAudioList({
           </div>
           <button type="button" className="btn" onClick={() => onOpen(item.output)}>
             Open audio file
+          </button>
+          <button type="button" className="btn" onClick={() => onOpenLocation(item.output)}>
+            Open File Location
           </button>
         </div>
       ))}

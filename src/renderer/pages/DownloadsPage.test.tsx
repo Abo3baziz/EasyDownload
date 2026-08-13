@@ -20,6 +20,7 @@ function createApiMock(): PreloadApi {
     selectDirectory: vi.fn(),
     openFile: vi.fn(),
     openDirectory: vi.fn(),
+    openFileLocation: vi.fn(),
     getSettings: vi.fn(),
     updateSettings: vi.fn(),
     getDependencies: vi.fn(),
@@ -198,6 +199,65 @@ describe('DownloadsPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open file' }))
 
     expect(window.mediaDownloader.openFile).toHaveBeenCalledWith('C:\\Downloads\\video.mp4')
+  })
+
+  it('opens the file location for a completed download', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'dl-3',
+          url: 'https://www.youtube.com/watch?v=abc',
+          title: 'Finished Video',
+          status: 'completed',
+          progress: { percent: 100 },
+          destination: 'C:\\Downloads\\video.mp4',
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ]
+    })
+    window.mediaDownloader.openFileLocation = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: undefined })
+
+    render(<DownloadsPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open File Location' }))
+
+    expect(window.mediaDownloader.openFileLocation).toHaveBeenCalledWith('C:\\Downloads\\video.mp4')
+  })
+
+  it('opens the file location for a converted audio item', async () => {
+    window.mediaDownloader.listDownloads = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: [completedDownload()] })
+    window.mediaDownloader.listConversions = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'cv-1',
+          type: 'extractAudio',
+          input: 'C:\\Downloads\\video.mp4',
+          output: 'C:\\Downloads\\video.mp3',
+          status: 'completed',
+          progress: { processedMs: 0 },
+          title: 'Finished Video',
+          createdAt: 2,
+          updatedAt: 2
+        }
+      ]
+    })
+    window.mediaDownloader.openFileLocation = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: undefined })
+
+    render(<DownloadsPage />)
+
+    const buttons = await screen.findAllByRole('button', { name: 'Open File Location' })
+    fireEvent.click(buttons[1]!)
+
+    expect(window.mediaDownloader.openFileLocation).toHaveBeenCalledWith('C:\\Downloads\\video.mp3')
   })
 
   it('shows the file name and size for a completed download', async () => {

@@ -19,6 +19,7 @@ function createApiMock(): PreloadApi {
     selectDirectory: vi.fn(),
     openFile: vi.fn(),
     openDirectory: vi.fn(),
+    openFileLocation: vi.fn(),
     getSettings: vi.fn().mockResolvedValue({
       ok: true,
       data: { downloadDirectory: '', notificationsEnabled: true, concurrencyLimit: 1 }

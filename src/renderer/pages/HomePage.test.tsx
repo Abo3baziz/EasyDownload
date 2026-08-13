@@ -22,6 +22,7 @@ function createApiMock(): PreloadApi {
     selectDirectory: vi.fn(),
     openFile: vi.fn(),
     openDirectory: vi.fn(),
+    openFileLocation: vi.fn(),
     getSettings: vi.fn(),
     updateSettings: vi.fn(),
     getDependencies: vi.fn(),
