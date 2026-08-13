@@ -11,6 +11,8 @@ const api: PreloadApi = {
     }
     return ipcRenderer.invoke(IPC_CHANNELS.downloadStart, { id: created.data.id })
   },
+  pauseDownload: (id) => ipcRenderer.invoke(IPC_CHANNELS.downloadPause, { id }),
+  resumeDownload: (id) => ipcRenderer.invoke(IPC_CHANNELS.downloadResume, { id }),
   cancelDownload: (id) => ipcRenderer.invoke(IPC_CHANNELS.downloadCancel, { id }),
   retryDownload: (id) => ipcRenderer.invoke(IPC_CHANNELS.downloadRetry, { id }),
   getDownload: (id) => ipcRenderer.invoke(IPC_CHANNELS.downloadGet, { id }),

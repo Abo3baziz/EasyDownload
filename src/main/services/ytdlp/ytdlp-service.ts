@@ -25,6 +25,7 @@ export interface DownloadMediaOptions {
   directory: string
   mergeAudio?: boolean
   mergeOutputFormat?: string
+  resume?: boolean
 }
 
 export type DownloadPhase = 'downloading' | 'processing'
@@ -39,11 +40,13 @@ export interface DownloadMediaResult {
   stdout: string
   stderr: string
   cancelled: boolean
+  paused?: boolean
   destination?: string
 }
 
 export interface DownloadMediaHandle {
   result: Promise<DownloadMediaResult>
+  pause?: () => void
   cancel(): void
 }
 
@@ -66,7 +69,7 @@ export function buildDownloadArgs(
   url: string,
   formatId: string,
   directory: string,
-  options: { merge?: { outputFormat?: string }; ffmpegLocation?: string } = {}
+  options: { merge?: { outputFormat?: string }; ffmpegLocation?: string; resume?: boolean } = {}
 ): readonly string[] {
   const formatSelector = options.merge ? `${formatId}+bestaudio` : formatId
   const args = [
@@ -80,6 +83,9 @@ export function buildDownloadArgs(
     '-o',
     join(directory, '%(title)s [%(id)s].%(ext)s')
   ]
+  if (options.resume) {
+    args.unshift('--continue')
+  }
   if (options.merge?.outputFormat) {
     args.push('--merge-output-format', options.merge.outputFormat)
   }
@@ -126,6 +132,7 @@ export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
       callbacks?: YtDlpDownloadCallbacks
     ): DownloadMediaHandle {
       let cancelled = false
+      let paused = false
       let destination: string | undefined
 
       const started = options.processes.startStreaming(ytDlpCommand, {
@@ -137,7 +144,8 @@ export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
             merge: downloadOptions.mergeAudio
               ? { outputFormat: downloadOptions.mergeOutputFormat }
               : undefined,
-            ffmpegLocation
+            ffmpegLocation,
+            resume: downloadOptions.resume
           }
         ),
         onStdout: (line) => handleLine(line),
@@ -171,6 +179,7 @@ export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
             stdout: processResult.stdout,
             stderr: processResult.stderr,
             cancelled,
+            paused,
             destination
           }
         })
@@ -184,6 +193,10 @@ export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
 
       return {
         result,
+        pause: () => {
+          paused = true
+          started.kill()
+        },
         cancel: () => {
           cancelled = true
           started.kill()

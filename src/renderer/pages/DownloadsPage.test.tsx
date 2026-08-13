@@ -10,6 +10,8 @@ function createApiMock(): PreloadApi {
   return {
     inspectUrl: vi.fn(),
     startDownload: vi.fn(),
+    pauseDownload: vi.fn(),
+    resumeDownload: vi.fn(),
     cancelDownload: vi.fn(),
     retryDownload: vi.fn(),
     getDownload: vi.fn(),
@@ -112,6 +114,34 @@ describe('DownloadsPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
 
     expect(window.mediaDownloader.cancelDownload).toHaveBeenCalledWith('dl-1')
+  })
+
+  it('offers pause for an active download and resumes a paused download', async () => {
+    const active = downloadingDownload()
+    let listener: ((download: typeof active) => void) | undefined
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({ ok: true, data: [active] })
+    window.mediaDownloader.onDownloadStateChange = vi.fn((callback) => {
+      listener = callback as typeof listener
+      return () => undefined
+    })
+    window.mediaDownloader.pauseDownload = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { ...active, status: 'paused' }
+    })
+    window.mediaDownloader.resumeDownload = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { ...active, status: 'downloading' }
+    })
+
+    render(<DownloadsPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Pause' }))
+    expect(window.mediaDownloader.pauseDownload).toHaveBeenCalledWith('dl-1')
+
+    act(() => listener?.({ ...active, status: 'paused' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Resume' }))
+
+    expect(window.mediaDownloader.resumeDownload).toHaveBeenCalledWith('dl-1')
   })
 
   it('offers retry for a failed download', async () => {

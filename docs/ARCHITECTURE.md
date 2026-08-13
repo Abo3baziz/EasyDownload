@@ -310,6 +310,7 @@ Responsibilities:
 * Track download state.
 * Start downloads.
 * Cancel downloads.
+* Pause and resume downloads.
 * Retry failed or cancelled downloads.
 * Track progress.
 * Handle completion.
@@ -329,6 +330,9 @@ stateDiagram-v2
 
     Ready --> Downloading
     Downloading --> Processing
+    Downloading --> Paused
+    Processing --> Paused
+    Paused --> Downloading
     Downloading --> Completed
     Downloading --> Failed
     Downloading --> Cancelled
@@ -404,6 +408,7 @@ The yt-dlp service is responsible for:
 * Reporting progress.
 * Reporting errors.
 * Cancelling execution.
+* Stopping execution for pause while preserving yt-dlp partial files for continuation.
 * Returning structured results.
 
 ---

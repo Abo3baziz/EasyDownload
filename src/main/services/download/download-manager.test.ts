@@ -48,8 +48,9 @@ function downloadHandle(result?: {
     destination?: string
   }>()
   const cancel = vi.fn()
-  const handle = { result: completion.promise, cancel }
-  return { handle, completion, cancel }
+  const pause = vi.fn()
+  const handle = { result: completion.promise, pause, cancel }
+  return { handle, completion, pause, cancel }
 }
 
 const OPTIONS: DownloadOptions = {
@@ -191,6 +192,54 @@ describe('createDownloadManager', () => {
     await flush()
 
     expect((await manager.get('dl-1')).status).toBe('cancelled')
+  })
+
+  it('retries a cancelled download as a fresh download', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
+    await manager.create(OPTIONS)
+
+    await manager.start('dl-1')
+    await flush()
+    await manager.cancel('dl-1')
+    first.completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
+    await flush()
+
+    await manager.retry('dl-1')
+    await flush()
+
+    expect(ytDlp.inspect).toHaveBeenCalledTimes(2)
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+  })
+
+  it('pauses an active download and resumes it with continuation', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+
+    const paused = await manager.pause('dl-1')
+    expect(paused.status).toBe('paused')
+    expect(first.pause).toHaveBeenCalled()
+    first.completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: false })
+    await flush()
+
+    await manager.resume('dl-1')
+    await flush()
+    expect(ytDlp.startDownload).toHaveBeenLastCalledWith(
+      { ...OPTIONS, resume: true },
+      expect.anything()
+    )
   })
 
   it('cancels a queued download without starting it', async () => {

@@ -9,6 +9,8 @@ import type { AppSettings } from './settings'
 export interface PreloadApi {
   inspectUrl(url: string): Promise<IpcResult<MediaInfo>>
   startDownload(options: DownloadOptions): Promise<IpcResult<Download>>
+  pauseDownload(id: string): Promise<IpcResult<Download>>
+  resumeDownload(id: string): Promise<IpcResult<Download>>
   cancelDownload(id: string): Promise<IpcResult<Download>>
   retryDownload(id: string): Promise<IpcResult<Download>>
   getDownload(id: string): Promise<IpcResult<Download>>

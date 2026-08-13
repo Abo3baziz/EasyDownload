@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-08-13
+
+### Fixed
+
+- Cancelled download retries now clear stale cancellation and pause markers and recreate per-attempt yt-dlp options, so retry immediately starts a fresh download instead of stalling.
+
+## 2026-08-13
+
+### Added
+
+- Pause, resume, and cancel controls for active downloads. Controls use explicit preload and IPC APIs, target the existing download ID, preserve progress and partial files for yt-dlp `--continue` resume, suppress late progress after cancellation, and keep cancelled jobs terminal with best-effort temporary-file cleanup.
+
 ## 2026-08-12
 
 ### Infrastructure

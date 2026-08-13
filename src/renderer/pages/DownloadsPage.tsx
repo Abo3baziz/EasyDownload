@@ -79,6 +79,20 @@ export function DownloadsPage() {
     }
   }
 
+  async function handlePause(download: Download) {
+    const result = await api.pauseDownload(download.id)
+    if (!result.ok) {
+      setError(result.error)
+    }
+  }
+
+  async function handleResume(download: Download) {
+    const result = await api.resumeDownload(download.id)
+    if (!result.ok) {
+      setError(result.error)
+    }
+  }
+
   async function handleRetry(download: Download) {
     const result = await api.retryDownload(download.id)
     if (!result.ok) {
@@ -196,6 +210,24 @@ export function DownloadsPage() {
                 </p>
               )}
               <div className="download-actions">
+                {canPause(download) && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => void handlePause(download)}
+                  >
+                    Pause
+                  </button>
+                )}
+                {download.status === 'paused' && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => void handleResume(download)}
+                  >
+                    Resume
+                  </button>
+                )}
                 {canCancel(download) && (
                   <button
                     type="button"
@@ -418,7 +450,11 @@ function DownloadProgressBar({ download }: { download: Download }) {
 }
 
 function canCancel(download: Download): boolean {
-  return ['queued', 'inspecting', 'downloading', 'processing'].includes(download.status)
+  return ['queued', 'inspecting', 'downloading', 'processing', 'paused'].includes(download.status)
+}
+
+function canPause(download: Download): boolean {
+  return download.status === 'downloading' || download.status === 'processing'
 }
 
 function canRetry(download: Download): boolean {
