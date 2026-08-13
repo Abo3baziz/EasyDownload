@@ -46,6 +46,9 @@ function isUsableFormat(format: YtDlpFormat): boolean {
   if (!format.url) {
     return false
   }
+  if ((format.ext ?? '').toLowerCase() === 'webm') {
+    return false
+  }
   return isRealCodec(format.vcodec) || isRealCodec(format.acodec)
 }
 

@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Removed WebM as a supported conversion format: the "WebM video (VP9)" conversion option, the `vp9` video codec (type, zod schema, and FFmpeg argument map), and the `.webm` output-extension mapping were removed. Video conversion is now MP4 (H.264/HEVC) or MKV; audio extraction (MP3/AAC/Opus/FLAC) is unchanged. WebM references that reflect real yt-dlp inspection output or download fixtures are retained.
+- Removed WebM as a supported format: WebM video and audio formats are no longer offered as download options (filtered from the inspected format list), the "WebM video (VP9)" conversion option, the `vp9` video codec (type, zod schema, and FFmpeg argument map), and the `.webm` output-extension mapping were removed. Download formats are now the non-WebM formats reported by yt-dlp; video conversion is MP4 (H.264/HEVC) or MKV; audio extraction (MP3/AAC/Opus/FLAC) is unchanged. WebM references that reflect real yt-dlp inspection output or download fixtures are retained.
 
 ## 2026-08-13
 

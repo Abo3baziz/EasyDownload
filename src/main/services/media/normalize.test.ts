@@ -136,6 +136,34 @@ describe('normalizeFormats', () => {
     expect(normalizeFormats([storyboard])).toEqual([])
   })
 
+  it('drops WebM formats from download options', () => {
+    const webmVideo: YtDlpFormat = {
+      format_id: '248',
+      ext: 'webm',
+      height: 1080,
+      vcodec: 'vp9',
+      acodec: 'none',
+      url: 'https://example.com/v.webm'
+    }
+    const webmAudio: YtDlpFormat = {
+      format_id: '251',
+      ext: 'webm',
+      vcodec: 'none',
+      acodec: 'opus',
+      url: 'https://example.com/a.webm'
+    }
+    const mp4: YtDlpFormat = {
+      format_id: '18',
+      ext: 'mp4',
+      height: 360,
+      vcodec: 'avc1',
+      acodec: 'mp4a',
+      url: 'https://example.com/v.mp4'
+    }
+    const formats = normalizeFormats([webmVideo, webmAudio, mp4])
+    expect(formats.map((f) => f.id)).toEqual(['18'])
+  })
+
   it('deduplicates formats that share the same label', () => {
     const dup: YtDlpFormat = {
       format_id: '137-1',
