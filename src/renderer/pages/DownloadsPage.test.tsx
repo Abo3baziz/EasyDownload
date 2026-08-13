@@ -72,6 +72,10 @@ function downloadingDownload() {
   }
 }
 
+async function openSection(name: string): Promise<void> {
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(`^${name}`) }))
+}
+
 describe('DownloadsPage', () => {
   beforeEach(() => {
     window.mediaDownloader = createApiMock()
@@ -87,12 +91,86 @@ describe('DownloadsPage', () => {
     expect(await screen.findByText(/No downloads yet/)).toBeInTheDocument()
   })
 
+  it('shows section navigation cards with counts instead of items', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        completedDownload(),
+        downloadingDownload(),
+        { ...downloadingDownload(), id: 'dl-paused', status: 'paused' }
+      ]
+    })
+
+    render(<DownloadsPage />)
+
+    expect(await screen.findByRole('button', { name: /^Completed/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Queue/ })).toHaveTextContent('2 downloads')
+    expect(screen.getByRole('button', { name: /^Cancelled/ })).toHaveTextContent('0 downloads')
+    expect(screen.getByRole('button', { name: /^Failed/ })).toHaveTextContent('0 downloads')
+    expect(screen.queryByText('Finished Video')).not.toBeInTheDocument()
+    expect(screen.queryByText('Example Video')).not.toBeInTheDocument()
+  })
+
+  it('opens a dedicated section page and navigates back', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [completedDownload(), downloadingDownload()]
+    })
+
+    render(<DownloadsPage />)
+
+    await openSection('Completed')
+
+    expect(await screen.findByRole('heading', { name: 'Completed' })).toBeInTheDocument()
+    expect(screen.getByText('Finished Video')).toBeInTheDocument()
+    expect(screen.queryByText('Example Video')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '← Downloads' }))
+
+    expect(await screen.findByRole('button', { name: /^Completed/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Queue/ })).toBeInTheDocument()
+  })
+
+  it('shows an empty state on a dedicated section page with no items', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [downloadingDownload()]
+    })
+
+    render(<DownloadsPage />)
+
+    await openSection('Failed')
+
+    expect(await screen.findByText('No failed downloads.')).toBeInTheDocument()
+  })
+
+  it('updates section counts when a download status changes', async () => {
+    const active = downloadingDownload()
+    let listener: ((download: typeof active) => void) | undefined
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({ ok: true, data: [active] })
+    window.mediaDownloader.onDownloadStateChange = vi.fn((callback) => {
+      listener = callback as typeof listener
+      return () => undefined
+    })
+
+    render(<DownloadsPage />)
+
+    expect(await screen.findByRole('button', { name: /^Queue/ })).toHaveTextContent('1 download')
+    expect(screen.getByRole('button', { name: /^Completed/ })).toHaveTextContent('0 downloads')
+
+    act(() => listener?.({ ...active, status: 'completed' }))
+
+    expect(await screen.findByRole('button', { name: /^Completed/ })).toHaveTextContent('1 download')
+    expect(screen.getByRole('button', { name: /^Queue/ })).toHaveTextContent('0 downloads')
+  })
+
   it('displays download progress and a cancel action for an active download', async () => {
     window.mediaDownloader.listDownloads = vi
       .fn()
       .mockResolvedValue({ ok: true, data: [downloadingDownload()] })
 
     render(<DownloadsPage />)
+    await openSection('Queue')
 
     expect(await screen.findByText('Example Video')).toBeInTheDocument()
     expect(await screen.findByText(/42%/)).toBeInTheDocument()
@@ -111,6 +189,7 @@ describe('DownloadsPage', () => {
       .mockResolvedValue({ ok: true, data: { ...downloadingDownload(), status: 'cancelled' } })
 
     render(<DownloadsPage />)
+    await openSection('Queue')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
 
@@ -135,6 +214,7 @@ describe('DownloadsPage', () => {
     })
 
     render(<DownloadsPage />)
+    await openSection('Queue')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Pause' }))
     expect(window.mediaDownloader.pauseDownload).toHaveBeenCalledWith('dl-1')
@@ -166,6 +246,7 @@ describe('DownloadsPage', () => {
       .mockResolvedValue({ ok: true, data: { ...downloadingDownload(), id: 'dl-2' } })
 
     render(<DownloadsPage />)
+    await openSection('Failed')
 
     expect(await screen.findByText('Broken Video')).toBeInTheDocument()
     expect(screen.getByText(/NetworkError: The network request failed/)).toBeInTheDocument()
@@ -195,6 +276,7 @@ describe('DownloadsPage', () => {
     window.mediaDownloader.openFile = vi.fn().mockResolvedValue({ ok: true, data: undefined })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open file' }))
 
@@ -222,6 +304,7 @@ describe('DownloadsPage', () => {
       .mockResolvedValue({ ok: true, data: undefined })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open File Location' }))
 
@@ -253,6 +336,7 @@ describe('DownloadsPage', () => {
       .mockResolvedValue({ ok: true, data: undefined })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     const buttons = await screen.findAllByRole('button', { name: 'Open File Location' })
     fireEvent.click(buttons[1]!)
@@ -280,6 +364,7 @@ describe('DownloadsPage', () => {
     })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     expect(await screen.findByText(/video\.mp4 · 100 MB/)).toBeInTheDocument()
   })
@@ -291,6 +376,7 @@ describe('DownloadsPage', () => {
     })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     const image = await screen.findByRole('img', { name: 'Finished Video' })
     expect(image).toHaveAttribute('src', 'https://img.example.com/thumb.jpg')
@@ -317,6 +403,7 @@ describe('DownloadsPage', () => {
     })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     expect(await screen.findByText('No thumbnail')).toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
@@ -330,6 +417,7 @@ describe('DownloadsPage', () => {
     })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     const image = await screen.findByRole('img', { name: 'Finished Video' })
     fireEvent.error(image)
@@ -358,6 +446,7 @@ describe('DownloadsPage', () => {
     })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     expect(await screen.findByText('Finished Video')).toBeInTheDocument()
     expect(screen.getByText(/video\.mp4 · 100 MB/)).toBeInTheDocument()
@@ -402,6 +491,7 @@ describe('DownloadsPage', () => {
       .mockResolvedValue({ ok: true, data: {} })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Convert' }))
 
@@ -425,6 +515,7 @@ describe('DownloadsPage', () => {
       .mockResolvedValue({ ok: true, data: {} })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     const select = await screen.findByLabelText('Conversion format')
     fireEvent.change(select, { target: { value: '2' } })
@@ -454,6 +545,7 @@ describe('DownloadsPage', () => {
       .mockResolvedValue({ ok: true, data: {} })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     await act(async () => {
       listener?.({
@@ -487,6 +579,7 @@ describe('DownloadsPage', () => {
     window.mediaDownloader.openFile = vi.fn().mockResolvedValue({ ok: true, data: undefined })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     await act(async () => {
       listener?.({
@@ -544,6 +637,7 @@ describe('DownloadsPage', () => {
     window.mediaDownloader.openFile = vi.fn().mockResolvedValue({ ok: true, data: undefined })
 
     render(<DownloadsPage />)
+    await openSection('Completed')
 
     expect(await screen.findByText('Converted audio')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Converted audio thumbnail' })).toHaveAttribute(

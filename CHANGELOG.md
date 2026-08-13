@@ -4,6 +4,12 @@
 
 ### Added
 
+- Downloads page navigation sections: the Downloads page now acts as a section selector with navigation cards (Completed, Queue, Cancelled, Failed) showing live download counts. Clicking a card opens a dedicated full-page view for that status (filtered by the existing status model, reusing the same download item card), with a "← Downloads" button back to the selector. Empty section pages show an appropriate empty message, and counts update automatically when statuses change.
+
+## 2026-08-13
+
+### Added
+
 - Open File Location action for completed downloads and converted audio items on the Downloads page. The action uses the persisted file path (`Download.destination` / `Conversion.output`) via a new `file:open-location` IPC channel, verifies the file exists before opening, and opens the OS file manager with the file selected (`shell.showItemInFolder`). Missing or invalid paths fail gracefully with a `FilesystemError` instead of crashing.
 
 ## 2026-08-13

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Conversion, ConversionStartOptions } from '../../shared/types/conversion'
 import type { AppError } from '../../shared/types/errors'
-import type { Download } from '../../shared/types/download'
+import type { Download, DownloadStatus } from '../../shared/types/download'
 import { ConversionControl } from '../components/ConversionControl'
 import { EmptyState } from '../components/EmptyState'
 import { StatusBadge } from '../components/StatusBadge'
@@ -14,6 +14,7 @@ export function DownloadsPage() {
   const [conversions, setConversions] = useState<Record<string, Conversion>>({})
   const [error, setError] = useState<AppError | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [activeSection, setActiveSection] = useState<DownloadSectionKey | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -167,11 +168,40 @@ export function DownloadsPage() {
     )
   }
 
-  if (!loaded || downloads.length === 0) {
+  const selected = SECTION_DEFINITIONS.find((section) => section.key === activeSection) ?? null
+
+  if (selected) {
+    const items = downloads.filter((download) => selected.statuses.includes(download.status))
     return (
       <section className="page">
-        <h1>Downloads</h1>
-        <EmptyState message="No downloads yet. Inspect a media URL to get started." />
+        <div className="section-page-header">
+          <button type="button" className="btn" onClick={() => setActiveSection(null)}>
+            ← Downloads
+          </button>
+          <h1>{selected.title}</h1>
+        </div>
+        {items.length === 0 ? (
+          <EmptyState message={selected.emptyMessage} />
+        ) : (
+          <ul className="download-list">
+            {items.map((download) => (
+              <DownloadListItem
+                key={download.id}
+                download={download}
+                conversions={conversions}
+                onCancel={(item) => void handleCancel(item)}
+                onPause={(item) => void handlePause(item)}
+                onResume={(item) => void handleResume(item)}
+                onRetry={(item) => void handleRetry(item)}
+                onOpenFile={(item) => void handleOpenFile(item)}
+                onOpenFileLocation={(path) => void handleOpenFileLocation(path)}
+                onStartConversion={(item, options) => void handleStartConversion(item, options)}
+                onCancelConversion={(id) => void handleCancelConversion(id)}
+                onOpenConversion={(path) => void handleOpenConversion(path)}
+              />
+            ))}
+          </ul>
+        )}
       </section>
     )
   }
@@ -179,6 +209,22 @@ export function DownloadsPage() {
   const hasHistory = downloads.some((download) =>
     ['completed', 'failed', 'cancelled'].includes(download.status)
   )
+
+  if (!loaded || downloads.length === 0) {
+    return (
+      <section className="page">
+        <div className="page-header">
+          <h1>Downloads</h1>
+          {hasHistory && (
+            <button type="button" className="btn" onClick={() => void handleClearHistory()}>
+              Clear history
+            </button>
+          )}
+        </div>
+        <EmptyState message="No downloads yet. Inspect a media URL to get started." />
+      </section>
+    )
+  }
 
   return (
     <section className="page">
@@ -190,108 +236,167 @@ export function DownloadsPage() {
           </button>
         )}
       </div>
-      <ul className="download-list">
-        {downloads.map((download) => {
-          const conversion = latestConversionFor(conversions, download.destination)
+      <div className="download-sections">
+        {SECTION_DEFINITIONS.map((section) => {
+          const count = downloads.filter((download) =>
+            section.statuses.includes(download.status)
+          ).length
           return (
-            <li key={download.id} className="download-item">
-              <div className="download-header">
-                <DownloadThumbnail download={download} />
-                <div className="download-main">
-                  <span className="download-title">{download.title ?? download.url}</span>
-                  <StatusBadge status={download.status} />
-                </div>
-              </div>
-              <DownloadProgressBar download={download} />
-              {download.status === 'completed' &&
-                download.fileName &&
-                download.fileSize !== undefined && (
-                  <p className="download-meta">
-                    {download.fileName} · {formatBytes(download.fileSize)}
-                  </p>
-                )}
-              <DownloadMetadata download={download} />
-              {download.error && (
-                <p className="download-error">
-                  {download.error.code}: {download.error.message}
-                </p>
-              )}
-              <div className="download-actions">
-                {canPause(download) && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => void handlePause(download)}
-                  >
-                    Pause
-                  </button>
-                )}
-                {download.status === 'paused' && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => void handleResume(download)}
-                  >
-                    Resume
-                  </button>
-                )}
-                {canCancel(download) && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => void handleCancel(download)}
-                  >
-                    Cancel
-                  </button>
-                )}
-                {canRetry(download) && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => void handleRetry(download)}
-                  >
-                    Retry
-                  </button>
-                )}
-                {download.status === 'completed' && download.destination && (
-                  <>
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => void handleOpenFile(download)}
-                    >
-                      Open file
-                    </button>
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => void handleOpenFileLocation(download.destination!)}
-                    >
-                      Open File Location
-                    </button>
-                  </>
-                )}
-              </div>
-              {download.status === 'completed' && download.destination && (
-                <ConvertedAudioList
-                  conversions={conversions}
-                  source={download.destination}
-                  onOpen={(path) => void handleOpenConversion(path)}
-                  onOpenLocation={(path) => void handleOpenFileLocation(path)}
-                />
-              )}
-              {download.status === 'completed' && download.destination && (
-                <ConversionControl
-                  conversion={conversion}
-                  onStart={(options) => void handleStartConversion(download, options)}
-                  onCancel={(id) => void handleCancelConversion(id)}
-                />
-              )}
-            </li>
+            <button
+              key={section.key}
+              type="button"
+              className="download-section-card"
+              onClick={() => setActiveSection(section.key)}
+            >
+              <span className="download-section-card-title">{section.title}</span>
+              <span className="download-section-card-subtitle">
+                {count === 1 ? '1 download' : `${count} downloads`}
+              </span>
+            </button>
           )
         })}
-      </ul>
+      </div>
     </section>
+  )
+}
+
+type DownloadSectionKey = 'completed' | 'queue' | 'cancelled' | 'failed'
+
+const SECTION_DEFINITIONS: ReadonlyArray<{
+  key: DownloadSectionKey
+  title: string
+  statuses: DownloadStatus[]
+  emptyMessage: string
+}> = [
+  {
+    key: 'completed',
+    title: 'Completed',
+    statuses: ['completed'],
+    emptyMessage: 'No completed downloads.'
+  },
+  {
+    key: 'queue',
+    title: 'Queue',
+    statuses: ['queued', 'inspecting', 'downloading', 'processing', 'paused'],
+    emptyMessage: 'No downloads in the queue.'
+  },
+  {
+    key: 'cancelled',
+    title: 'Cancelled',
+    statuses: ['cancelled'],
+    emptyMessage: 'No cancelled downloads.'
+  },
+  {
+    key: 'failed',
+    title: 'Failed',
+    statuses: ['failed'],
+    emptyMessage: 'No failed downloads.'
+  }
+]
+
+interface DownloadListItemProps {
+  download: Download
+  conversions: Record<string, Conversion>
+  onCancel: (download: Download) => void
+  onPause: (download: Download) => void
+  onResume: (download: Download) => void
+  onRetry: (download: Download) => void
+  onOpenFile: (download: Download) => void
+  onOpenFileLocation: (path: string) => void
+  onStartConversion: (download: Download, options: Omit<ConversionStartOptions, 'input'>) => void
+  onCancelConversion: (id: string) => void
+  onOpenConversion: (path: string) => void
+}
+
+function DownloadListItem({
+  download,
+  conversions,
+  onCancel,
+  onPause,
+  onResume,
+  onRetry,
+  onOpenFile,
+  onOpenFileLocation,
+  onStartConversion,
+  onCancelConversion,
+  onOpenConversion
+}: DownloadListItemProps) {
+  const conversion = latestConversionFor(conversions, download.destination)
+  return (
+    <li className="download-item">
+      <div className="download-header">
+        <DownloadThumbnail download={download} />
+        <div className="download-main">
+          <span className="download-title">{download.title ?? download.url}</span>
+          <StatusBadge status={download.status} />
+        </div>
+      </div>
+      <DownloadProgressBar download={download} />
+      {download.status === 'completed' &&
+        download.fileName &&
+        download.fileSize !== undefined && (
+          <p className="download-meta">
+            {download.fileName} · {formatBytes(download.fileSize)}
+          </p>
+        )}
+      <DownloadMetadata download={download} />
+      {download.error && (
+        <p className="download-error">
+          {download.error.code}: {download.error.message}
+        </p>
+      )}
+      <div className="download-actions">
+        {canPause(download) && (
+          <button type="button" className="btn" onClick={() => onPause(download)}>
+            Pause
+          </button>
+        )}
+        {download.status === 'paused' && (
+          <button type="button" className="btn" onClick={() => onResume(download)}>
+            Resume
+          </button>
+        )}
+        {canCancel(download) && (
+          <button type="button" className="btn" onClick={() => onCancel(download)}>
+            Cancel
+          </button>
+        )}
+        {canRetry(download) && (
+          <button type="button" className="btn" onClick={() => onRetry(download)}>
+            Retry
+          </button>
+        )}
+        {download.status === 'completed' && download.destination && (
+          <>
+            <button type="button" className="btn" onClick={() => onOpenFile(download)}>
+              Open file
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => onOpenFileLocation(download.destination!)}
+            >
+              Open File Location
+            </button>
+          </>
+        )}
+      </div>
+      {download.status === 'completed' && download.destination && (
+        <ConvertedAudioList
+          conversions={conversions}
+          source={download.destination}
+          onOpen={(path) => onOpenConversion(path)}
+          onOpenLocation={(path) => onOpenFileLocation(path)}
+        />
+      )}
+      {download.status === 'completed' && download.destination && (
+        <ConversionControl
+          conversion={conversion}
+          onStart={(options) => onStartConversion(download, options)}
+          onCancel={(id) => onCancelConversion(id)}
+        />
+      )}
+    </li>
   )
 }
 
