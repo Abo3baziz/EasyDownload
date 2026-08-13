@@ -219,6 +219,8 @@ window.mediaDownloader.clearHistory()
 window.mediaDownloader.onDownloadProgress()
 window.mediaDownloader.startConversion()
 window.mediaDownloader.onConversionStateChange()
+window.mediaDownloader.listInspectionHistory()
+window.mediaDownloader.onInspectionHistoryChange()
 ```
 
 The exact API is subject to implementation.
@@ -284,6 +286,8 @@ Main Process
 │
 ├── History Manager
 │
+├── Inspection History Manager
+│
 ├── Notification Manager
 │
 ├── FFmpeg Service
@@ -292,6 +296,8 @@ Main Process
 ```
 
 The Notification Manager owns desktop notifications (FR-015). It observes the Download Manager's update stream and, when notifications are enabled in settings, surfaces download completion and failure to the user. Notification behavior is isolated from the core download workflow: the Download Manager is unaware of notifications, and notification failures are swallowed so they never affect downloads.
+
+The Inspection History Manager records every successful URL inspection as a persistent, offline-available history entry (URL, thumbnail reference, operation, absolute timestamp) using the shared JSON store (`inspection-history.json` in the user data directory). It lazy-loads persisted entries, saves new entries before surfacing them, and broadcasts each new entry over IPC so the Home page History section updates live without an app restart. Persistence failures are logged and never break the inspection flow, and a missing or remote thumbnail never prevents an entry from being stored.
 
 The FFmpeg Service wraps the FFmpeg executable for merge, convert, and audio-extraction operations. See section 13.
 
@@ -691,6 +697,8 @@ download:retry
 download:get
 download:list
 history:clear
+inspectionHistory:list
+inspectionHistory:state
 dialog:select-directory
 file:open
 file:open-directory
@@ -756,6 +764,8 @@ sequenceDiagram
     Main-->>UI: Media result
     UI-->>User: Display media
 ```
+
+On a successful inspection, the main process also records an entry through the Inspection History Manager (URL, thumbnail reference, `INSPECTED` operation, absolute timestamp) and broadcasts it so the Home page History section can update live. History recording never prevents the inspection result from being returned.
 
 ---
 

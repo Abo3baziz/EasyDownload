@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { PreloadApi } from '../shared/types/preload'
@@ -30,7 +30,9 @@ function createApiMock(): PreloadApi {
     cancelConversion: vi.fn(),
     listConversions: vi.fn().mockResolvedValue({ ok: true, data: [] }),
     onDownloadStateChange: vi.fn(() => () => undefined),
-    onConversionStateChange: vi.fn(() => () => undefined)
+    onConversionStateChange: vi.fn(() => () => undefined),
+    listInspectionHistory: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+    onInspectionHistoryChange: vi.fn(() => () => undefined)
   }
 }
 
@@ -39,8 +41,13 @@ describe('App', () => {
     window.mediaDownloader = createApiMock()
   })
 
-  it('renders the navigation and the home page', () => {
+  async function renderApp() {
     render(<App />)
+    await act(async () => {})
+  }
+
+  it('renders the navigation and the home page', async () => {
+    await renderApp()
 
     expect(screen.getByRole('navigation')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument()
@@ -50,7 +57,7 @@ describe('App', () => {
   })
 
   it('navigates to the settings page', async () => {
-    render(<App />)
+    await renderApp()
 
     await screen.getByRole('button', { name: 'Settings' }).click()
 
@@ -70,7 +77,7 @@ describe('App', () => {
       }
     })
 
-    render(<App />)
+    await renderApp()
 
     fireEvent.change(screen.getByLabelText('Media URL'), {
       target: { value: 'https://example.com/video-a' }
@@ -101,7 +108,7 @@ describe('App', () => {
       }
     })
 
-    render(<App />)
+    await renderApp()
 
     fireEvent.change(screen.getByLabelText('Media URL'), {
       target: { value: 'https://example.com/video-a' }
@@ -148,7 +155,7 @@ describe('App', () => {
       }
     })
 
-    render(<App />)
+    await renderApp()
 
     fireEvent.change(screen.getByLabelText('Media URL'), {
       target: { value: 'https://example.com/video-a' }

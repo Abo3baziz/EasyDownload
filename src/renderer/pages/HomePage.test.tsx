@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MediaInfo } from '../../shared/types/media'
 import type { PreloadApi } from '../../shared/types/preload'
+import { HistoryStateProvider } from '../state/historyState'
 import { HomeStateProvider } from '../state/homeState'
 import { HomePage } from './HomePage'
 
@@ -30,14 +31,18 @@ function createApiMock(): PreloadApi {
     cancelConversion: vi.fn(),
     listConversions: vi.fn().mockResolvedValue({ ok: true, data: [] }),
     onDownloadStateChange: vi.fn(() => () => undefined),
-    onConversionStateChange: vi.fn(() => () => undefined)
+    onConversionStateChange: vi.fn(() => () => undefined),
+    listInspectionHistory: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+    onInspectionHistoryChange: vi.fn(() => () => undefined)
   }
 }
 
 function renderHome() {
   return render(
     <HomeStateProvider>
-      <HomePage />
+      <HistoryStateProvider>
+        <HomePage />
+      </HistoryStateProvider>
     </HomeStateProvider>
   )
 }
@@ -71,6 +76,7 @@ describe('HomePage', () => {
 
   async function submitUrl(url: string) {
     renderHome()
+    await act(async () => {})
     fireEvent.change(screen.getByLabelText('Media URL'), { target: { value: url } })
     fireEvent.click(screen.getByRole('button', { name: 'Inspect' }))
   }
@@ -445,6 +451,7 @@ describe('HomePage', () => {
       .mockResolvedValueOnce(inspectResult(mediaFor('https://example.com/video-b')))
 
     renderHome()
+    await act(async () => {})
     const input = screen.getByLabelText('Media URL')
 
     fireEvent.change(input, { target: { value: 'https://example.com/video-a' } })

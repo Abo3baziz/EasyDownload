@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { DownloadsPage } from './pages/DownloadsPage'
 import { HomePage } from './pages/HomePage'
 import { SettingsPage } from './pages/SettingsPage'
+import { HistoryStateProvider } from './state/historyState'
 import { HomeStateProvider } from './state/homeState'
 
 type Tab = 'home' | 'downloads' | 'settings'
@@ -17,25 +18,27 @@ export default function App() {
 
   return (
     <HomeStateProvider>
-      <div className="app">
-        <nav className="app-nav" aria-label="Primary">
-          {TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={tab === item.id ? 'app-nav-item active' : 'app-nav-item'}
-              onClick={() => setTab(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        <main className="app-content">
-          {tab === 'home' && <HomePage />}
-          {tab === 'downloads' && <DownloadsPage />}
-          {tab === 'settings' && <SettingsPage />}
-        </main>
-      </div>
+      <HistoryStateProvider>
+        <div className="app">
+          <nav className="app-nav" aria-label="Primary">
+            {TABS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={tab === item.id ? 'app-nav-item active' : 'app-nav-item'}
+                onClick={() => setTab(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          <main className="app-content">
+            {tab === 'home' && <HomePage />}
+            {tab === 'downloads' && <DownloadsPage />}
+            {tab === 'settings' && <SettingsPage />}
+          </main>
+        </div>
+      </HistoryStateProvider>
     </HomeStateProvider>
   )
 }

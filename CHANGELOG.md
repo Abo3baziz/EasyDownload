@@ -4,6 +4,12 @@
 
 ### Added
 
+- Home page inspection history: a new History section on the Home page shows the URLs previously inspected. Each successful inspection creates a persistent entry (URL, thumbnail reference, `INSPECTED` operation, absolute timestamp) recorded by a new Inspection History Manager main-process service and stored offline in `inspection-history.json` (reusing the existing `createJsonStore<T>` helper). Entries are sorted newest first, grouped by the user's local calendar day (`Today`, `Yesterday`, or a readable date), and each shows a truncated URL with a full-URL tooltip, the inspection thumbnail (with a `No thumbnail` fallback when missing or offline), and an `Inspected · <relative time>` indicator. Re-inspecting a URL adds a new entry at the top. A renderer `HistoryStateProvider` loads history on startup and subscribes to a new `inspectionHistory:state` event so new entries appear automatically without restarting; persistence failures are logged and never block the inspection result.
+
+## 2026-08-13
+
+### Added
+
 - Prevent duplicate downloads: starting a download for a video and format that has already been completed no longer creates a second job; the Download Manager rejects it and the Home page notifies the user that the video was already downloaded in that format. Different formats of the same video are still allowed, and re-downloading after a failed or cancelled attempt (or after the previous file was deleted) remains possible.
 
 ## 2026-08-13

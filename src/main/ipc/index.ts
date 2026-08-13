@@ -12,9 +12,14 @@ import type { Services } from '../services'
 import { registerIpcHandler } from './handle'
 
 export function registerIpc(services: Services): void {
-  registerIpcHandler(ipcMain, IPC_CHANNELS.mediaInspect, inspectUrlSchema, ({ url }) =>
-    services.media.inspectUrl(url)
-  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.mediaInspect, inspectUrlSchema, async ({ url }) => {
+    const media = await services.media.inspectUrl(url)
+    await services.inspectionHistory.add({
+      url,
+      thumbnail: media.thumbnail
+    })
+    return media
+  })
   registerIpcHandler(ipcMain, IPC_CHANNELS.downloadCreate, downloadOptionsSchema, (options) =>
     services.downloads.create(options)
   )
@@ -72,6 +77,9 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.conversionList, undefined, () =>
     services.conversions.list()
   )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.inspectionHistoryList, undefined, () =>
+    services.inspectionHistory.list()
+  )
 
   services.downloads.onUpdate((download) => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -83,6 +91,12 @@ export function registerIpc(services: Services): void {
   services.conversions.onUpdate((conversion) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(IPC_CHANNELS.conversionStateEvent, conversion)
+    }
+  })
+
+  services.inspectionHistory.onUpdate((entry) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send(IPC_CHANNELS.inspectionHistoryStateEvent, entry)
     }
   })
 }
