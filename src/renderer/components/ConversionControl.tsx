@@ -8,10 +8,6 @@ const CONVERSION_OPTIONS: readonly { label: string; options: Omit<ConversionStar
     options: { type: 'convert', videoCodec: 'h264', audioCodec: 'copy' }
   },
   {
-    label: 'WebM video (VP9)',
-    options: { type: 'convert', videoCodec: 'vp9', audioCodec: 'copy' }
-  },
-  {
     label: 'MP3 audio',
     options: { type: 'extractAudio', audioCodec: 'mp3' }
   },

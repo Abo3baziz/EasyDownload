@@ -1,6 +1,6 @@
 import type { AppError } from './errors'
 
-export type VideoCodec = 'copy' | 'h264' | 'hevc' | 'vp9'
+export type VideoCodec = 'copy' | 'h264' | 'hevc'
 export type AudioCodec = 'copy' | 'mp3' | 'aac' | 'opus' | 'flac' | 'vorbis'
 
 export type ConversionType = 'convert' | 'extractAudio'

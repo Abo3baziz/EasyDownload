@@ -518,7 +518,7 @@ describe('DownloadsPage', () => {
     await openSection('Completed')
 
     const select = await screen.findByLabelText('Conversion format')
-    fireEvent.change(select, { target: { value: '2' } })
+    fireEvent.change(select, { target: { value: '1' } })
     fireEvent.click(screen.getByRole('button', { name: 'Convert' }))
 
     expect(window.mediaDownloader.startConversion).toHaveBeenCalledWith({
