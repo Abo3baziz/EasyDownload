@@ -357,6 +357,43 @@ describe('HomePage', () => {
     expect(screen.getByRole('button', { name: 'Download' })).toBeEnabled()
   })
 
+  it('notifies the user when the video was already downloaded in that format', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
+      inspectResult({
+        id: 'abc',
+        title: 'Example Video',
+        website: 'www.youtube.com',
+        formats: [
+          { id: '137', label: '1080p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
+        ]
+      })
+    )
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.startDownload = vi.fn().mockResolvedValue({
+      ok: false,
+      error: {
+        code: 'DownloadError',
+        message: 'This video has already been downloaded in this format.'
+      }
+    })
+
+    await submitUrl('https://www.youtube.com/watch?v=abc')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This video has already been downloaded in this format.'
+    )
+    expect(window.mediaDownloader.startDownload).toHaveBeenCalledWith({
+      url: 'https://www.youtube.com/watch?v=abc',
+      formatId: '137',
+      directory: 'C:\\Downloads'
+    })
+  })
+
   it('clears the URL input and the displayed inspection when Clear is clicked', async () => {
     window.mediaDownloader.inspectUrl = vi
       .fn()

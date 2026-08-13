@@ -635,6 +635,61 @@ describe('createDownloadManager', () => {
     })
   })
 
+  it('rejects creating a download for the same video and format when already completed', async () => {
+    const records = [terminalRecord({ id: 'dl-old', status: 'completed' })]
+    const { history } = createMockHistory(records)
+    const ytDlp = createMockYtDlp()
+    const manager = createDownloadManager({ ytDlp, history, generateId: () => 'dl-new' })
+
+    await expect(manager.create(OPTIONS)).rejects.toThrow(
+      'This video has already been downloaded in this format.'
+    )
+  })
+
+  it('allows downloading the same video at a different format after completion', async () => {
+    const records = [terminalRecord({ id: 'dl-old', status: 'completed' })]
+    const { history } = createMockHistory(records)
+    const ytDlp = createMockYtDlp()
+    const manager = createDownloadManager({ ytDlp, history, generateId: () => 'dl-new' })
+
+    const download = await manager.create({ ...OPTIONS, formatId: '18' })
+
+    expect(download.status).toBe('queued')
+    expect(download.formatId).toBe('18')
+  })
+
+  it('allows re-downloading after a failed or cancelled attempt', async () => {
+    const records = [
+      terminalRecord({ id: 'dl-failed', status: 'failed', formatId: '137' }),
+      terminalRecord({ id: 'dl-cancelled', status: 'cancelled', formatId: '137' })
+    ]
+    const { history } = createMockHistory(records)
+    const ytDlp = createMockYtDlp()
+    const manager = createDownloadManager({ ytDlp, history, generateId: () => 'dl-new' })
+
+    const download = await manager.create(OPTIONS)
+
+    expect(download.status).toBe('queued')
+  })
+
+  it('allows re-downloading when the previous completed file no longer exists', async () => {
+    const records = [
+      terminalRecord({ id: 'dl-old', status: 'completed', destination: 'D:\\Downloads\\gone.mp4' })
+    ]
+    const { history } = createMockHistory(records)
+    const ytDlp = createMockYtDlp()
+    const manager = createDownloadManager({
+      ytDlp,
+      history,
+      fileExists: () => false,
+      generateId: () => 'dl-new'
+    })
+
+    const download = await manager.create(OPTIONS)
+
+    expect(download.status).toBe('queued')
+  })
+
   it('removes a completed download from history when its file no longer exists', async () => {
     const records = [
       terminalRecord({ id: 'dl-old', destination: 'D:\\Downloads\\gone.mp4' })
@@ -765,7 +820,7 @@ describe('createDownloadManager', () => {
     const { handle } = downloadHandle()
     ytDlp.startDownload.mockReturnValue(handle)
     const manager = createDownloadManager({ ytDlp, history, generateId: () => 'dl-1' })
-    await manager.create(OPTIONS)
+    await manager.create({ ...OPTIONS, formatId: '18' })
     await manager.start('dl-1')
     await flush()
 

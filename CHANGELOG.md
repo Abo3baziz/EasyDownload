@@ -2,6 +2,12 @@
 
 ## 2026-08-13
 
+### Added
+
+- Prevent duplicate downloads: starting a download for a video and format that has already been completed no longer creates a second job; the Download Manager rejects it and the Home page notifies the user that the video was already downloaded in that format. Different formats of the same video are still allowed, and re-downloading after a failed or cancelled attempt (or after the previous file was deleted) remains possible.
+
+## 2026-08-13
+
 ### Fixed
 
 - Ghost downloads for the same video at different qualities: the yt-dlp output template now embeds the selected format id (`%(title)s [%(id)s] [<format>].%(ext)s`), so each download of the same video gets its own output file instead of colliding on `Title [id].mp4`. Downloads keep their unique id-based identity; the fix removes the ambiguous file/path association that made two same-video downloads appear as a ghost/duplicate entry.

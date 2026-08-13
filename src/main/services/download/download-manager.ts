@@ -3,6 +3,7 @@ import { unlink } from 'node:fs/promises'
 import { basename } from 'node:path'
 import type { Download, DownloadOptions, DownloadStatus } from '../../../shared/types/download'
 import type { DependencyStatus } from '../../../shared/types/dependencies'
+import { normalizeUrl } from '../../../shared/utils/url'
 import { AppError, toAppError } from '../../utils/errors'
 import type { HistoryManager } from '../history/history-manager'
 import { buildResolution, isRealCodec } from '../media/normalize'
@@ -306,6 +307,20 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
 
   return {
     async create(optionsPayload: DownloadOptions): Promise<Download> {
+      await ensureLoaded()
+      pruneMissingFiles()
+      const alreadyDownloaded = [...jobs.values()].some(
+        (download) =>
+          download.status === 'completed' &&
+          download.formatId === optionsPayload.formatId &&
+          normalizeUrl(download.url) === normalizeUrl(optionsPayload.url)
+      )
+      if (alreadyDownloaded) {
+        throw new AppError(
+          'DownloadError',
+          'This video has already been downloaded in this format.'
+        )
+      }
       const download: Download = {
         id: generateId(),
         url: optionsPayload.url,
