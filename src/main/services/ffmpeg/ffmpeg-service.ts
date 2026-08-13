@@ -65,8 +65,7 @@ const OVERWRITE_ARG = ['-y'] as const
 export const VIDEO_CODEC_ARGS: Record<FfmpegVideoCodec, readonly string[]> = {
   copy: ['-c:v', 'copy'],
   h264: ['-c:v', 'libx264', '-preset', 'fast', '-crf', '23'],
-  hevc: ['-c:v', 'libx265', '-preset', 'fast', '-crf', '28'],
-  vp9: ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '30']
+  hevc: ['-c:v', 'libx265', '-preset', 'fast', '-crf', '28']
 }
 
 export const AUDIO_CODEC_ARGS: Record<FfmpegAudioCodec, readonly string[]> = {

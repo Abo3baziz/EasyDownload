@@ -36,7 +36,7 @@ export const settingsSchema = z
   })
   .strict()
 
-export const videoCodecSchema = z.enum(['copy', 'h264', 'hevc', 'vp9'])
+export const videoCodecSchema = z.enum(['copy', 'h264', 'hevc'])
 
 export const audioCodecSchema = z.enum(['copy', 'mp3', 'aac', 'opus', 'flac', 'vorbis'])
 

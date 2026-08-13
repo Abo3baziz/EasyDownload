@@ -94,9 +94,6 @@ describe('buildConversionOutputPath', () => {
       buildConversionOutputPath('in.mkv', { type: 'convert', videoCodec: 'h264' })
     ).toMatch(/\.mp4$/)
     expect(
-      buildConversionOutputPath('in.mp4', { type: 'convert', videoCodec: 'vp9' })
-    ).toMatch(/\.webm$/)
-    expect(
       buildConversionOutputPath('in.mp4', { type: 'extractAudio', audioCodec: 'flac' })
     ).toMatch(/\.flac$/)
     expect(

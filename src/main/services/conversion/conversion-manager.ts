@@ -252,8 +252,6 @@ function outputExtension(
     case 'h264':
     case 'hevc':
       return 'mp4'
-    case 'vp9':
-      return 'webm'
     case 'copy':
       return 'mkv'
   }

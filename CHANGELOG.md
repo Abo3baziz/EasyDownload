@@ -2,6 +2,12 @@
 
 ## 2026-08-13
 
+### Changed
+
+- Removed WebM as a supported conversion format: the "WebM video (VP9)" conversion option, the `vp9` video codec (type, zod schema, and FFmpeg argument map), and the `.webm` output-extension mapping were removed. Video conversion is now MP4 (H.264/HEVC) or MKV; audio extraction (MP3/AAC/Opus/FLAC) is unchanged. WebM references that reflect real yt-dlp inspection output or download fixtures are retained.
+
+## 2026-08-13
+
 ### Added
 
 - Download file location and existence tracking: the Download Manager now prunes completed downloads whose persisted file path no longer exists on disk whenever the download list is loaded or refreshed (including after an app restart). The full path remains the source of truth on each record, checks run entirely in the main process via `existsSync`, the pruned result is re-persisted to download history, and legacy completed records without a stored path are kept because they cannot be verified.
@@ -77,7 +83,7 @@
 
 ### Added
 
-- Media conversion feature: a new Conversion Manager runs post-download conversions through the FFmpeg Service (convert to MP4/WebM, or extract MP3/AAC/Opus/FLAC audio), deriving an output path next to the source (never overwriting it), verifying the source exists, and broadcasting `conversion:state` events with normalized progress. New `conversion:start` / `conversion:cancel` IPC channels and preload APIs; the Downloads page shows per-download conversion controls with progress, cancel, and open-converted-file actions. Unit and renderer tests added; verified end-to-end against the bundled FFmpeg binary.
+- Media conversion feature: a new Conversion Manager runs post-download conversions through the FFmpeg Service (convert to MP4/MKV, or extract MP3/AAC/Opus/FLAC audio), deriving an output path next to the source (never overwriting it), verifying the source exists, and broadcasting `conversion:state` events with normalized progress. New `conversion:start` / `conversion:cancel` IPC channels and preload APIs; the Downloads page shows per-download conversion controls with progress, cancel, and open-converted-file actions. Unit and renderer tests added; verified end-to-end against the bundled FFmpeg binary.
 
 ## 2026-08-11
 
