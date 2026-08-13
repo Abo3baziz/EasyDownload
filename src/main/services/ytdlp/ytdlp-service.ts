@@ -81,7 +81,7 @@ export function buildDownloadArgs(
     '-f',
     formatSelector,
     '-o',
-    join(directory, '%(title)s [%(id)s].%(ext)s')
+    join(directory, `%(title)s [%(id)s] [${escapeTemplateLiteral(formatId)}].%(ext)s`)
   ]
   if (options.resume) {
     args.unshift('--continue')
@@ -330,6 +330,10 @@ export function parseProgressLine(line: string): DownloadProgress | undefined {
   }
 
   return progress
+}
+
+function escapeTemplateLiteral(value: string): string {
+  return value.replace(/%/g, '%%')
 }
 
 function isProcessingLine(line: string): boolean {

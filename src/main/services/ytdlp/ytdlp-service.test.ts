@@ -192,7 +192,7 @@ describe('buildDownloadArgs', () => {
       '-f',
       '137',
       '-o',
-      'D:\\Downloads\\%(title)s [%(id)s].%(ext)s',
+      'D:\\Downloads\\%(title)s [%(id)s] [137].%(ext)s',
       'https://example.com/watch?v=1'
     ])
   })
@@ -210,7 +210,7 @@ describe('buildDownloadArgs', () => {
       '-f',
       '137+bestaudio',
       '-o',
-      'D:\\Downloads\\%(title)s [%(id)s].%(ext)s',
+      'D:\\Downloads\\%(title)s [%(id)s] [137].%(ext)s',
       '--merge-output-format',
       'mp4',
       'https://example.com/watch?v=1'
@@ -230,7 +230,7 @@ describe('buildDownloadArgs', () => {
       '-f',
       '248+bestaudio',
       '-o',
-      'D:\\Downloads\\%(title)s [%(id)s].%(ext)s',
+      'D:\\Downloads\\%(title)s [%(id)s] [248].%(ext)s',
       'https://example.com/watch?v=1'
     ])
   })
@@ -249,7 +249,7 @@ describe('buildDownloadArgs', () => {
       '-f',
       '137+bestaudio',
       '-o',
-      'D:\\Downloads\\%(title)s [%(id)s].%(ext)s',
+      'D:\\Downloads\\%(title)s [%(id)s] [137].%(ext)s',
       '--merge-output-format',
       'mp4',
       '--ffmpeg-location',
@@ -261,6 +261,19 @@ describe('buildDownloadArgs', () => {
   it('omits the ffmpeg location when none is provided', () => {
     const args = buildDownloadArgs('https://example.com/watch?v=1', '137', 'D:\\Downloads')
     expect(args).not.toContain('--ffmpeg-location')
+  })
+
+  it('produces distinct output templates for different formats of the same video', () => {
+    const outputOf = (args: readonly string[]): string => {
+      const index = args.indexOf('-o')
+      return args[index + 1]!
+    }
+    const args1080 = buildDownloadArgs('https://example.com/watch?v=1', '137', 'D:\\Downloads')
+    const args720 = buildDownloadArgs('https://example.com/watch?v=1', '18', 'D:\\Downloads')
+
+    expect(outputOf(args1080)).not.toBe(outputOf(args720))
+    expect(outputOf(args1080)).toContain('[137]')
+    expect(outputOf(args720)).toContain('[18]')
   })
 })
 

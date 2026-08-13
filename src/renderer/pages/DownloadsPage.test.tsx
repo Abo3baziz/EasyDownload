@@ -180,6 +180,41 @@ describe('DownloadsPage', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
   })
 
+  it('renders two same-video downloads with different formats as independent items', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'dl-1080p',
+          url: 'https://www.youtube.com/watch?v=abc',
+          title: 'Example Video',
+          status: 'downloading',
+          formatId: '137',
+          progress: { percent: 45 },
+          createdAt: 1,
+          updatedAt: 1
+        },
+        {
+          id: 'dl-720p',
+          url: 'https://www.youtube.com/watch?v=abc',
+          title: 'Example Video',
+          status: 'downloading',
+          formatId: '18',
+          progress: { percent: 20 },
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ]
+    })
+
+    render(<DownloadsPage />)
+    await openSection('Queue')
+
+    expect(await screen.findAllByText('Example Video')).toHaveLength(2)
+    expect(screen.getByText(/45%/)).toBeInTheDocument()
+    expect(screen.getByText(/20%/)).toBeInTheDocument()
+  })
+
   it('cancels a download', async () => {
     window.mediaDownloader.listDownloads = vi
       .fn()
