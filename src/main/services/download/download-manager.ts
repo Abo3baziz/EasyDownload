@@ -32,6 +32,7 @@ export interface DownloadManagerOptions {
   checkFfmpeg?: () => Promise<Pick<DependencyStatus, 'available'>>
   history?: HistoryManager
   statFile?: (path: string) => Promise<{ size: number } | undefined>
+  fileExists?: (path: string) => boolean
   now?: () => number
   generateId?: () => string
 }
@@ -100,6 +101,25 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       .then(() => options.history?.save(records))
       .catch(() => undefined)
     return persistChain
+  }
+
+  function pruneMissingFiles(): void {
+    if (!options.fileExists) {
+      return
+    }
+    let removed = false
+    for (const [id, download] of jobs) {
+      if (download.status === 'completed' && download.destination) {
+        if (!options.fileExists(download.destination)) {
+          jobs.delete(id)
+          configs.delete(id)
+          removed = true
+        }
+      }
+    }
+    if (removed) {
+      void persistHistory()
+    }
   }
 
   function update(id: string, changes: Partial<Download>): Download {
@@ -408,6 +428,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
 
     async list(): Promise<Download[]> {
       await ensureLoaded()
+      pruneMissingFiles()
       return [...jobs.values()]
     },
 
