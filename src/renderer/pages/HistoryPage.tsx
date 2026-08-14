@@ -1,11 +1,12 @@
-import { EmptyState } from '../components/EmptyState'
+import { HistorySection } from '../components/HistorySection'
 
 export function HistoryPage() {
-  // Placeholder section; to be connected to the persisted download history.
   return (
     <section className="page">
-      <h1>History</h1>
-      <EmptyState message="No history yet." />
+      <div className="page-header">
+        <h1>History</h1>
+      </div>
+      <HistorySection />
     </section>
   )
 }

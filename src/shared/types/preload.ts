@@ -2,6 +2,7 @@ import type { Conversion, ConversionStartOptions } from './conversion'
 import type { DependencyStatus } from './dependencies'
 import type { Download, DownloadOptions } from './download'
 import type { AppError } from './errors'
+import type { HistoryEntry } from './history'
 import type { IpcResult } from './ipc'
 import type { MediaInfo } from './media'
 import type { AppSettings } from './settings'
@@ -28,4 +29,6 @@ export interface PreloadApi {
   listConversions(): Promise<IpcResult<Conversion[]>>
   onDownloadStateChange(listener: (download: Download) => void): () => void
   onConversionStateChange(listener: (conversion: Conversion) => void): () => void
+  listInspectionHistory(): Promise<IpcResult<HistoryEntry[]>>
+  onInspectionHistoryChange(listener: (entry: HistoryEntry) => void): () => void
 }

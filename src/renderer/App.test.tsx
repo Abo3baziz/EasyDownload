@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { PreloadApi } from '../shared/types/preload'
@@ -30,7 +30,9 @@ function createApiMock(): PreloadApi {
     cancelConversion: vi.fn(),
     listConversions: vi.fn().mockResolvedValue({ ok: true, data: [] }),
     onDownloadStateChange: vi.fn(() => () => undefined),
-    onConversionStateChange: vi.fn(() => () => undefined)
+    onConversionStateChange: vi.fn(() => () => undefined),
+    listInspectionHistory: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+    onInspectionHistoryChange: vi.fn(() => () => undefined)
   }
 }
 
@@ -39,8 +41,13 @@ describe('App', () => {
     window.mediaDownloader = createApiMock()
   })
 
-  it('renders the sidebar navigation and the home page', () => {
+  async function renderApp() {
     render(<App />)
+    await act(async () => {})
+  }
+
+  it('renders the sidebar navigation and the home page', async () => {
+    await renderApp()
 
     expect(screen.getByRole('navigation')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument()
@@ -56,15 +63,15 @@ describe('App', () => {
   })
 
   it('navigates to the settings page', async () => {
-    render(<App />)
+    await renderApp()
 
     await screen.getByRole('button', { name: 'Settings' }).click()
 
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
   })
 
-  it('navigates to the history placeholder page', async () => {
-    render(<App />)
+  it('navigates to the history section', async () => {
+    await renderApp()
 
     await screen.getByRole('button', { name: 'History' }).click()
 
@@ -72,7 +79,7 @@ describe('App', () => {
   })
 
   it('navigates to each download section', async () => {
-    render(<App />)
+    await renderApp()
 
     fireEvent.click(screen.getByRole('button', { name: 'Downloads' }))
     expect(screen.getByRole('heading', { name: 'Downloads' })).toBeInTheDocument()
@@ -90,8 +97,8 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Failed' })).toBeInTheDocument()
   })
 
-  it('expands and collapses the Download Sections group', () => {
-    render(<App />)
+  it('expands and collapses the Download Sections group', async () => {
+    await renderApp()
 
     const group = screen.getByRole('button', { name: 'Download Sections' })
     expect(group).toHaveAttribute('aria-expanded', 'true')
@@ -103,8 +110,8 @@ describe('App', () => {
     expect(group).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('keeps the active download section and the current page when the group is collapsed', () => {
-    render(<App />)
+  it('keeps the active download section and the current page when the group is collapsed', async () => {
+    await renderApp()
 
     fireEvent.click(screen.getByRole('button', { name: 'Queue' }))
     expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument()
@@ -116,8 +123,8 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument()
   })
 
-  it('collapses and expands the sidebar with the show/hide button', () => {
-    render(<App />)
+  it('collapses and expands the sidebar with the show/hide button', async () => {
+    await renderApp()
 
     expect(screen.getByRole('navigation')).not.toHaveClass('collapsed')
 
@@ -129,8 +136,8 @@ describe('App', () => {
     expect(screen.getByRole('navigation')).not.toHaveClass('collapsed')
   })
 
-  it('keeps the current page when the sidebar is collapsed', () => {
-    render(<App />)
+  it('keeps the current page when the sidebar is collapsed', async () => {
+    await renderApp()
 
     fireEvent.click(screen.getByRole('button', { name: 'Queue' }))
     expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument()
@@ -140,7 +147,7 @@ describe('App', () => {
   })
 
   it('highlights the active section', async () => {
-    render(<App />)
+    await renderApp()
 
     await screen.getByRole('button', { name: 'Settings' }).click()
 
@@ -161,7 +168,7 @@ describe('App', () => {
       }
     })
 
-    render(<App />)
+    await renderApp()
 
     fireEvent.change(screen.getByLabelText('Media URL'), {
       target: { value: 'https://example.com/video-a' }
@@ -192,7 +199,7 @@ describe('App', () => {
       }
     })
 
-    render(<App />)
+    await renderApp()
 
     fireEvent.change(screen.getByLabelText('Media URL'), {
       target: { value: 'https://example.com/video-a' }
@@ -239,7 +246,7 @@ describe('App', () => {
       }
     })
 
-    render(<App />)
+    await renderApp()
 
     fireEvent.change(screen.getByLabelText('Media URL'), {
       target: { value: 'https://example.com/video-a' }

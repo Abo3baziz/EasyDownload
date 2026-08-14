@@ -28,8 +28,11 @@ const api: PreloadApi = {
   startConversion: (options) => ipcRenderer.invoke(IPC_CHANNELS.conversionStart, options),
   cancelConversion: (id) => ipcRenderer.invoke(IPC_CHANNELS.conversionCancel, { id }),
   listConversions: () => ipcRenderer.invoke(IPC_CHANNELS.conversionList),
+  listInspectionHistory: () => ipcRenderer.invoke(IPC_CHANNELS.inspectionHistoryList),
   onDownloadStateChange: (listener) => subscribe(IPC_CHANNELS.downloadStateEvent, listener),
-  onConversionStateChange: (listener) => subscribe(IPC_CHANNELS.conversionStateEvent, listener)
+  onConversionStateChange: (listener) => subscribe(IPC_CHANNELS.conversionStateEvent, listener),
+  onInspectionHistoryChange: (listener) =>
+    subscribe(IPC_CHANNELS.inspectionHistoryStateEvent, listener)
 }
 
 function subscribe<T>(channel: string, listener: (data: T) => void): () => void {

@@ -4,6 +4,7 @@ import type { AppError } from '../../shared/types/errors'
 import type { Download, DownloadStatus } from '../../shared/types/download'
 import { ConversionControl } from '../components/ConversionControl'
 import { EmptyState } from '../components/EmptyState'
+import { MediaThumbnail } from '../components/MediaThumbnail'
 import { StatusBadge } from '../components/StatusBadge'
 import { useDownloads } from '../hooks/useDownloads'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
@@ -361,25 +362,6 @@ function DownloadThumbnail({ download }: { download: Download }) {
     return null
   }
   return <MediaThumbnail src={download.thumbnail} alt={download.title ?? 'Video thumbnail'} />
-}
-
-function MediaThumbnail({ src, alt }: { src?: string; alt: string }) {
-  const [failed, setFailed] = useState(false)
-  if (!src || failed) {
-    return (
-      <div className="download-thumbnail-fallback" aria-hidden="true">
-        No thumbnail
-      </div>
-    )
-  }
-  return (
-    <img
-      className="download-thumbnail"
-      src={src}
-      alt={alt}
-      onError={() => setFailed(true)}
-    />
-  )
 }
 
 function ConvertedAudioList({

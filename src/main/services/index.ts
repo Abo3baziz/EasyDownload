@@ -18,6 +18,8 @@ import type { FileManager } from './filesystem/file-manager'
 import { createFileManager } from './filesystem/file-manager'
 import type { HistoryManager } from './history/history-manager'
 import { createHistoryManager } from './history/history-manager'
+import type { InspectionHistoryManager } from './history/inspection-history-manager'
+import { createInspectionHistoryManager } from './history/inspection-history-manager'
 import { createJsonStore } from './history/json-store'
 import type { MediaService } from './media/media-service'
 import { createMediaService } from './media/media-service'
@@ -37,6 +39,7 @@ export interface Services {
   dependencies: DependencyManager
   settings: SettingsManager
   history: HistoryManager
+  inspectionHistory: InspectionHistoryManager
   notifications: NotificationManager
   ffmpeg: FfmpegService
   conversions: ConversionManager
@@ -81,6 +84,12 @@ export function createServices(deps: ServicesDeps): Services {
   }
   const settings = createSettingsManager({ dir: deps.userDataDir, defaults: settingsDefaults })
   const history = createHistoryManager({ dir: deps.userDataDir })
+  const inspectionHistory = createInspectionHistoryManager({
+    history: createJsonStore({
+      dir: deps.userDataDir,
+      fileName: 'inspection-history.json'
+    })
+  })
   const conversionHistory = createJsonStore<Conversion>({
     dir: deps.userDataDir,
     fileName: 'conversions.json'
@@ -129,6 +138,7 @@ export function createServices(deps: ServicesDeps): Services {
     dependencies,
     settings,
     history,
+    inspectionHistory,
     notifications,
     ffmpeg,
     conversions
