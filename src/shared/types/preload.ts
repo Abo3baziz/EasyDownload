@@ -30,5 +30,7 @@ export interface PreloadApi {
   onDownloadStateChange(listener: (download: Download) => void): () => void
   onConversionStateChange(listener: (conversion: Conversion) => void): () => void
   listInspectionHistory(): Promise<IpcResult<HistoryEntry[]>>
+  deleteInspectionHistoryEntry(id: string): Promise<IpcResult<boolean>>
   onInspectionHistoryChange(listener: (entry: HistoryEntry) => void): () => void
+  onInspectionHistoryDeleted(listener: (entry: HistoryEntry) => void): () => void
 }

@@ -80,6 +80,9 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.inspectionHistoryList, undefined, () =>
     services.inspectionHistory.list()
   )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.inspectionHistoryDelete, idSchema, ({ id }) =>
+    services.inspectionHistory.remove(id)
+  )
 
   services.downloads.onUpdate((download) => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -97,6 +100,12 @@ export function registerIpc(services: Services): void {
   services.inspectionHistory.onUpdate((entry) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(IPC_CHANNELS.inspectionHistoryStateEvent, entry)
+    }
+  })
+
+  services.inspectionHistory.onDelete((entry) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send(IPC_CHANNELS.inspectionHistoryDeleteEvent, entry)
     }
   })
 }

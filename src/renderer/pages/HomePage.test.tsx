@@ -31,7 +31,9 @@ function createApiMock(): PreloadApi {
     onDownloadStateChange: vi.fn(() => () => undefined),
     onConversionStateChange: vi.fn(() => () => undefined),
     listInspectionHistory: vi.fn().mockResolvedValue({ ok: true, data: [] }),
-    onInspectionHistoryChange: vi.fn(() => () => undefined)
+    deleteInspectionHistoryEntry: vi.fn().mockResolvedValue({ ok: true, data: true }),
+    onInspectionHistoryChange: vi.fn(() => () => undefined),
+    onInspectionHistoryDeleted: vi.fn(() => () => undefined)
   }
 }
 

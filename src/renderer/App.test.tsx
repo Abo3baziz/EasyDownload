@@ -32,7 +32,9 @@ function createApiMock(): PreloadApi {
     onDownloadStateChange: vi.fn(() => () => undefined),
     onConversionStateChange: vi.fn(() => () => undefined),
     listInspectionHistory: vi.fn().mockResolvedValue({ ok: true, data: [] }),
-    onInspectionHistoryChange: vi.fn(() => () => undefined)
+    deleteInspectionHistoryEntry: vi.fn().mockResolvedValue({ ok: true, data: true }),
+    onInspectionHistoryChange: vi.fn(() => () => undefined),
+    onInspectionHistoryDeleted: vi.fn(() => () => undefined)
   }
 }
 
@@ -263,5 +265,58 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Home' }))
 
     expect(screen.getByRole('button', { name: 'Downloading' })).toBeDisabled()
+  })
+
+  it('loads a history entry back into the Home inspection workflow', async () => {
+    window.mediaDownloader.listInspectionHistory = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'e1',
+          url: 'https://example.com/video',
+          thumbnail: 'https://example.com/thumb.jpg',
+          operation: 'INSPECTED' as const,
+          createdAt: new Date(2026, 7, 13, 11, 55).getTime()
+        }
+      ]
+    })
+
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+    expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Inspect https://example.com/video' })
+    )
+
+    expect(screen.getByRole('heading', { name: 'EasyDownload' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Media URL')).toHaveValue('https://example.com/video')
+  })
+
+  it('deletes a history entry and updates the list immediately', async () => {
+    window.mediaDownloader.listInspectionHistory = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'e1',
+          url: 'https://example.com/video',
+          operation: 'INSPECTED' as const,
+          createdAt: new Date(2026, 7, 13, 11, 55).getTime()
+        }
+      ]
+    })
+
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+    expect(screen.getByText('https://example.com/video')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete https://example.com/video' }))
+    await act(async () => {})
+
+    expect(window.mediaDownloader.deleteInspectionHistoryEntry).toHaveBeenCalledWith('e1')
+    expect(screen.queryByText('https://example.com/video')).toBeNull()
+    expect(screen.getByText(/No history yet/)).toBeInTheDocument()
   })
 })

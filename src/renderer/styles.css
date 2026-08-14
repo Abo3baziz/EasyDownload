@@ -730,3 +730,17 @@ button:disabled {
   color: var(--text-muted);
   font-size: 12px;
 }
+
+.history-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.history-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}

@@ -22,7 +22,9 @@ export const IPC_CHANNELS = {
   conversionList: 'conversion:list',
   conversionStateEvent: 'conversion:state',
   inspectionHistoryList: 'inspectionHistory:list',
-  inspectionHistoryStateEvent: 'inspectionHistory:state'
+  inspectionHistoryDelete: 'inspectionHistory:delete',
+  inspectionHistoryStateEvent: 'inspectionHistory:state',
+  inspectionHistoryDeleteEvent: 'inspectionHistory:deleted'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
