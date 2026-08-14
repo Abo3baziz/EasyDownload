@@ -5,39 +5,67 @@ import type { Download, DownloadStatus } from '../../shared/types/download'
 import { ConversionControl } from '../components/ConversionControl'
 import { EmptyState } from '../components/EmptyState'
 import { StatusBadge } from '../components/StatusBadge'
+import { useDownloads } from '../hooks/useDownloads'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 import { formatBytes, formatDate, formatDuration } from '../../shared/utils/format'
 
-export function DownloadsPage() {
+export type DownloadSection = 'downloads' | 'queue' | 'completed' | 'cancelled' | 'failed'
+
+const SECTION_DEFINITIONS: Record<
+  DownloadSection,
+  { title: string; statuses: DownloadStatus[] | null; emptyMessage: string }
+> = {
+  downloads: {
+    title: 'Downloads',
+    statuses: null,
+    emptyMessage: 'No downloads yet. Inspect a media URL to get started.'
+  },
+  queue: {
+    title: 'Queue',
+    statuses: ['queued', 'inspecting', 'downloading', 'processing', 'paused'],
+    emptyMessage: 'No downloads in the queue.'
+  },
+  completed: {
+    title: 'Completed',
+    statuses: ['completed'],
+    emptyMessage: 'No completed downloads.'
+  },
+  cancelled: {
+    title: 'Cancelled',
+    statuses: ['cancelled'],
+    emptyMessage: 'No cancelled downloads.'
+  },
+  failed: {
+    title: 'Failed',
+    statuses: ['failed'],
+    emptyMessage: 'No failed downloads.'
+  }
+}
+
+const TERMINAL_STATUSES: DownloadStatus[] = ['completed', 'failed', 'cancelled']
+
+export function DownloadsPage({ section }: { section: DownloadSection }) {
   const api = useMediaDownloader()
-  const [downloads, setDownloads] = useState<Download[]>([])
+  const { downloads, error: loadError, replaceDownloads } = useDownloads()
   const [conversions, setConversions] = useState<Record<string, Conversion>>({})
   const [error, setError] = useState<AppError | null>(null)
-  const [loaded, setLoaded] = useState(false)
-  const [activeSection, setActiveSection] = useState<DownloadSectionKey | null>(null)
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
       try {
-        const [downloadResult, conversionResult] = await Promise.all([
-          api.listDownloads(),
-          api.listConversions()
-        ])
+        const result = await api.listConversions()
         if (cancelled) return
-        if (downloadResult.ok) {
-          setDownloads(downloadResult.data)
-        } else {
-          setError(downloadResult.error)
-        }
-        if (conversionResult.ok) {
+        if (result.ok) {
           setConversions((previous) => {
             const next = { ...previous }
-            for (const conversion of conversionResult.data) {
+            for (const conversion of result.data) {
               next[conversion.id] = conversion
             }
             return next
           })
+        } else {
+          setError(result.error)
         }
       } catch (err) {
         if (cancelled) return
@@ -45,31 +73,16 @@ export function DownloadsPage() {
           code: 'UnknownError',
           message: err instanceof Error ? err.message : String(err)
         })
-      } finally {
-        if (!cancelled) setLoaded(true)
       }
     })()
 
-    const unsubscribe = api.onDownloadStateChange((download) => {
-      setDownloads((previous) => {
-        const index = previous.findIndex((item) => item.id === download.id)
-        if (index === -1) {
-          return [download, ...previous]
-        }
-        const next = [...previous]
-        next[index] = download
-        return next
-      })
-    })
-
-    const unsubscribeConversions = api.onConversionStateChange((conversion) => {
+    const unsubscribe = api.onConversionStateChange((conversion) => {
       setConversions((previous) => ({ ...previous, [conversion.id]: conversion }))
     })
 
     return () => {
       cancelled = true
       unsubscribe()
-      unsubscribeConversions()
     }
   }, [api])
 
@@ -153,75 +166,42 @@ export function DownloadsPage() {
       setError(result.error)
       return
     }
-    setDownloads(result.data)
+    replaceDownloads(result.data)
     setConversions({})
   }
 
-  if (error) {
+  const definition = SECTION_DEFINITIONS[section]
+  const statuses = definition.statuses
+  const items =
+    statuses === null
+      ? downloads
+      : downloads.filter((download) => statuses.includes(download.status))
+  const hasHistory = downloads.some((download) => TERMINAL_STATUSES.includes(download.status))
+  const shownError = loadError ?? error
+
+  if (shownError) {
     return (
       <section className="page">
-        <h1>Downloads</h1>
+        <h1>{definition.title}</h1>
         <div className="alert" role="alert">
-          <strong>{error.code}</strong> {error.message}
+          <strong>{shownError.code}</strong> {shownError.message}
         </div>
       </section>
     )
   }
 
-  const selected = SECTION_DEFINITIONS.find((section) => section.key === activeSection) ?? null
-
-  if (selected) {
-    const items = downloads.filter((download) => selected.statuses.includes(download.status))
-    return (
-      <section className="page">
-        <div className="section-page-header">
-          <button type="button" className="btn" onClick={() => setActiveSection(null)}>
-            ← Downloads
-          </button>
-          <h1>{selected.title}</h1>
-        </div>
-        {items.length === 0 ? (
-          <EmptyState message={selected.emptyMessage} />
-        ) : (
-          <ul className="download-list">
-            {items.map((download) => (
-              <DownloadListItem
-                key={download.id}
-                download={download}
-                conversions={conversions}
-                onCancel={(item) => void handleCancel(item)}
-                onPause={(item) => void handlePause(item)}
-                onResume={(item) => void handleResume(item)}
-                onRetry={(item) => void handleRetry(item)}
-                onOpenFile={(item) => void handleOpenFile(item)}
-                onOpenFileLocation={(path) => void handleOpenFileLocation(path)}
-                onStartConversion={(item, options) => void handleStartConversion(item, options)}
-                onCancelConversion={(id) => void handleCancelConversion(id)}
-                onOpenConversion={(path) => void handleOpenConversion(path)}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
-    )
-  }
-
-  const hasHistory = downloads.some((download) =>
-    ['completed', 'failed', 'cancelled'].includes(download.status)
-  )
-
-  if (!loaded || downloads.length === 0) {
+  if (items.length === 0) {
     return (
       <section className="page">
         <div className="page-header">
-          <h1>Downloads</h1>
-          {hasHistory && (
+          <h1>{definition.title}</h1>
+          {section === 'downloads' && hasHistory && (
             <button type="button" className="btn" onClick={() => void handleClearHistory()}>
               Clear history
             </button>
           )}
         </div>
-        <EmptyState message="No downloads yet. Inspect a media URL to get started." />
+        <EmptyState message={definition.emptyMessage} />
       </section>
     )
   }
@@ -229,70 +209,34 @@ export function DownloadsPage() {
   return (
     <section className="page">
       <div className="page-header">
-        <h1>Downloads</h1>
-        {hasHistory && (
+        <h1>{definition.title}</h1>
+        {section === 'downloads' && hasHistory && (
           <button type="button" className="btn" onClick={() => void handleClearHistory()}>
             Clear history
           </button>
         )}
       </div>
-      <div className="download-sections">
-        {SECTION_DEFINITIONS.map((section) => {
-          const count = downloads.filter((download) =>
-            section.statuses.includes(download.status)
-          ).length
-          return (
-            <button
-              key={section.key}
-              type="button"
-              className="download-section-card"
-              onClick={() => setActiveSection(section.key)}
-            >
-              <span className="download-section-card-title">{section.title}</span>
-              <span className="download-section-card-subtitle">
-                {count === 1 ? '1 download' : `${count} downloads`}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+      <ul className="download-list">
+        {items.map((download) => (
+          <DownloadListItem
+            key={download.id}
+            download={download}
+            conversions={conversions}
+            onCancel={(item) => void handleCancel(item)}
+            onPause={(item) => void handlePause(item)}
+            onResume={(item) => void handleResume(item)}
+            onRetry={(item) => void handleRetry(item)}
+            onOpenFile={(item) => void handleOpenFile(item)}
+            onOpenFileLocation={(path) => void handleOpenFileLocation(path)}
+            onStartConversion={(item, options) => void handleStartConversion(item, options)}
+            onCancelConversion={(id) => void handleCancelConversion(id)}
+            onOpenConversion={(path) => void handleOpenConversion(path)}
+          />
+        ))}
+      </ul>
     </section>
   )
 }
-
-type DownloadSectionKey = 'completed' | 'queue' | 'cancelled' | 'failed'
-
-const SECTION_DEFINITIONS: ReadonlyArray<{
-  key: DownloadSectionKey
-  title: string
-  statuses: DownloadStatus[]
-  emptyMessage: string
-}> = [
-  {
-    key: 'completed',
-    title: 'Completed',
-    statuses: ['completed'],
-    emptyMessage: 'No completed downloads.'
-  },
-  {
-    key: 'queue',
-    title: 'Queue',
-    statuses: ['queued', 'inspecting', 'downloading', 'processing', 'paused'],
-    emptyMessage: 'No downloads in the queue.'
-  },
-  {
-    key: 'cancelled',
-    title: 'Cancelled',
-    statuses: ['cancelled'],
-    emptyMessage: 'No cancelled downloads.'
-  },
-  {
-    key: 'failed',
-    title: 'Failed',
-    statuses: ['failed'],
-    emptyMessage: 'No failed downloads.'
-  }
-]
 
 interface DownloadListItemProps {
   download: Download
