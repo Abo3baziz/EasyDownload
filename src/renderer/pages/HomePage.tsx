@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { AppError } from '../../shared/types/errors'
 import type { MediaFormat, MediaInfo } from '../../shared/types/media'
 import { formatBytes, formatDuration } from '../../shared/utils/format'
-import { HistorySection } from '../components/HistorySection'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 import { useHomeState } from '../state/homeState'
 
@@ -140,8 +139,6 @@ export function HomePage() {
           onDownload={(format) => void handleDownload(format)}
         />
       )}
-
-      <HistorySection />
     </section>
   )
 }

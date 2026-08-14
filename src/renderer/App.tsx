@@ -1,41 +1,31 @@
 import { useState } from 'react'
-import { DownloadsPage } from './pages/DownloadsPage'
+import { Sidebar, type SidebarSection } from './components/Sidebar'
+import { DownloadsPage, type DownloadSection } from './pages/DownloadsPage'
 import { HomePage } from './pages/HomePage'
+import { HistoryPage } from './pages/HistoryPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { HistoryStateProvider } from './state/historyState'
 import { HomeStateProvider } from './state/homeState'
 
-type Tab = 'home' | 'downloads' | 'settings'
+const DOWNLOAD_SECTIONS: DownloadSection[] = ['downloads', 'queue', 'completed', 'cancelled', 'failed']
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'home', label: 'Home' },
-  { id: 'downloads', label: 'Downloads' },
-  { id: 'settings', label: 'Settings' }
-]
+function isDownloadSection(section: SidebarSection): section is DownloadSection {
+  return DOWNLOAD_SECTIONS.includes(section as DownloadSection)
+}
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('home')
+  const [section, setSection] = useState<SidebarSection>('home')
 
   return (
     <HomeStateProvider>
       <HistoryStateProvider>
         <div className="app">
-          <nav className="app-nav" aria-label="Primary">
-            {TABS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={tab === item.id ? 'app-nav-item active' : 'app-nav-item'}
-                onClick={() => setTab(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </nav>
+          <Sidebar section={section} onNavigate={setSection} />
           <main className="app-content">
-            {tab === 'home' && <HomePage />}
-            {tab === 'downloads' && <DownloadsPage />}
-            {tab === 'settings' && <SettingsPage />}
+            {section === 'home' && <HomePage />}
+            {isDownloadSection(section) && <DownloadsPage section={section} />}
+            {section === 'history' && <HistoryPage />}
+            {section === 'settings' && <SettingsPage />}
           </main>
         </div>
       </HistoryStateProvider>

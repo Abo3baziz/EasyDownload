@@ -70,7 +70,6 @@ describe('HistorySection', () => {
   it('shows an empty state when there is no history', async () => {
     await renderSection()
 
-    expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument()
     expect(screen.getByText(/No history yet/)).toBeInTheDocument()
   })
 

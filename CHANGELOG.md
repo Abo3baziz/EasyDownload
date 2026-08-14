@@ -1,10 +1,17 @@
 # Changelog
 
+## 2026-08-14
+
+### Changed
+
+- Replaced the top navigation bar and the Downloads page section selector with a single centralized collapsible sidebar. The sidebar contains Home, a nested Download Sections group (Downloads, Queue, Completed, Cancelled, Failed) with live count badges, History, and Settings. Download Sections has its own expand/collapse behavior with a chevron indicator; collapsing the group never navigates away from the current download section, and the active section is preserved. A dedicated Show/Hide Sidebar button collapses the sidebar to an icon-only rail with smooth transitions; the content area reflows automatically, and the Download Sections group stays distinguishable via a chevron indicator when only icons are shown. The Downloads page now renders the section selected in the sidebar (each status filter + an all-downloads overview with the Clear history action) instead of navigation cards. A shared `useDownloads` hook feeds both the sidebar badges and the Downloads page from the same `download:list`/`download:state` stream, so counts update automatically without resetting active downloads, queue, history, or status.
+- Connected the sidebar History section to the persistent inspection history: the History section (previously an empty placeholder) now lists previously inspected URLs with the same day-grouped, offline-persisted, live-updating behavior, replacing the History section previously embedded on the Home page.
+
 ## 2026-08-13
 
 ### Added
 
-- Home page inspection history: a new History section on the Home page shows the URLs previously inspected. Each successful inspection creates a persistent entry (URL, thumbnail reference, `INSPECTED` operation, absolute timestamp) recorded by a new Inspection History Manager main-process service and stored offline in `inspection-history.json` (reusing the existing `createJsonStore<T>` helper). Entries are sorted newest first, grouped by the user's local calendar day (`Today`, `Yesterday`, or a readable date), and each shows a truncated URL with a full-URL tooltip, the inspection thumbnail (with a `No thumbnail` fallback when missing or offline), and an `Inspected · <relative time>` indicator. Re-inspecting a URL adds a new entry at the top. A renderer `HistoryStateProvider` loads history on startup and subscribes to a new `inspectionHistory:state` event so new entries appear automatically without restarting; persistence failures are logged and never block the inspection result.
+- Home page inspection history: a new History section (originally on the Home page, later moved into the dedicated sidebar History section) shows the URLs previously inspected. Each successful inspection creates a persistent entry (URL, thumbnail reference, `INSPECTED` operation, absolute timestamp) recorded by a new Inspection History Manager main-process service and stored offline in `inspection-history.json` (reusing the existing `createJsonStore<T>` helper). Entries are sorted newest first, grouped by the user's local calendar day (`Today`, `Yesterday`, or a readable date), and each shows a truncated URL with a full-URL tooltip, the inspection thumbnail (with a `No thumbnail` fallback when missing or offline), and an `Inspected · <relative time>` indicator. Re-inspecting a URL adds a new entry at the top. A renderer `HistoryStateProvider` loads history on startup and subscribes to a new `inspectionHistory:state` event so new entries appear automatically without restarting; persistence failures are logged and never block the inspection result.
 
 ## 2026-08-13
 

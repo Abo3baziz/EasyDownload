@@ -10,7 +10,6 @@ export function HistorySection() {
 
   return (
     <section className='history-section'>
-      <h2>History</h2>
       {error && (
         <div className='alert' role='alert'>
           <strong>{error.code}</strong> {error.message}

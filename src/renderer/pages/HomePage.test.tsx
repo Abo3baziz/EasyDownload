@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MediaInfo } from '../../shared/types/media'
 import type { PreloadApi } from '../../shared/types/preload'
-import { HistoryStateProvider } from '../state/historyState'
 import { HomeStateProvider } from '../state/homeState'
 import { HomePage } from './HomePage'
 
@@ -40,9 +38,7 @@ function createApiMock(): PreloadApi {
 function renderHome() {
   return render(
     <HomeStateProvider>
-      <HistoryStateProvider>
-        <HomePage />
-      </HistoryStateProvider>
+      <HomePage />
     </HomeStateProvider>
   )
 }

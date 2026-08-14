@@ -46,12 +46,18 @@ describe('App', () => {
     await act(async () => {})
   }
 
-  it('renders the navigation and the home page', async () => {
+  it('renders the sidebar navigation and the home page', async () => {
     await renderApp()
 
     expect(screen.getByRole('navigation')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download Sections' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Downloads' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Queue' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Completed' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancelled' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Failed' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'History' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByLabelText('Media URL')).toBeInTheDocument()
   })
@@ -62,6 +68,91 @@ describe('App', () => {
     await screen.getByRole('button', { name: 'Settings' }).click()
 
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+  })
+
+  it('navigates to the history section', async () => {
+    await renderApp()
+
+    await screen.getByRole('button', { name: 'History' }).click()
+
+    expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument()
+  })
+
+  it('navigates to each download section', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Downloads' }))
+    expect(screen.getByRole('heading', { name: 'Downloads' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Queue' }))
+    expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Completed' }))
+    expect(screen.getByRole('heading', { name: 'Completed' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelled' }))
+    expect(screen.getByRole('heading', { name: 'Cancelled' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Failed' }))
+    expect(screen.getByRole('heading', { name: 'Failed' })).toBeInTheDocument()
+  })
+
+  it('expands and collapses the Download Sections group', async () => {
+    await renderApp()
+
+    const group = screen.getByRole('button', { name: 'Download Sections' })
+    expect(group).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.click(group)
+    expect(group).toHaveAttribute('aria-expanded', 'false')
+
+    fireEvent.click(group)
+    expect(group).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('keeps the active download section and the current page when the group is collapsed', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Queue' }))
+    expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download Sections' }))
+    expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download Sections' }))
+    expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument()
+  })
+
+  it('collapses and expands the sidebar with the show/hide button', async () => {
+    await renderApp()
+
+    expect(screen.getByRole('navigation')).not.toHaveClass('collapsed')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide sidebar' }))
+    expect(screen.getByRole('navigation')).toHaveClass('collapsed')
+    expect(screen.getByRole('button', { name: 'Show sidebar' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show sidebar' }))
+    expect(screen.getByRole('navigation')).not.toHaveClass('collapsed')
+  })
+
+  it('keeps the current page when the sidebar is collapsed', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Queue' }))
+    expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide sidebar' }))
+    expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument()
+  })
+
+  it('highlights the active section', async () => {
+    await renderApp()
+
+    await screen.getByRole('button', { name: 'Settings' }).click()
+
+    expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Home' })).not.toHaveAttribute('aria-current')
   })
 
   it('keeps the URL and inspection result when navigating Home → Downloads → Home', async () => {
