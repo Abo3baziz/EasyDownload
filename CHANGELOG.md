@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-14
+
+### Changed
+
+- Replaced the top navigation bar and the Downloads page section selector with a single centralized collapsible sidebar. The sidebar contains Home, a nested Download Sections group (Downloads, Queue, Completed, Cancelled, Failed) with live count badges, History, and Settings. Download Sections has its own expand/collapse behavior with a chevron indicator; collapsing the group never navigates away from the current download section, and the active section is preserved. A dedicated Show/Hide Sidebar button collapses the sidebar to an icon-only rail with smooth transitions; the content area reflows automatically, and the Download Sections group stays distinguishable via a chevron indicator when only icons are shown. The Downloads page now renders the section selected in the sidebar (each status filter + an all-downloads overview with the Clear history action) instead of navigation cards. A shared `useDownloads` hook feeds both the sidebar badges and the Downloads page from the same `download:list`/`download:state` stream, so counts update automatically without resetting active downloads, queue, history, or status.
+- Added a placeholder History section (empty state) that will be connected to the persisted download history in a later change.
+
 ## 2026-08-13
 
 ### Added
