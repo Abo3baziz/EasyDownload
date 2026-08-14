@@ -34,6 +34,7 @@ export interface DownloadManagerOptions {
   history?: HistoryManager
   statFile?: (path: string) => Promise<{ size: number } | undefined>
   fileExists?: (path: string) => boolean
+  getConcurrencyLimit?: () => number | Promise<number>
   now?: () => number
   generateId?: () => string
 }
@@ -48,12 +49,13 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
   const jobs = new Map<string, Download>()
   const configs = new Map<string, DownloadOptions>()
   const queue: string[] = []
+  const activeIds = new Set<string>()
   const handles = new Map<string, DownloadMediaHandle>()
   const mediaOptionsById = new Map<string, DownloadMediaOptions>()
   const pauseRequests = new Set<string>()
   const cancelRequests = new Set<string>()
   const listeners = new Set<(download: Download) => void>()
-  let activeId: string | undefined
+  let scheduleChain: Promise<void> = Promise.resolve()
   let historyLoaded = false
   let loadingHistory: Promise<void> | undefined
   let persistChain: Promise<void> = Promise.resolve()
@@ -153,19 +155,37 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     }
   }
 
-  async function executeNext(): Promise<void> {
-    if (activeId || queue.length === 0) {
-      return
+  async function resolveConcurrencyLimit(): Promise<number> {
+    if (!options.getConcurrencyLimit) {
+      return 1
     }
-    const id = queue.shift() as string
-    activeId = id
-    await execute(id)
-    activeId = undefined
-    await executeNext()
+    try {
+      return Math.max(1, await options.getConcurrencyLimit())
+    } catch {
+      return 1
+    }
   }
 
   function schedule(): void {
-    void executeNext().catch(() => undefined)
+    scheduleChain = scheduleChain.then(executeNext).catch(() => undefined)
+  }
+
+  async function executeNext(): Promise<void> {
+    const limit = await resolveConcurrencyLimit()
+    while (queue.length > 0 && activeIds.size < limit) {
+      const id = queue.shift() as string
+      if (activeIds.has(id)) {
+        queue.unshift(id)
+        break
+      }
+      activeIds.add(id)
+      void execute(id)
+        .catch(() => undefined)
+        .finally(() => {
+          activeIds.delete(id)
+          schedule()
+        })
+    }
   }
 
   async function execute(id: string): Promise<void> {
@@ -282,7 +302,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
 
   async function finishCancelled(id: string, destination?: string): Promise<void> {
     await cleanupFiles(destination)
-    if (getOrThrow(id).status !== 'cancelled') {
+    const status = getOrThrow(id).status
+    if (status !== 'cancelled' && !isTerminal(status) && status !== 'queued') {
       update(id, { status: 'cancelled', progress: {} })
     }
   }
@@ -347,9 +368,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       if (!queue.includes(id)) {
         queue.push(id)
       }
-      if (!activeId) {
-        schedule()
-      }
+      schedule()
       return getOrThrow(id)
     },
 
@@ -377,8 +396,10 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
         mediaOptionsById.set(id, { ...existingOptions, resume: true })
       }
       update(id, { status: 'queued', error: undefined })
-      queue.push(id)
-      if (!activeId) schedule()
+      if (!queue.includes(id)) {
+        queue.push(id)
+      }
+      schedule()
       return getOrThrow(id)
     },
 
@@ -428,11 +449,11 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       pauseRequests.delete(id)
       mediaOptionsById.delete(id)
       update(id, { status: 'queued', progress: {}, error: undefined })
-      queue.push(id)
-      void persistHistory()
-      if (!activeId) {
-        schedule()
+      if (!queue.includes(id)) {
+        queue.push(id)
       }
+      void persistHistory()
+      schedule()
       return getOrThrow(id)
     },
 

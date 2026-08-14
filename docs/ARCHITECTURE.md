@@ -1111,9 +1111,9 @@ The renderer should not assume that a local UI state change means the underlying
 
 # 34. Concurrency
 
-The architecture should support multiple downloads in the future.
+The application supports multiple downloads running concurrently.
 
-The Download Manager should therefore treat downloads as independent jobs.
+The Download Manager treats downloads as independent jobs.
 
 Conceptually:
 
@@ -1125,11 +1125,11 @@ Download Manager
 └── Job C → yt-dlp
 ```
 
-Concurrency limits should be configurable in the future.
+The Download Manager enforces a configurable concurrency limit (FR-016): at most `concurrencyLimit` downloads run at the same time, and the limit is never exceeded. Each active job occupies one concurrency slot for its whole execution (inspection, download, and post-processing); when a job reaches a terminal state (completed, failed, cancelled) or pauses, its slot is released and the next queued job starts automatically. Queued, paused, failed, and cancelled downloads never occupy a slot.
 
-Queue management (FR-012) is handled by the Download Manager.
+The limit is read from the settings via a `getConcurrencyLimit` option provided to the Download Manager (defaulting to 1 when absent); it is re-read each time the queue is drained, so a settings change applies as soon as the next slot needs to be filled. The renderer does not enforce the limit — the Download Manager centralizes all concurrency and queue management.
 
-The initial MVP may support only one active download if that simplifies implementation.
+Queue management (FR-012) is handled by the Download Manager. Starting the same download twice never creates a second process: `start` only accepts queued downloads, queue re-entry is guarded, and a job is never re-executed while its previous process is still exiting.
 
 ---
 

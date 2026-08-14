@@ -2,6 +2,12 @@
 
 ## 2026-08-14
 
+### Added
+
+- Concurrent downloads (FR-012, FR-016): the Download Manager now enforces the configured concurrency limit instead of the hardcoded single-slot scheduler. The manager reads the persisted `concurrencyLimit` setting (1–10) via a new `getConcurrencyLimit` option wired from the settings service, starts up to that many downloads simultaneously, and never exceeds the limit. Each job occupies one slot for its full lifecycle; when a download completes, fails, cancels, or pauses, its slot is released and the next queued download starts automatically. Retrying a failed or cancelled download re-enters the queue and respects the limit, pausing frees the slot (resume re-queues), and starting the same download twice cannot create a second process (status guards, queue re-entry guards, and an active-execution guard that defers a re-queued job until its previous process has fully exited). Cancellation cleanup no longer clobbers a download that was retried while its old process was still exiting, and per-download state, processes, progress events, and cleanup remain fully isolated across concurrent jobs.
+
+## 2026-08-14
+
 ### Changed
 
 - Inspection history is now a rolling 30-day window: entries older than 30 days are automatically pruned whenever the history store is loaded (app start / History section load) or a new URL is added, removing the oldest entries first. Pruning is persisted to `inspection-history.json` (with rollback and an inline error when persistence fails) and broadcast through the `inspectionHistory:deleted` event so open windows drop expired entries immediately; entries inside the window, day-based grouping, and all download/conversion state are unaffected.

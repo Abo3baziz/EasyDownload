@@ -121,6 +121,7 @@ export function createServices(deps: ServicesDeps): Services {
     checkFfmpeg: () => dependencies.checkFfmpeg(),
     history,
     fileExists: existsSync,
+    getConcurrencyLimit: async () => (await settings.load()).concurrencyLimit,
     statFile: async (path) => {
       try {
         const info = await stat(path)
