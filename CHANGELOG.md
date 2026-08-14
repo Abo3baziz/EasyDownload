@@ -4,6 +4,12 @@
 
 ### Changed
 
+- Inspection history is now a rolling 30-day window: entries older than 30 days are automatically pruned whenever the history store is loaded (app start / History section load) or a new URL is added, removing the oldest entries first. Pruning is persisted to `inspection-history.json` (with rollback and an inline error when persistence fails) and broadcast through the `inspectionHistory:deleted` event so open windows drop expired entries immediately; entries inside the window, day-based grouping, and all download/conversion state are unaffected.
+
+## 2026-08-14
+
+### Changed
+
 - Inspection history is now unique per URL: re-inspecting an already-listed URL refreshes that single entry (new `Inspected · <time>` timestamp, updated thumbnail) and moves it back to the top instead of creating a duplicate entry. URLs are compared with the existing `normalizeUrl` helper, legacy duplicate records in `inspection-history.json` are pruned to the newest one on load, and history entries are still only created for inspections that succeeded (failed inspections never reach the history manager).
 
 ## 2026-08-14

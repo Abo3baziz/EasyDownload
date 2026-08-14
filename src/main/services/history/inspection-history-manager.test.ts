@@ -6,6 +6,8 @@ import type { HistoryEntry } from '../../../shared/types/history'
 import { createJsonStore } from './json-store'
 import { createInspectionHistoryManager } from './inspection-history-manager'
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
 describe('createInspectionHistoryManager', () => {
   let dir: string
 
@@ -134,19 +136,20 @@ describe('createInspectionHistoryManager', () => {
   })
 
   it('keeps only the newest record per URL when loading legacy duplicates', async () => {
+    const newerCreatedAt = Date.now() - 10 * DAY_MS
     const store = createJsonStore<HistoryEntry>({ dir, fileName: 'inspection-history.json' })
     await store.save([
       {
         id: 'old',
         url: 'https://example.com/video',
         operation: 'INSPECTED',
-        createdAt: 1000
+        createdAt: newerCreatedAt - 10 * DAY_MS
       },
       {
         id: 'new',
         url: 'https://example.com/video',
         operation: 'INSPECTED',
-        createdAt: 2000
+        createdAt: newerCreatedAt
       }
     ])
 
@@ -157,7 +160,7 @@ describe('createInspectionHistoryManager', () => {
         id: 'new',
         url: 'https://example.com/video',
         operation: 'INSPECTED',
-        createdAt: 2000
+        createdAt: newerCreatedAt
       }
     ])
   })
@@ -177,6 +180,94 @@ describe('createInspectionHistoryManager', () => {
     expect(listener).not.toHaveBeenCalled()
     await expect(history.list()).resolves.toEqual([first])
     errorSpy.mockRestore()
+  })
+
+  it('removes entries older than 30 days when a new entry is added', async () => {
+    let timestamp = 1_000_000
+    const history = createManager({ now: () => timestamp, generateId: createSequentialId() })
+    const old = await history.add({ url: 'https://example.com/old' })
+    timestamp += 31 * DAY_MS
+    const fresh = await history.add({ url: 'https://example.com/fresh' })
+
+    expect(old?.createdAt).toBe(1_000_000)
+    await expect(history.list()).resolves.toEqual([fresh])
+
+    const reloaded = createManager({ now: () => timestamp, generateId: createSequentialId() })
+    await expect(reloaded.list()).resolves.toEqual([fresh])
+  })
+
+  it('keeps entries that are within the 30-day retention window', async () => {
+    let timestamp = 1_000_000
+    const history = createManager({ now: () => timestamp, generateId: createSequentialId() })
+    await history.add({ url: 'https://example.com/older' })
+    timestamp += 29 * DAY_MS
+    await history.add({ url: 'https://example.com/newer' })
+
+    await expect(history.list()).resolves.toHaveLength(2)
+  })
+
+  it('keeps an entry that is exactly 30 days old', async () => {
+    let timestamp = 1_000_000
+    const history = createManager({ now: () => timestamp, generateId: createSequentialId() })
+    await history.add({ url: 'https://example.com/edge' })
+    timestamp += 30 * DAY_MS
+    await history.add({ url: 'https://example.com/next' })
+
+    await expect(history.list()).resolves.toHaveLength(2)
+  })
+
+  it('prunes expired entries when the history is loaded', async () => {
+    const recentCreatedAt = 1_000_000 + 29 * DAY_MS
+    const store = createJsonStore<HistoryEntry>({ dir, fileName: 'inspection-history.json' })
+    await store.save([
+      {
+        id: 'expired',
+        url: 'https://example.com/expired',
+        operation: 'INSPECTED',
+        createdAt: 1_000_000
+      },
+      {
+        id: 'recent',
+        url: 'https://example.com/recent',
+        operation: 'INSPECTED',
+        createdAt: recentCreatedAt
+      }
+    ])
+    const nowTimestamp = 1_000_000 + 31 * DAY_MS
+
+    const history = createManager({ now: () => nowTimestamp })
+    await expect(history.list()).resolves.toEqual([
+      {
+        id: 'recent',
+        url: 'https://example.com/recent',
+        operation: 'INSPECTED',
+        createdAt: recentCreatedAt
+      }
+    ])
+
+    const reloaded = createManager({ now: () => nowTimestamp })
+    await expect(reloaded.list()).resolves.toEqual([
+      {
+        id: 'recent',
+        url: 'https://example.com/recent',
+        operation: 'INSPECTED',
+        createdAt: recentCreatedAt
+      }
+    ])
+  })
+
+  it('emits delete events for pruned entries', async () => {
+    let timestamp = 1_000_000
+    const history = createManager({ now: () => timestamp, generateId: createSequentialId() })
+    const old = await history.add({ url: 'https://example.com/old' })
+    const listener = vi.fn()
+    history.onDelete(listener)
+    timestamp += 31 * DAY_MS
+
+    await history.add({ url: 'https://example.com/fresh' })
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenCalledWith(old)
   })
 
   it('removes an entry and persists the deletion', async () => {
