@@ -24,7 +24,7 @@ export default function App() {
           <main className="app-content">
             {section === 'home' && <HomePage />}
             {isDownloadSection(section) && <DownloadsPage section={section} />}
-            {section === 'history' && <HistoryPage />}
+            {section === 'history' && <HistoryPage onInspect={() => setSection('home')} />}
             {section === 'settings' && <SettingsPage />}
           </main>
         </div>

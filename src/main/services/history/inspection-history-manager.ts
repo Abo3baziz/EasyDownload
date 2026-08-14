@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto'
+import { normalizeUrl } from '../../../shared/utils/url'
 import type { HistoryEntry } from '../../../shared/types/history'
 import type { JsonStore } from './json-store'
 
 export interface InspectionHistoryManager {
   list(): Promise<HistoryEntry[]>
   add(input: { url: string; thumbnail?: string }): Promise<HistoryEntry | null>
+  remove(id: string): Promise<boolean>
   onUpdate(listener: (entry: HistoryEntry) => void): () => void
+  onDelete(listener: (entry: HistoryEntry) => void): () => void
 }
 
 export interface InspectionHistoryManagerOptions {
@@ -21,11 +24,18 @@ export function createInspectionHistoryManager(
   const generateId = options.generateId ?? (() => randomUUID())
   const entries = new Map<string, HistoryEntry>()
   const listeners = new Set<(entry: HistoryEntry) => void>()
+  const deleteListeners = new Set<(entry: HistoryEntry) => void>()
   let historyLoaded = false
   let loadingHistory: Promise<void> | undefined
 
   function emit(entry: HistoryEntry): void {
     for (const listener of listeners) {
+      listener(entry)
+    }
+  }
+
+  function emitDelete(entry: HistoryEntry): void {
+    for (const listener of deleteListeners) {
       listener(entry)
     }
   }
@@ -38,7 +48,15 @@ export function createInspectionHistoryManager(
       loadingHistory = options.history
         .load()
         .then((records) => {
+          const newestByUrl = new Map<string, HistoryEntry>()
           for (const record of records) {
+            const key = normalizeUrl(record.url)
+            const current = newestByUrl.get(key)
+            if (!current || record.createdAt >= current.createdAt) {
+              newestByUrl.set(key, record)
+            }
+          }
+          for (const record of newestByUrl.values()) {
             if (!entries.has(record.id)) {
               entries.set(record.id, record)
             }
@@ -54,15 +72,15 @@ export function createInspectionHistoryManager(
     return loadingHistory
   }
 
-  async function saveEntry(entry: HistoryEntry): Promise<boolean> {
+  async function persist(): Promise<boolean> {
     if (!options.history) {
       return true
     }
     try {
-      await options.history.save([...entries.values(), entry])
+      await options.history.save([...entries.values()])
       return true
     } catch (err) {
-      console.error('[inspectionHistory] Failed to save a history entry.', err)
+      console.error('[inspectionHistory] Failed to save history entries.', err)
       return false
     }
   }
@@ -75,6 +93,25 @@ export function createInspectionHistoryManager(
 
     async add(input: { url: string; thumbnail?: string }): Promise<HistoryEntry | null> {
       await ensureLoaded()
+      const existing = [...entries.values()].find(
+        (entry) => normalizeUrl(entry.url) === normalizeUrl(input.url)
+      )
+      if (existing) {
+        const updated: HistoryEntry = {
+          ...existing,
+          url: input.url,
+          thumbnail: input.thumbnail,
+          createdAt: now()
+        }
+        entries.set(updated.id, updated)
+        const saved = await persist()
+        if (!saved) {
+          entries.set(existing.id, existing)
+          return null
+        }
+        emit(updated)
+        return updated
+      }
       const entry: HistoryEntry = {
         id: generateId(),
         url: input.url,
@@ -82,19 +119,43 @@ export function createInspectionHistoryManager(
         operation: 'INSPECTED',
         createdAt: now()
       }
-      const saved = await saveEntry(entry)
+      entries.set(entry.id, entry)
+      const saved = await persist()
       if (!saved) {
+        entries.delete(entry.id)
         return null
       }
-      entries.set(entry.id, entry)
       emit(entry)
       return entry
+    },
+
+    async remove(id: string): Promise<boolean> {
+      await ensureLoaded()
+      const entry = entries.get(id)
+      if (!entry) {
+        return false
+      }
+      entries.delete(id)
+      const saved = await persist()
+      if (!saved) {
+        entries.set(id, entry)
+        return false
+      }
+      emitDelete(entry)
+      return true
     },
 
     onUpdate(listener: (entry: HistoryEntry) => void): () => void {
       listeners.add(listener)
       return () => {
         listeners.delete(listener)
+      }
+    },
+
+    onDelete(listener: (entry: HistoryEntry) => void): () => void {
+      deleteListeners.add(listener)
+      return () => {
+        deleteListeners.delete(listener)
       }
     }
   }

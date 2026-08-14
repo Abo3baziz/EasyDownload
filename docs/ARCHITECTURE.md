@@ -220,7 +220,9 @@ window.mediaDownloader.onDownloadProgress()
 window.mediaDownloader.startConversion()
 window.mediaDownloader.onConversionStateChange()
 window.mediaDownloader.listInspectionHistory()
+window.mediaDownloader.deleteInspectionHistoryEntry()
 window.mediaDownloader.onInspectionHistoryChange()
+window.mediaDownloader.onInspectionHistoryDeleted()
 ```
 
 The exact API is subject to implementation.
@@ -297,7 +299,7 @@ Main Process
 
 The Notification Manager owns desktop notifications (FR-015). It observes the Download Manager's update stream and, when notifications are enabled in settings, surfaces download completion and failure to the user. Notification behavior is isolated from the core download workflow: the Download Manager is unaware of notifications, and notification failures are swallowed so they never affect downloads.
 
-The Inspection History Manager records every successful URL inspection as a persistent, offline-available history entry (URL, thumbnail reference, operation, absolute timestamp) using the shared JSON store (`inspection-history.json` in the user data directory). It lazy-loads persisted entries, saves new entries before surfacing them, and broadcasts each new entry over IPC so the sidebar History section updates live without an app restart. Persistence failures are logged and never break the inspection flow, and a missing or remote thumbnail never prevents an entry from being stored.
+The Inspection History Manager records every successful URL inspection as a persistent, offline-available history entry (URL, thumbnail reference, operation, absolute timestamp) using the shared JSON store (`inspection-history.json` in the user data directory). History keeps at most one entry per normalized URL (`normalizeUrl`): re-inspecting an existing URL refreshes that entry (new timestamp, updated thumbnail) instead of creating a duplicate, and legacy duplicate records are pruned to the newest one when loading. It lazy-loads persisted entries, saves new entries before surfacing them, and broadcasts each new or refreshed entry over IPC so the sidebar History section updates live without an app restart. Entries can be removed individually by id: the manager deletes the entry, persists the remaining list (rolling back and reporting failure if persistence fails), and broadcasts a deletion event so open windows drop the entry immediately. Persistence failures are logged and never break the inspection flow, and a missing or remote thumbnail never prevents an entry from being stored.
 
 The FFmpeg Service wraps the FFmpeg executable for merge, convert, and audio-extraction operations. See section 13.
 
@@ -698,7 +700,9 @@ download:get
 download:list
 history:clear
 inspectionHistory:list
+inspectionHistory:delete
 inspectionHistory:state
+inspectionHistory:deleted
 dialog:select-directory
 file:open
 file:open-directory

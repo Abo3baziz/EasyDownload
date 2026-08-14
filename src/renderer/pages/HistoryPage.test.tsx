@@ -4,6 +4,7 @@ import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PreloadApi } from '../../shared/types/preload'
 import { HistoryStateProvider } from '../state/historyState'
+import { HomeStateProvider } from '../state/homeState'
 import { HistoryPage } from './HistoryPage'
 
 function createApiMock(): PreloadApi {
@@ -30,15 +31,19 @@ function createApiMock(): PreloadApi {
     onDownloadStateChange: vi.fn(() => () => undefined),
     onConversionStateChange: vi.fn(() => () => undefined),
     listInspectionHistory: vi.fn().mockResolvedValue({ ok: true, data: [] }),
-    onInspectionHistoryChange: vi.fn(() => () => undefined)
+    deleteInspectionHistoryEntry: vi.fn().mockResolvedValue({ ok: true, data: true }),
+    onInspectionHistoryChange: vi.fn(() => () => undefined),
+    onInspectionHistoryDeleted: vi.fn(() => () => undefined)
   }
 }
 
-function renderPage() {
+function renderPage(onInspect: (url: string) => void = vi.fn()) {
   render(
-    <HistoryStateProvider>
-      <HistoryPage />
-    </HistoryStateProvider>
+    <HomeStateProvider>
+      <HistoryStateProvider>
+        <HistoryPage onInspect={onInspect} />
+      </HistoryStateProvider>
+    </HomeStateProvider>
   )
 }
 
