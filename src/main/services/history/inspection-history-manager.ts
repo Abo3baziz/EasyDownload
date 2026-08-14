@@ -3,6 +3,8 @@ import { normalizeUrl } from '../../../shared/utils/url'
 import type { HistoryEntry } from '../../../shared/types/history'
 import type { JsonStore } from './json-store'
 
+export const INSPECTION_HISTORY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+
 export interface InspectionHistoryManager {
   list(): Promise<HistoryEntry[]>
   add(input: { url: string; thumbnail?: string }): Promise<HistoryEntry | null>
@@ -85,14 +87,47 @@ export function createInspectionHistoryManager(
     }
   }
 
+  function collectExpired(): HistoryEntry[] {
+    const nowMs = now()
+    const expired: HistoryEntry[] = []
+    for (const entry of entries.values()) {
+      if (nowMs - entry.createdAt > INSPECTION_HISTORY_RETENTION_MS) {
+        expired.push(entry)
+      }
+    }
+    return expired
+  }
+
+  async function pruneExpired(): Promise<void> {
+    const expired = collectExpired()
+    if (expired.length === 0) {
+      return
+    }
+    for (const entry of expired) {
+      entries.delete(entry.id)
+    }
+    const saved = await persist()
+    if (!saved) {
+      for (const entry of expired) {
+        entries.set(entry.id, entry)
+      }
+      return
+    }
+    for (const entry of expired) {
+      emitDelete(entry)
+    }
+  }
+
   return {
     async list(): Promise<HistoryEntry[]> {
       await ensureLoaded()
+      await pruneExpired()
       return [...entries.values()]
     },
 
     async add(input: { url: string; thumbnail?: string }): Promise<HistoryEntry | null> {
       await ensureLoaded()
+      await pruneExpired()
       const existing = [...entries.values()].find(
         (entry) => normalizeUrl(entry.url) === normalizeUrl(input.url)
       )
