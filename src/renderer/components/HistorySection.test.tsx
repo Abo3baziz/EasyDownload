@@ -189,6 +189,35 @@ describe('HistorySection', () => {
     expect(screen.getByText('https://example.com/second')).toBeInTheDocument()
   })
 
+  it('replaces an existing entry and moves it to the top when the same URL is inspected again', async () => {
+    let listener: ((item: HistoryEntry) => void) | undefined
+    window.mediaDownloader.listInspectionHistory = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        entry({ id: 'a', url: 'https://example.com/a', createdAt: NOW - 60_000 }),
+        entry({ id: 'b', url: 'https://example.com/b', createdAt: NOW - 3600_000 })
+      ]
+    })
+    window.mediaDownloader.onInspectionHistoryChange = vi.fn((callback) => {
+      listener = callback
+      return () => undefined
+    })
+
+    await renderSection()
+
+    act(() => {
+      listener?.(entry({ id: 'a', url: 'https://example.com/a', createdAt: NOW + 1 }))
+    })
+
+    expect(screen.getAllByText('https://example.com/a')).toHaveLength(1)
+    expect(screen.getByText('Inspected · Just now')).toBeInTheDocument()
+
+    const urls = screen
+      .getAllByTitle(/https:\/\/example\.com/)
+      .map((node) => node.textContent)
+    expect(urls).toEqual(['https://example.com/a', 'https://example.com/b'])
+  })
+
   it('renders Inspect and Delete actions for every entry', async () => {
     window.mediaDownloader.listInspectionHistory = vi.fn().mockResolvedValue({
       ok: true,

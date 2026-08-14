@@ -2,6 +2,12 @@
 
 ## 2026-08-14
 
+### Changed
+
+- Inspection history is now unique per URL: re-inspecting an already-listed URL refreshes that single entry (new `Inspected · <time>` timestamp, updated thumbnail) and moves it back to the top instead of creating a duplicate entry. URLs are compared with the existing `normalizeUrl` helper, legacy duplicate records in `inspection-history.json` are pruned to the newest one on load, and history entries are still only created for inspections that succeeded (failed inspections never reach the history manager).
+
+## 2026-08-14
+
 ### Added
 
 - Per-entry actions in the History section: every inspection-history entry now has an **Inspect** button and a **Delete** button (each with an icon, accessible label, and tooltip). **Inspect** loads the entry's URL back into the Home page inspection workflow (the URL input is restored and, when the Home page's in-memory inspection cache still holds it, the metadata and formats reappear as if the URL had just been inspected). **Delete** removes only that entry: the History UI updates immediately (optimistic removal with rollback on failure), the deletion is persisted via a new `inspectionHistory:delete` IPC channel (`InspectionHistoryManager.remove`), and a new `inspectionHistory:deleted` event keeps every open window in sync. The existing newest-to-oldest ordering, day-based grouping, thumbnails, timestamps, and offline persistence are unchanged; delete failures surface as an inline alert without touching other entries or active downloads.

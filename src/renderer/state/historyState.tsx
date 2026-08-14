@@ -99,14 +99,9 @@ export function useHistoryState(): HistoryState {
 }
 
 function mergeHistory(entries: HistoryEntry[]): HistoryEntry[] {
-  const seen = new Set<string>()
-  const unique: HistoryEntry[] = []
+  const byId = new Map<string, HistoryEntry>()
   for (const entry of entries) {
-    if (seen.has(entry.id)) {
-      continue
-    }
-    seen.add(entry.id)
-    unique.push(entry)
+    byId.set(entry.id, entry)
   }
-  return unique.sort((a, b) => b.createdAt - a.createdAt)
+  return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt)
 }
