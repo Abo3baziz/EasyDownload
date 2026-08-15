@@ -101,6 +101,25 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
     }
   }
 
+  async function handleDelete(download: Download) {
+    const result = await api.deleteDownload(download.id)
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    if (download.destination) {
+      setConversions((previous) => {
+        const next = { ...previous }
+        for (const [id, conversion] of Object.entries(next)) {
+          if (conversion.input === download.destination) {
+            delete next[id]
+          }
+        }
+        return next
+      })
+    }
+  }
+
   async function handlePause(download: Download) {
     const result = await api.pauseDownload(download.id)
     if (!result.ok) {
@@ -181,6 +200,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
   const downloadListProps = {
     conversions,
     onCancel: (item: Download) => void handleCancel(item),
+    onDelete: (item: Download) => void handleDelete(item),
     onPause: (item: Download) => void handlePause(item),
     onResume: (item: Download) => void handleResume(item),
     onRetry: (item: Download) => void handleRetry(item),
@@ -199,14 +219,13 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
       : downloads.filter((download) => statuses.includes(download.status))
   const groups = GROUPED_SECTIONS.has(section) ? groupByDay(items) : undefined
   const hasHistory = downloads.some((download) => TERMINAL_STATUSES.includes(download.status))
-  const shownError = loadError ?? error
 
-  if (shownError) {
+  if (loadError) {
     return (
       <section className="page">
         <h1>{definition.title}</h1>
         <div className="alert" role="alert">
-          <strong>{shownError.code}</strong> {shownError.message}
+          <strong>{loadError.code}</strong> {loadError.message}
         </div>
       </section>
     )
@@ -215,6 +234,11 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
   if (items.length === 0) {
     return (
       <section className="page">
+        {error && (
+          <div className="alert" role="alert">
+            <strong>{error.code}</strong> {error.message}
+          </div>
+        )}
         <div className="page-header">
           <h1>{definition.title}</h1>
           {section === 'downloads' && hasHistory && (
@@ -230,6 +254,11 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
 
   return (
     <section className="page">
+      {error && (
+        <div className="alert" role="alert">
+          <strong>{error.code}</strong> {error.message}
+        </div>
+      )}
       <div className="page-header">
         <h1>{definition.title}</h1>
         {section === 'downloads' && hasHistory && (
@@ -262,6 +291,7 @@ interface DownloadListProps {
   downloads: Download[]
   conversions: Record<string, Conversion>
   onCancel: (download: Download) => void
+  onDelete: (download: Download) => void
   onPause: (download: Download) => void
   onResume: (download: Download) => void
   onRetry: (download: Download) => void
@@ -286,6 +316,7 @@ interface DownloadListItemProps {
   download: Download
   conversions: Record<string, Conversion>
   onCancel: (download: Download) => void
+  onDelete: (download: Download) => void
   onPause: (download: Download) => void
   onResume: (download: Download) => void
   onRetry: (download: Download) => void
@@ -300,6 +331,7 @@ function DownloadListItem({
   download,
   conversions,
   onCancel,
+  onDelete,
   onPause,
   onResume,
   onRetry,
@@ -352,6 +384,11 @@ function DownloadListItem({
         {canRetry(download) && (
           <button type="button" className="btn" onClick={() => onRetry(download)}>
             Retry
+          </button>
+        )}
+        {canDelete(download) && (
+          <button type="button" className="btn" onClick={() => onDelete(download)}>
+            Delete
           </button>
         )}
         {download.status === 'completed' && download.destination && (
@@ -555,4 +592,8 @@ function canPause(download: Download): boolean {
 
 function canRetry(download: Download): boolean {
   return download.status === 'failed' || download.status === 'cancelled'
+}
+
+function canDelete(download: Download): boolean {
+  return TERMINAL_STATUSES.includes(download.status)
 }

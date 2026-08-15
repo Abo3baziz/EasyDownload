@@ -387,6 +387,37 @@ describe('createConversionManager', () => {
     ])
   })
 
+  it('removes completed conversions linked to a download and persists the cleanup', async () => {
+    const linked = completedConversionRecord({ id: 'cv-linked' })
+    const unrelated = completedConversionRecord({
+      id: 'cv-other',
+      input: 'C:\\Downloads\\Other.mp4',
+      output: 'C:\\Downloads\\Other.mp3'
+    })
+    const { history, save } = createMockHistory([linked, unrelated])
+    const manager = createConversionManager({ ffmpeg: createMockFfmpeg(), history })
+
+    await expect(manager.removeForInput(linked.input)).resolves.toEqual([linked])
+
+    await expect(manager.list()).resolves.toEqual([unrelated])
+    expect(save).toHaveBeenLastCalledWith([unrelated])
+  })
+
+  it('does not remove linked conversions while one is running', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const manager = createConversionManager({ ffmpeg, generateId: () => 'cv-1' })
+    await manager.start(OPTIONS)
+
+    await expect(manager.removeForInput(OPTIONS.input)).rejects.toThrow(
+      'Cannot delete a download while a conversion is running.'
+    )
+    await expect(manager.list()).resolves.toMatchObject([
+      expect.objectContaining({ id: 'cv-1', status: 'running' })
+    ])
+  })
+
   it('clears persisted conversion history', async () => {
     const ffmpeg = createMockFfmpeg()
     const { handle, completion } = mockHandle()

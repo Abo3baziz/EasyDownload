@@ -570,6 +570,74 @@ describe('createDownloadManager', () => {
     expect((await manager.get('dl-2')).status).toBe('downloading')
   })
 
+  it.each(['completed', 'failed', 'cancelled'] as const)(
+    'removes a %s download from history and emits a deletion',
+    async (status) => {
+      const record = terminalRecord({ id: `dl-${status}`, status })
+      const { history, save } = createMockHistory([record])
+      const ytDlp = createMockYtDlp()
+      const manager = createDownloadManager({ ytDlp, history })
+      const deleted = vi.fn()
+      manager.onDelete(deleted)
+
+      await expect(manager.remove(record.id)).resolves.toEqual(record)
+
+      expect(save).toHaveBeenLastCalledWith([])
+      expect(deleted).toHaveBeenCalledWith(record)
+      await expect(manager.list()).resolves.toEqual([])
+    }
+  )
+
+  it('rejects deleting an active download', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const { handle } = downloadHandle()
+    ytDlp.startDownload.mockReturnValue(handle)
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+
+    await expect(manager.remove('dl-1')).rejects.toThrow(
+      'Cannot delete a download in state "downloading"'
+    )
+    await expect(manager.get('dl-1')).resolves.toMatchObject({ status: 'downloading' })
+  })
+
+  it('waits for a cancelled process to finish before deleting its history entry', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const { handle, completion } = downloadHandle()
+    ytDlp.startDownload.mockReturnValue(handle)
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+
+    await manager.cancel('dl-1')
+    const removal = manager.remove('dl-1')
+    await flush()
+
+    completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
+
+    await expect(removal).resolves.toMatchObject({ id: 'dl-1', status: 'cancelled' })
+    await expect(manager.get('dl-1')).rejects.toThrow('The download was not found.')
+  })
+
+  it('restores a deleted entry when history persistence fails', async () => {
+    const record = terminalRecord({ id: 'dl-failed' })
+    const { history, save } = createMockHistory([record])
+    save.mockRejectedValueOnce(new Error('write failed'))
+    const manager = createDownloadManager({ ytDlp: createMockYtDlp(), history })
+    const deleted = vi.fn()
+    manager.onDelete(deleted)
+
+    await expect(manager.remove(record.id)).rejects.toMatchObject({ code: 'FilesystemError' })
+
+    await expect(manager.get(record.id)).resolves.toEqual(record)
+    expect(deleted).not.toHaveBeenCalled()
+  })
+
   it('does not start the same download twice', async () => {
     const ytDlp = createMockYtDlp()
     ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })

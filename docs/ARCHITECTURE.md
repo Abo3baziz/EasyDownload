@@ -570,11 +570,13 @@ Terminal downloads (completed, failed, cancelled) are persisted locally by a His
 
 * Lazy-loads persisted history into the job list on first access.
 * Persists terminal downloads after each terminal state transition.
+* Exposes `remove(id)` for completed, failed, and cancelled records; removal is persisted with rollback on failure and broadcasts the removed record to all renderer windows.
+* Removes linked conversion history metadata when a completed download is deleted, while leaving the source and converted files on disk.
 * Exposes `clearHistory()` to remove only terminal records.
 * Captures the final file size of completed downloads for display.
 * Retries history-loaded downloads by reconstructing the download configuration from the persisted record (format ID and directory).
 
-The renderer never reads or writes the history file directly; it only uses the `history:clear` IPC channel.
+The renderer never reads or writes the history file directly; it uses the `history:clear` and `download:delete` IPC channels. Active, queued, and paused downloads cannot be deleted.
 
 ---
 
@@ -695,9 +697,11 @@ media:inspect
 download:create
 download:start
 download:cancel
+download:delete
 download:retry
 download:get
 download:list
+download:deleted
 history:clear
 inspectionHistory:list
 inspectionHistory:delete

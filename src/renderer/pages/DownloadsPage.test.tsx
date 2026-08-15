@@ -14,6 +14,7 @@ function createApiMock(): PreloadApi {
     pauseDownload: vi.fn(),
     resumeDownload: vi.fn(),
     cancelDownload: vi.fn(),
+    deleteDownload: vi.fn(),
     retryDownload: vi.fn(),
     getDownload: vi.fn(),
     listDownloads: vi.fn(),
@@ -29,6 +30,7 @@ function createApiMock(): PreloadApi {
     cancelConversion: vi.fn(),
     listConversions: vi.fn().mockResolvedValue({ ok: true, data: [] }),
     onDownloadStateChange: vi.fn(() => () => undefined),
+    onDownloadDeleted: vi.fn(() => () => undefined),
     onConversionStateChange: vi.fn(() => () => undefined),
     listInspectionHistory: vi.fn().mockResolvedValue({ ok: true, data: [] }),
     deleteInspectionHistoryEntry: vi.fn().mockResolvedValue({ ok: true, data: true }),
@@ -225,6 +227,80 @@ describe('DownloadsPage', () => {
     expect(screen.getByText(/1 MB\/s/)).toBeInTheDocument()
     expect(screen.getByText(/ETA 00:58/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+  })
+
+  it.each(['completed', 'cancelled', 'failed'] as const)(
+    'offers Delete for %s downloads',
+    async (status) => {
+      const download: Download =
+        status === 'completed'
+          ? completedDownload()
+          : {
+              ...downloadingDownload(),
+              id: `dl-${status}`,
+              title: `${status} Video`,
+              status,
+              progress: {},
+              error:
+                status === 'failed'
+                  ? { code: 'NetworkError', message: 'The network request failed.' }
+                  : undefined
+            }
+      window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+        ok: true,
+        data: [download]
+      })
+      window.mediaDownloader.deleteDownload = vi
+        .fn()
+        .mockResolvedValue({ ok: true, data: true })
+
+      renderSection(status === 'completed' ? 'completed' : status)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+      await act(async () => {})
+
+      expect(window.mediaDownloader.deleteDownload).toHaveBeenCalledWith(download.id)
+    }
+  )
+
+  it('removes a download when a deletion event arrives', async () => {
+    const completed = completedDownload()
+    let listener: ((download: Download) => void) | undefined
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [completed]
+    })
+    window.mediaDownloader.onDownloadDeleted = vi.fn((callback) => {
+      listener = callback
+      return () => undefined
+    })
+
+    renderSection('completed')
+
+    expect(await screen.findByText('Finished Video')).toBeInTheDocument()
+    act(() => listener?.(completed))
+
+    expect(await screen.findByText('No completed downloads.')).toBeInTheDocument()
+  })
+
+  it('shows an error when deleting a download fails', async () => {
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [completedDownload()]
+    })
+    window.mediaDownloader.deleteDownload = vi.fn().mockResolvedValue({
+      ok: false,
+      error: { code: 'FilesystemError', message: 'Failed to delete history entry.' }
+    })
+
+    renderSection('completed')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await act(async () => {})
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Failed to delete history entry.')
+    expect(screen.getByText('Finished Video')).toBeInTheDocument()
   })
 
   it('renders two same-video downloads with different formats as independent items', async () => {
