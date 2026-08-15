@@ -284,6 +284,8 @@ After a successful download, the application should allow the user to:
 * View the file size.
 * View the download status.
 
+The application must reliably record the final downloaded file path — including after format merging — so file actions remain available for every completed download. Records that lost their file path should be repaired from the download directory when the file can be matched uniquely.
+
 ---
 
 ## FR-011 — Error Handling

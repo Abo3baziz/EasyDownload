@@ -638,6 +638,137 @@ describe('createDownloadManager', () => {
     expect(deleted).not.toHaveBeenCalled()
   })
 
+  it('derives the completed destination from known metadata when capture failed', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({
+      id: 'abc123',
+      title: 'Example Video',
+      formats: [{ format_id: '137', vcodec: 'avc1.42001E', acodec: 'mp4a.40.2', ext: 'mp4' }]
+    })
+    const { handle, completion } = downloadHandle()
+    ytDlp.startDownload.mockReturnValue(handle)
+    const expected = 'D:\\Downloads\\Example Video [abc123] [137].mp4'
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => 'dl-1',
+      fileExists: (path) => path === expected
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+    completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+
+    await expect(manager.get('dl-1')).resolves.toMatchObject({
+      status: 'completed',
+      destination: expected,
+      fileName: 'Example Video [abc123] [137].mp4'
+    })
+  })
+
+  it('does not store a derived destination when the file does not exist', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({
+      id: 'abc123',
+      title: 'Example Video',
+      formats: [{ format_id: '137', vcodec: 'avc1.42001E', acodec: 'mp4a.40.2', ext: 'mp4' }]
+    })
+    const { handle, completion } = downloadHandle()
+    ytDlp.startDownload.mockReturnValue(handle)
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => 'dl-1',
+      fileExists: () => false
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+    completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+
+    const download = await manager.get('dl-1')
+    expect(download.status).toBe('completed')
+    expect(download.destination).toBeUndefined()
+  })
+
+  it('backfills a stored completed download with a unique matching file', async () => {
+    const record = terminalRecord({
+      id: 'dl-old',
+      status: 'completed',
+      title: 'Example Video',
+      formatId: '18',
+      directory: 'D:\\Downloads',
+      extension: 'mp4'
+    })
+    const { history, save } = createMockHistory([record])
+    const manager = createDownloadManager({
+      ytDlp: createMockYtDlp(),
+      history,
+      listDirectory: async () => ['Example Video [abc123] [18].mp4', 'Other.mp4'],
+      fileExists: () => true,
+      statFile: async () => ({ size: 42 })
+    })
+
+    await expect(manager.get(record.id)).resolves.toMatchObject({
+      destination: 'D:\\Downloads\\Example Video [abc123] [18].mp4',
+      fileName: 'Example Video [abc123] [18].mp4',
+      fileSize: 42
+    })
+    expect(save).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: record.id,
+        destination: 'D:\\Downloads\\Example Video [abc123] [18].mp4'
+      })
+    ])
+  })
+
+  it('leaves a stored completed download untouched when multiple files match', async () => {
+    const record = terminalRecord({
+      id: 'dl-old',
+      status: 'completed',
+      title: 'Example Video',
+      formatId: '18',
+      directory: 'D:\\Downloads',
+      extension: 'mp4'
+    })
+    const { history, save } = createMockHistory([record])
+    const manager = createDownloadManager({
+      ytDlp: createMockYtDlp(),
+      history,
+      listDirectory: async () => [
+        'Example Video [abc123] [18].mp4',
+        'Example Video [def456] [18].mp4'
+      ],
+      fileExists: () => true
+    })
+
+    const download = await manager.get(record.id)
+    expect(download).not.toHaveProperty('destination')
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('leaves a stored completed download untouched when no file matches', async () => {
+    const record = terminalRecord({
+      id: 'dl-old',
+      status: 'completed',
+      title: 'Example Video',
+      formatId: '18',
+      directory: 'D:\\Downloads',
+      extension: 'mp4'
+    })
+    const { history, save } = createMockHistory([record])
+    const manager = createDownloadManager({
+      ytDlp: createMockYtDlp(),
+      history,
+      listDirectory: async () => ['Unrelated.mp4'],
+      fileExists: () => true
+    })
+
+    const download = await manager.get(record.id)
+    expect(download).not.toHaveProperty('destination')
+    expect(save).not.toHaveBeenCalled()
+  })
+
   it('does not start the same download twice', async () => {
     const ytDlp = createMockYtDlp()
     ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })

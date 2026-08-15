@@ -193,6 +193,8 @@ describe('buildDownloadArgs', () => {
       '137',
       '-o',
       'D:\\Downloads\\%(title)s [%(id)s] [137].%(ext)s',
+      '--print',
+      'after_move:filepath',
       'https://example.com/watch?v=1'
     ])
   })
@@ -211,6 +213,8 @@ describe('buildDownloadArgs', () => {
       '137+bestaudio',
       '-o',
       'D:\\Downloads\\%(title)s [%(id)s] [137].%(ext)s',
+      '--print',
+      'after_move:filepath',
       '--merge-output-format',
       'mp4',
       'https://example.com/watch?v=1'
@@ -231,6 +235,8 @@ describe('buildDownloadArgs', () => {
       '248+bestaudio',
       '-o',
       'D:\\Downloads\\%(title)s [%(id)s] [248].%(ext)s',
+      '--print',
+      'after_move:filepath',
       'https://example.com/watch?v=1'
     ])
   })
@@ -250,6 +256,8 @@ describe('buildDownloadArgs', () => {
       '137+bestaudio',
       '-o',
       'D:\\Downloads\\%(title)s [%(id)s] [137].%(ext)s',
+      '--print',
+      'after_move:filepath',
       '--merge-output-format',
       'mp4',
       '--ffmpeg-location',
@@ -519,6 +527,82 @@ describe('createYtDlpService.startDownload', () => {
       .result
 
     expect(onPhase).toHaveBeenCalledWith('processing')
+  })
+
+  it('captures the final path printed on stdout and prefers it over parsed lines', async () => {
+    const kill = vi.fn()
+    const startStreaming = vi.fn().mockImplementation(
+      (_command: string, options?: StartStreamingOptions): StartedProcess => {
+        for (const line of ['[download] Destination: D:\\Downloads\\Stale.mp4']) {
+          options?.onStderr?.(line)
+        }
+        for (const line of [
+          'D:\\Downloads\\Example.f137.mp4',
+          'D:\\Downloads\\Example.f251.webm',
+          'D:\\Downloads\\Example.mp4'
+        ]) {
+          options?.onStdout?.(line)
+        }
+        return {
+          result: Promise.resolve({
+            stdout: '',
+            stderr: '',
+            exitCode: 0,
+            timedOut: false
+          } satisfies ProcessResult),
+          kill
+        }
+      }
+    )
+    const processes = { startStreaming } as unknown as ProcessManager
+    const service = createYtDlpService({ processes })
+
+    const result = await service
+      .startDownload({
+        url: 'https://example.com/watch?v=1',
+        formatId: '137',
+        directory: 'D:\\Downloads',
+        mergeAudio: true
+      })
+      .result
+
+    expect(result.destination).toBe('D:\\Downloads\\Example.mp4')
+  })
+
+  it('ignores path-like lines on stderr', async () => {
+    const { processes } = createStreamingProcesses({
+      exitCode: 0,
+      stderr: 'D:\\Downloads\\Example.mp4\n'
+    })
+    const service = createYtDlpService({ processes })
+
+    const result = await service
+      .startDownload({
+        url: 'https://example.com/watch?v=1',
+        formatId: '18',
+        directory: 'D:\\Downloads'
+      })
+      .result
+
+    expect(result.destination).toBeUndefined()
+  })
+
+  it('keeps the parsed destination when the print line never appears', async () => {
+    const { processes } = createStreamingProcesses({
+      exitCode: 0,
+      stderr: '[download] Destination: D:\\Downloads\\Example.mp4\n'
+    })
+    const service = createYtDlpService({ processes })
+
+    const result = await service
+      .startDownload({
+        url: 'https://example.com/watch?v=1',
+        formatId: '18',
+        directory: 'D:\\Downloads'
+      })
+      .result
+
+    expect(result.destination).toBe('D:\\Downloads\\Example.mp4')
   })
 
   it('kills the process and reports cancellation when cancel is called', async () => {

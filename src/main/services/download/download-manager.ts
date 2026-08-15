@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { unlink } from 'node:fs/promises'
-import { basename } from 'node:path'
+import { basename, join } from 'node:path'
 import type { Download, DownloadOptions, DownloadStatus } from '../../../shared/types/download'
 import type { DependencyStatus } from '../../../shared/types/dependencies'
 import { normalizeUrl } from '../../../shared/utils/url'
@@ -36,6 +36,7 @@ export interface DownloadManagerOptions {
   history?: HistoryManager
   statFile?: (path: string) => Promise<{ size: number } | undefined>
   fileExists?: (path: string) => boolean
+  listDirectory?: (path: string) => Promise<string[]>
   getConcurrencyLimit?: () => number | Promise<number>
   now?: () => number
   generateId?: () => string
@@ -55,6 +56,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
   const executionPromises = new Map<string, Promise<void>>()
   const handles = new Map<string, DownloadMediaHandle>()
   const mediaOptionsById = new Map<string, DownloadMediaOptions>()
+  const mediaMetaById = new Map<string, { id: string; title: string; extension: string }>()
   const pauseRequests = new Set<string>()
   const cancelRequests = new Set<string>()
   const listeners = new Set<(download: Download) => void>()
@@ -83,12 +85,13 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     if (!loadingHistory) {
       loadingHistory = options.history
         .load()
-        .then((records) => {
+        .then(async (records) => {
           for (const record of records) {
             if (!jobs.has(record.id)) {
               jobs.set(record.id, record)
             }
           }
+          await backfillMissingDestinations()
         })
         .catch(() => undefined)
         .finally(() => {
@@ -225,6 +228,14 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
         }
         mediaOptions = buildDownloadMediaOptions(config, media)
         mediaOptionsById.set(id, mediaOptions)
+        const format = (media.formats ?? []).find(
+          (candidate) => candidate.format_id === config.formatId
+        )
+        mediaMetaById.set(id, {
+          id: media.id,
+          title: media.title,
+          extension: mediaOptions.mergeOutputFormat ?? format?.ext ?? 'mp4'
+        })
         update(id, {
           title: media.title,
           thumbnail: media.thumbnail,
@@ -288,12 +299,13 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
           update(id, { destination: result.destination })
         }
       } else if (result.exitCode === 0) {
-        const fileSize = await readFileSize(result.destination)
+        const destination = result.destination ?? deriveCompletedDestination(id)
+        const fileSize = await readFileSize(destination)
         update(id, {
           status: 'completed',
           progress: { percent: 100 },
-          fileName: result.destination ? basename(result.destination) : undefined,
-          destination: result.destination,
+          fileName: destination ? basename(destination) : undefined,
+          destination,
           fileSize
         })
       } else {
@@ -329,6 +341,81 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     } catch {
       return undefined
     }
+  }
+
+  function deriveCompletedDestination(id: string): string | undefined {
+    const meta = mediaMetaById.get(id)
+    const config = configs.get(id)
+    if (!meta || !config || !options.fileExists) {
+      return undefined
+    }
+    const candidate = join(
+      config.directory,
+      `${meta.title} [${meta.id}] [${config.formatId}].${meta.extension}`
+    )
+    return options.fileExists(candidate) ? candidate : undefined
+  }
+
+  async function backfillMissingDestinations(): Promise<void> {
+    if (!options.listDirectory || !options.fileExists) {
+      return
+    }
+    let changed = false
+    for (const download of jobs.values()) {
+      if (download.status !== 'completed' || download.destination) {
+        continue
+      }
+      if (!download.directory || !download.title || !download.formatId || !download.extension) {
+        continue
+      }
+      const match = await findMatchingFile(
+        download.directory,
+        download.title,
+        download.formatId,
+        download.extension
+      )
+      if (!match) {
+        continue
+      }
+      const destination = join(download.directory, match.fileName)
+      if (!options.fileExists(destination)) {
+        continue
+      }
+      jobs.set(download.id, {
+        ...download,
+        destination,
+        fileName: match.fileName,
+        fileSize: match.fileSize
+      })
+      changed = true
+    }
+    if (changed) {
+      void persistHistory()
+    }
+  }
+
+  async function findMatchingFile(
+    directory: string,
+    title: string,
+    formatId: string,
+    extension: string
+  ): Promise<{ fileName: string; fileSize?: number } | undefined> {
+    let names: string[]
+    try {
+      names = await options.listDirectory!(directory)
+    } catch {
+      return undefined
+    }
+    const pattern = new RegExp(
+      `^${escapeRegExp(title)} \\[[^\\]]+\\] \\[${escapeRegExp(formatId)}\\]\\.${escapeRegExp(extension)}$`
+    )
+    const matches = names.filter((name) => pattern.test(name))
+    if (matches.length !== 1) {
+      return undefined
+    }
+    const fileName = matches[0]!
+    const fileSize = await readFileSize(join(directory, fileName))
+    return { fileName, fileSize }
   }
 
   function configFromDownload(download: Download): DownloadOptions {
@@ -459,6 +546,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       cancelRequests.delete(id)
       pauseRequests.delete(id)
       mediaOptionsById.delete(id)
+      mediaMetaById.delete(id)
       update(id, { status: 'queued', progress: {}, error: undefined })
       if (!queue.includes(id)) {
         queue.push(id)
@@ -505,6 +593,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       jobs.delete(id)
       configs.delete(id)
       mediaOptionsById.delete(id)
+      mediaMetaById.delete(id)
       handles.delete(id)
       if (queueIndex >= 0) {
         queue.splice(queueIndex, 1)
@@ -619,4 +708,8 @@ function formatMetadata(
     audioCodec: isRealCodec(format.acodec) ? format.acodec : undefined,
     fps: format.fps
   }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
