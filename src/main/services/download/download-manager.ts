@@ -22,10 +22,12 @@ export interface DownloadManager {
   resume(id: string): Promise<Download>
   cancel(id: string): Promise<Download>
   retry(id: string): Promise<Download>
+  remove(id: string): Promise<Download | undefined>
   get(id: string): Promise<Download>
   list(): Promise<Download[]>
   clearHistory(): Promise<Download[]>
   onUpdate(listener: (download: Download) => void): () => void
+  onDelete(listener: (download: Download) => void): () => void
 }
 
 export interface DownloadManagerOptions {
@@ -50,15 +52,17 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
   const configs = new Map<string, DownloadOptions>()
   const queue: string[] = []
   const activeIds = new Set<string>()
+  const executionPromises = new Map<string, Promise<void>>()
   const handles = new Map<string, DownloadMediaHandle>()
   const mediaOptionsById = new Map<string, DownloadMediaOptions>()
   const pauseRequests = new Set<string>()
   const cancelRequests = new Set<string>()
   const listeners = new Set<(download: Download) => void>()
+  const deleteListeners = new Set<(download: Download) => void>()
   let scheduleChain: Promise<void> = Promise.resolve()
   let historyLoaded = false
   let loadingHistory: Promise<void> | undefined
-  let persistChain: Promise<void> = Promise.resolve()
+  let persistChain: Promise<boolean> = Promise.resolve(true)
 
   function getOrThrow(id: string): Download {
     const download = jobs.get(id)
@@ -94,15 +98,16 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     return loadingHistory
   }
 
-  function persistHistory(): Promise<void> {
+  function persistHistory(): Promise<boolean> {
     if (!options.history) {
-      return Promise.resolve()
+      return Promise.resolve(true)
     }
     const records = [...jobs.values()].filter((download) => isTerminal(download.status))
     persistChain = persistChain
-      .catch(() => undefined)
-      .then(() => options.history?.save(records))
-      .catch(() => undefined)
+      .catch(() => false)
+      .then(() => options.history!.save(records))
+      .then(() => true)
+      .catch(() => false)
     return persistChain
   }
 
@@ -138,6 +143,12 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
 
   function emit(download: Download): void {
     for (const listener of listeners) {
+      listener(download)
+    }
+  }
+
+  function emitDelete(download: Download): void {
+    for (const listener of deleteListeners) {
       listener(download)
     }
   }
@@ -179,12 +190,13 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
         break
       }
       activeIds.add(id)
-      void execute(id)
-        .catch(() => undefined)
-        .finally(() => {
-          activeIds.delete(id)
-          schedule()
-        })
+      const execution = execute(id).catch(() => undefined)
+      executionPromises.set(id, execution)
+      void execution.finally(() => {
+        executionPromises.delete(id)
+        activeIds.delete(id)
+        schedule()
+      })
     }
   }
 
@@ -456,6 +468,72 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       return getOrThrow(id)
     },
 
+    async remove(id: string): Promise<Download | undefined> {
+      await ensureLoaded()
+      let download = jobs.get(id)
+      if (!download) {
+        return undefined
+      }
+      if (!isTerminal(download.status)) {
+        throw new AppError(
+          'DownloadError',
+          `Cannot delete a download in state "${download.status}".`
+        )
+      }
+
+      const execution = executionPromises.get(id)
+      if (execution) {
+        await execution
+        download = jobs.get(id)
+        if (!download) {
+          return undefined
+        }
+        if (!isTerminal(download.status)) {
+          throw new AppError(
+            'DownloadError',
+            `Cannot delete a download in state "${download.status}".`
+          )
+        }
+      }
+
+      const config = configs.get(id)
+      const mediaOptions = mediaOptionsById.get(id)
+      const wasPaused = pauseRequests.delete(id)
+      const wasCancelled = cancelRequests.delete(id)
+      const queueIndex = queue.indexOf(id)
+
+      jobs.delete(id)
+      configs.delete(id)
+      mediaOptionsById.delete(id)
+      handles.delete(id)
+      if (queueIndex >= 0) {
+        queue.splice(queueIndex, 1)
+      }
+
+      if (!(await persistHistory())) {
+        jobs.set(id, download)
+        if (config) {
+          configs.set(id, config)
+        }
+        if (mediaOptions) {
+          mediaOptionsById.set(id, mediaOptions)
+        }
+        if (wasPaused) {
+          pauseRequests.add(id)
+        }
+        if (wasCancelled) {
+          cancelRequests.add(id)
+        }
+        if (queueIndex >= 0) {
+          queue.splice(queueIndex, 0, id)
+        }
+        throw new AppError('FilesystemError', 'Failed to delete the download history entry.')
+      }
+
+      emitDelete(download)
+      return download
+    },
+
     async get(id: string): Promise<Download> {
       await ensureLoaded()
       return getOrThrow(id)
@@ -482,6 +560,13 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       listeners.add(listener)
       return () => {
         listeners.delete(listener)
+      }
+    },
+
+    onDelete(listener: (download: Download) => void): () => void {
+      deleteListeners.add(listener)
+      return () => {
+        deleteListeners.delete(listener)
       }
     }
   }

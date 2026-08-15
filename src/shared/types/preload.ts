@@ -13,10 +13,12 @@ export interface PreloadApi {
   pauseDownload(id: string): Promise<IpcResult<Download>>
   resumeDownload(id: string): Promise<IpcResult<Download>>
   cancelDownload(id: string): Promise<IpcResult<Download>>
+  deleteDownload(id: string): Promise<IpcResult<boolean>>
   retryDownload(id: string): Promise<IpcResult<Download>>
   getDownload(id: string): Promise<IpcResult<Download>>
   listDownloads(): Promise<IpcResult<Download[]>>
   clearHistory(): Promise<IpcResult<Download[]>>
+  onDownloadDeleted(listener: (download: Download) => void): () => void
   selectDirectory(): Promise<IpcResult<string | null>>
   openFile(path: string): Promise<IpcResult<void>>
   openDirectory(path: string): Promise<IpcResult<void>>

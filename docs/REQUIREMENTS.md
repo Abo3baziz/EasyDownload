@@ -335,7 +335,10 @@ The application should allow the user to:
 * View the status of each historical download.
 * View filename, file size, source, and destination for completed downloads.
 * Retry a failed or cancelled download where supported.
+* Delete individual completed, failed, or cancelled history entries.
 * Clear history.
+
+Deleting a history entry must not delete the downloaded file or converted output files. Linked conversion history metadata should be removed with a completed download entry.
 
 History storage is an implementation decision and must not require a remote service.
 

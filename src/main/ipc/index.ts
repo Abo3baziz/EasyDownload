@@ -35,6 +35,14 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.downloadCancel, idSchema, ({ id }) =>
     services.downloads.cancel(id)
   )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.downloadDelete, idSchema, async ({ id }) => {
+    const download = await services.downloads.get(id)
+    if (download.status === 'completed' && download.destination) {
+      await services.conversions.removeForInput(download.destination)
+    }
+    const removed = await services.downloads.remove(id)
+    return removed !== undefined
+  })
   registerIpcHandler(ipcMain, IPC_CHANNELS.downloadRetry, idSchema, ({ id }) =>
     services.downloads.retry(id)
   )
@@ -89,6 +97,12 @@ export function registerIpc(services: Services): void {
       window.webContents.send(IPC_CHANNELS.downloadStateEvent, download)
     }
     void services.notifications.notify(download)
+  })
+
+  services.downloads.onDelete((download) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send(IPC_CHANNELS.downloadDeletedEvent, download)
+    }
   })
 
   services.conversions.onUpdate((conversion) => {

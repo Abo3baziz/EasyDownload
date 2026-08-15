@@ -8,6 +8,7 @@ import type { JsonStore } from '../history/json-store'
 export interface ConversionManager {
   start(options: ConversionStartOptions): Promise<Conversion>
   cancel(id: string): Promise<Conversion>
+  removeForInput(input: string): Promise<Conversion[]>
   list(): Promise<Conversion[]>
   clearHistory(): Promise<Conversion[]>
   onUpdate(listener: (conversion: Conversion) => void): () => void
@@ -29,7 +30,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
   const listeners = new Set<(conversion: Conversion) => void>()
   let historyLoaded = false
   let loadingHistory: Promise<void> | undefined
-  let persistChain: Promise<void> = Promise.resolve()
+  let persistChain: Promise<boolean> = Promise.resolve(true)
 
   function emit(conversion: Conversion): void {
     for (const listener of listeners) {
@@ -59,17 +60,18 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
     return loadingHistory
   }
 
-  function persistHistory(): Promise<void> {
+  function persistHistory(): Promise<boolean> {
     if (!options.history) {
-      return Promise.resolve()
+      return Promise.resolve(true)
     }
     const records = [...conversions.values()].filter(
       (conversion) => conversion.type === 'extractAudio' && conversion.status === 'completed'
     )
     persistChain = persistChain
-      .catch(() => undefined)
-      .then(() => options.history?.save(records))
-      .catch(() => undefined)
+      .catch(() => false)
+      .then(() => options.history!.save(records))
+      .then(() => true)
+      .catch(() => false)
     return persistChain
   }
 
@@ -194,6 +196,30 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
         handle.cancel()
       }
       return conversion
+    },
+
+    async removeForInput(input: string): Promise<Conversion[]> {
+      await ensureLoaded()
+      const removed = [...conversions.values()].filter((conversion) => conversion.input === input)
+      if (removed.some((conversion) => conversion.status === 'running')) {
+        throw new AppError('DownloadError', 'Cannot delete a download while a conversion is running.')
+      }
+      if (removed.length === 0) {
+        return []
+      }
+
+      for (const conversion of removed) {
+        conversions.delete(conversion.id)
+      }
+
+      if (!(await persistHistory())) {
+        for (const conversion of removed) {
+          conversions.set(conversion.id, conversion)
+        }
+        throw new AppError('FilesystemError', 'Failed to delete linked conversion history.')
+      }
+
+      return removed
     },
 
     async list(): Promise<Conversion[]> {

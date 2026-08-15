@@ -16,12 +16,34 @@ export function useDownloads(): DownloadsState {
 
   useEffect(() => {
     let cancelled = false
+    const deletedIds = new Set<string>()
+
+    const unsubscribe = api.onDownloadStateChange((download) => {
+      if (deletedIds.has(download.id)) {
+        return
+      }
+      setDownloads((previous) => {
+        const index = previous.findIndex((item) => item.id === download.id)
+        if (index === -1) {
+          return [download, ...previous]
+        }
+        const next = [...previous]
+        next[index] = download
+        return next
+      })
+    })
+
+    const unsubscribeDelete = api.onDownloadDeleted((download) => {
+      deletedIds.add(download.id)
+      setDownloads((previous) => previous.filter((item) => item.id !== download.id))
+    })
+
     void (async () => {
       try {
         const result = await api.listDownloads()
         if (cancelled) return
         if (result.ok) {
-          setDownloads(result.data)
+          setDownloads(result.data.filter((download) => !deletedIds.has(download.id)))
         } else {
           setError(result.error)
         }
@@ -34,21 +56,10 @@ export function useDownloads(): DownloadsState {
       }
     })()
 
-    const unsubscribe = api.onDownloadStateChange((download) => {
-      setDownloads((previous) => {
-        const index = previous.findIndex((item) => item.id === download.id)
-        if (index === -1) {
-          return [download, ...previous]
-        }
-        const next = [...previous]
-        next[index] = download
-        return next
-      })
-    })
-
     return () => {
       cancelled = true
       unsubscribe()
+      unsubscribeDelete()
     }
   }, [api])
 
