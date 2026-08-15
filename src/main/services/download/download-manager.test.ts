@@ -22,7 +22,7 @@ function deferred<T>() {
 
 interface MockYtDlp {
   inspect: Mock<(url: string) => Promise<YtDlpMedia>>
-  inspectPlaylist: Mock<(url: string) => Promise<YtDlpMedia>>
+  inspectFlat: Mock<(url: string) => Promise<YtDlpMedia>>
   startDownload: Mock<
     (options: DownloadMediaOptions, callbacks?: YtDlpDownloadCallbacks) => DownloadMediaHandle
   >
@@ -31,7 +31,7 @@ interface MockYtDlp {
 function createMockYtDlp(): MockYtDlp {
   return {
     inspect: vi.fn(),
-    inspectPlaylist: vi.fn(),
+    inspectFlat: vi.fn(),
     startDownload: vi.fn()
   }
 }
@@ -1557,7 +1557,7 @@ describe('createDownloadManager', () => {
 
     it('creates one tagged queued job per entry and resolves the preset format at download time', async () => {
       const ytDlp = createMockYtDlp()
-      ytDlp.inspectPlaylist.mockResolvedValue(
+      ytDlp.inspectFlat.mockResolvedValue(
         playlist(
           { id: 'v1', title: 'Video One', url: 'https://example.com/watch?v=1' },
           { id: 'v2', title: 'Video Two', url: 'https://example.com/watch?v=2' }
@@ -1615,7 +1615,7 @@ describe('createDownloadManager', () => {
       const existing = terminalRecord({ id: 'dl-old' })
       const { history } = createMockHistory([existing])
       const ytDlp = createMockYtDlp()
-      ytDlp.inspectPlaylist.mockResolvedValue(
+      ytDlp.inspectFlat.mockResolvedValue(
         playlist(
           { id: 'v1', title: 'Video One', url: 'https://example.com/watch?v=1' },
           { id: 'v1b', title: 'Video One Again', url: 'https://example.com/watch?v=1' },
@@ -1642,7 +1642,7 @@ describe('createDownloadManager', () => {
 
     it('throws a clear error when the playlist has no downloadable entries', async () => {
       const ytDlp = createMockYtDlp()
-      ytDlp.inspectPlaylist.mockResolvedValue(
+      ytDlp.inspectFlat.mockResolvedValue(
         playlist({ id: 'v1', title: 'No Url Video' })
       )
       const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
@@ -1657,7 +1657,7 @@ describe('createDownloadManager', () => {
 
     it('continues with other entries when one entry fails to inspect', async () => {
       const ytDlp = createMockYtDlp()
-      ytDlp.inspectPlaylist.mockResolvedValue(
+      ytDlp.inspectFlat.mockResolvedValue(
         playlist(
           { id: 'v1', title: 'Video One', url: 'https://example.com/watch?v=1' },
           { id: 'v2', title: 'Video Two', url: 'https://example.com/watch?v=2' }
@@ -1688,7 +1688,7 @@ describe('createDownloadManager', () => {
 
     it('retries a playlist entry whose format was never resolved', async () => {
       const ytDlp = createMockYtDlp()
-      ytDlp.inspectPlaylist.mockResolvedValue(
+      ytDlp.inspectFlat.mockResolvedValue(
         playlist({ id: 'v1', title: 'Video One', url: 'https://example.com/watch?v=1' })
       )
       ytDlp.inspect
@@ -1722,7 +1722,7 @@ describe('createDownloadManager', () => {
 
     it('cancels every non-terminal download tagged with the playlist id', async () => {
       const ytDlp = createMockYtDlp()
-      ytDlp.inspectPlaylist.mockResolvedValue(
+      ytDlp.inspectFlat.mockResolvedValue(
         playlist(
           { id: 'v1', title: 'Video One', url: 'https://example.com/watch?v=1' },
           { id: 'v2', title: 'Video Two', url: 'https://example.com/watch?v=2' }

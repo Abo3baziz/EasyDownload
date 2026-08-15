@@ -224,7 +224,7 @@ describe('parsePlaylistOutput', () => {
   })
 })
 
-describe('createYtDlpService.inspectPlaylist', () => {
+describe('createYtDlpService.inspectFlat', () => {
   it('parses a successful flat-playlist inspection', async () => {
     const playlist = {
       id: 'PL123',
@@ -235,7 +235,7 @@ describe('createYtDlpService.inspectPlaylist', () => {
     const processes = createMockProcesses(successResult(JSON.stringify(playlist)))
     const service = createYtDlpService({ processes })
 
-    await expect(service.inspectPlaylist('https://www.youtube.com/playlist?list=PL123')).resolves.toEqual(
+    await expect(service.inspectFlat('https://www.youtube.com/playlist?list=PL123')).resolves.toEqual(
       playlist
     )
     expect(processes.runToCompletion).toHaveBeenCalledWith('yt-dlp', {
@@ -253,7 +253,7 @@ describe('createYtDlpService.inspectPlaylist', () => {
     })
     const service = createYtDlpService({ processes })
 
-    await expect(service.inspectPlaylist('https://example.com/bad')).rejects.toMatchObject({
+    await expect(service.inspectFlat('https://example.com/bad')).rejects.toMatchObject({
       code: 'UnsupportedMediaError'
     })
   })

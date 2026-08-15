@@ -628,7 +628,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
 
     async downloadPlaylist(playlistOptions: PlaylistDownloadOptions): Promise<PlaylistStartResult> {
       await ensureLoaded()
-      const raw = await options.ytDlp.inspectPlaylist(playlistOptions.url)
+      const raw = await options.ytDlp.inspectFlat(playlistOptions.url)
       const playlistId = raw.id
       const playlistTitle = raw.title
       const entries = normalizePlaylistEntries(raw.entries ?? [])

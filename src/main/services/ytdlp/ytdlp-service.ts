@@ -6,7 +6,7 @@ import type { YtDlpMedia } from './types'
 
 export interface YtDlpService {
   inspect(url: string): Promise<YtDlpMedia>
-  inspectPlaylist(url: string): Promise<YtDlpMedia>
+  inspectFlat(url: string): Promise<YtDlpMedia>
   startDownload(
     options: DownloadMediaOptions,
     callbacks?: YtDlpDownloadCallbacks
@@ -151,7 +151,7 @@ export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
       return runInspection(url, buildInspectArgs)
     },
 
-    async inspectPlaylist(url: string): Promise<YtDlpMedia> {
+    async inspectFlat(url: string): Promise<YtDlpMedia> {
       return runInspection(url, buildPlaylistInspectArgs, parsePlaylistOutput)
     },
 

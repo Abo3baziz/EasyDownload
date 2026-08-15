@@ -27,7 +27,7 @@ export function createMediaService(options: MediaServiceOptions): MediaService {
         throw new AppError('DependencyError', 'yt-dlp is not available.')
       }
 
-      const raw = await options.ytDlp.inspect(url)
+      const raw = await options.ytDlp.inspectFlat(url)
       if (isPlaylist(raw)) {
         return { kind: 'playlist', playlist: normalizePlaylist(raw) }
       }

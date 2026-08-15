@@ -31,8 +31,8 @@ function createDependencyMock(available = true): DependencyManager {
   } as unknown as DependencyManager
 }
 
-function createYtDlpMock(inspect = vi.fn()): YtDlpService {
-  return { inspect } as unknown as YtDlpService
+function createYtDlpMock(inspectFlat = vi.fn()): YtDlpService {
+  return { inspectFlat } as unknown as YtDlpService
 }
 
 describe('createMediaService', () => {
@@ -50,7 +50,7 @@ describe('createMediaService', () => {
     expect(result.media.title).toBe('Example Video')
     expect(result.media.website).toBe('www.youtube.com')
     expect(result.media.formats.map((f) => f.label)).toEqual(['360p MP4'])
-    expect(ytDlp.inspect).toHaveBeenCalledWith('https://www.youtube.com/watch?v=abc123')
+    expect(ytDlp.inspectFlat).toHaveBeenCalledWith('https://www.youtube.com/watch?v=abc123')
   })
 
   it('returns a playlist result when yt-dlp reports a playlist', async () => {
@@ -115,7 +115,7 @@ describe('createMediaService', () => {
     await expect(media.inspectUrl('not-a-url')).rejects.toMatchObject({
       code: 'ValidationError'
     })
-    expect(ytDlp.inspect).not.toHaveBeenCalled()
+    expect(ytDlp.inspectFlat).not.toHaveBeenCalled()
   })
 
   it('rejects inspection when yt-dlp is not available', async () => {
@@ -125,7 +125,7 @@ describe('createMediaService', () => {
     await expect(media.inspectUrl('https://example.com/video')).rejects.toMatchObject({
       code: 'DependencyError'
     })
-    expect(ytDlp.inspect).not.toHaveBeenCalled()
+    expect(ytDlp.inspectFlat).not.toHaveBeenCalled()
   })
 
   it('propagates errors raised by the yt-dlp service', async () => {
