@@ -234,14 +234,32 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     scheduleChain = scheduleChain.then(executeNext).catch(() => undefined)
   }
 
+  function canStartJob(id: string): boolean {
+    const download = jobs.get(id)
+    if (!download?.playlistId) {
+      return true
+    }
+    return !hasActivePlaylistEntry(download.playlistId)
+  }
+
+  function hasActivePlaylistEntry(playlistId: string): boolean {
+    for (const activeId of activeIds) {
+      const download = jobs.get(activeId)
+      if (download?.playlistId === playlistId) {
+        return true
+      }
+    }
+    return false
+  }
+
   async function executeNext(): Promise<void> {
     const limit = await resolveConcurrencyLimit()
     while (queue.length > 0 && activeIds.size < limit) {
-      const id = queue.shift() as string
-      if (activeIds.has(id)) {
-        queue.unshift(id)
+      const index = queue.findIndex((id) => !activeIds.has(id) && canStartJob(id))
+      if (index === -1) {
         break
       }
+      const id = queue.splice(index, 1)[0] as string
       activeIds.add(id)
       const execution = execute(id).catch(() => undefined)
       executionPromises.set(id, execution)
