@@ -11,6 +11,8 @@ function createApiMock(): PreloadApi {
   return {
     inspectUrl: vi.fn(),
     startDownload: vi.fn(),
+    downloadPlaylist: vi.fn(),
+    cancelPlaylist: vi.fn(),
     pauseDownload: vi.fn(),
     resumeDownload: vi.fn(),
     cancelDownload: vi.fn(),
@@ -791,5 +793,90 @@ describe('DownloadsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open audio file' }))
 
     expect(window.mediaDownloader.openFile).toHaveBeenCalledWith('C:\\Downloads\\video.mp3')
+  })
+
+  it('groups playlist downloads under a playlist header with aggregate progress', async () => {
+    const entry = (id: string, status: Download['status'], playlistIndex: number): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: `Video ${playlistIndex}`,
+      status,
+      progress: {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex,
+      playlistCount: 3,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        entry('dl-1', 'downloading', 1),
+        entry('dl-2', 'queued', 2),
+        { ...downloadingDownload(), id: 'dl-standalone' }
+      ]
+    })
+
+    renderSection('queue')
+
+    expect(await screen.findByText('My Playlist')).toBeInTheDocument()
+    expect(screen.getByText('0 of 3 videos completed')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel playlist' })).toBeInTheDocument()
+    expect(screen.getByText('Video 1')).toBeInTheDocument()
+    expect(screen.getByText('Video 2')).toBeInTheDocument()
+    expect(screen.getByText('Example Video')).toBeInTheDocument()
+  })
+
+  it('cancels the whole playlist through the playlist-level action', async () => {
+    const entry = (id: string, status: Download['status']): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: id,
+      status,
+      progress: {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 2,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [entry('dl-1', 'downloading'), entry('dl-2', 'queued')]
+    })
+    window.mediaDownloader.cancelPlaylist = vi.fn().mockResolvedValue({ ok: true, data: undefined })
+
+    renderSection('queue')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel playlist' }))
+
+    expect(window.mediaDownloader.cancelPlaylist).toHaveBeenCalledWith('PL123')
+  })
+
+  it('does not show the playlist cancel action once every entry is terminal', async () => {
+    const entry = (id: string): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: id,
+      status: 'completed',
+      progress: { percent: 100 },
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 2,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [entry('dl-1'), entry('dl-2')]
+    })
+
+    renderSection('completed')
+
+    expect(await screen.findByText('2 of 2 videos completed')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel playlist' })).not.toBeInTheDocument()
   })
 })

@@ -11,6 +11,8 @@ function createApiMock(): PreloadApi {
   return {
     inspectUrl: vi.fn(),
     startDownload: vi.fn(),
+    downloadPlaylist: vi.fn(),
+    cancelPlaylist: vi.fn(),
     pauseDownload: vi.fn(),
     resumeDownload: vi.fn(),
     cancelDownload: vi.fn(),
@@ -66,7 +68,22 @@ function mediaFor(url: string): MediaInfo {
 }
 
 function inspectResult(media: MediaInfo) {
-  return { ok: true, data: media }
+  return { ok: true, data: { kind: 'video' as const, media } }
+}
+
+function playlistResult(
+  playlist: {
+    id: string
+    title: string
+    thumbnail?: string
+    website?: string
+    entries: Array<{ id: string; title: string; url: string; duration?: number }>
+  }
+) {
+  return {
+    ok: true,
+    data: { kind: 'playlist' as const, playlist }
+  }
 }
 
 describe('HomePage', () => {
@@ -170,6 +187,115 @@ describe('HomePage', () => {
       formatId: '137',
       directory: 'C:\\Downloads'
     })
+  })
+
+  it('renders a playlist card with a quality preset selector', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
+      playlistResult({
+        id: 'PL123',
+        title: 'My Playlist',
+        website: 'www.youtube.com',
+        entries: [
+          { id: 'v1', title: 'Video One', url: 'https://www.youtube.com/watch?v=v1', duration: 60 },
+          { id: 'v2', title: 'Video Two', url: 'https://www.youtube.com/watch?v=v2' }
+        ]
+      })
+    )
+
+    await submitUrl('https://www.youtube.com/playlist?list=PL123')
+
+    expect(await screen.findByRole('heading', { name: 'My Playlist' })).toBeInTheDocument()
+    expect(screen.getByText('www.youtube.com · 2 videos')).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Playlist quality' })).toBeInTheDocument()
+    expect(screen.getByLabelText('720p')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download playlist' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Formats' })).not.toBeInTheDocument()
+  })
+
+  it('starts a playlist download with the selected preset in the configured directory', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
+      playlistResult({
+        id: 'PL123',
+        title: 'My Playlist',
+        website: 'www.youtube.com',
+        entries: [
+          { id: 'v1', title: 'Video One', url: 'https://www.youtube.com/watch?v=v1' },
+          { id: 'v2', title: 'Video Two', url: 'https://www.youtube.com/watch?v=v2' }
+        ]
+      })
+    )
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.downloadPlaylist = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { playlistId: 'PL123', created: 2, skipped: 0 }
+    })
+
+    await submitUrl('https://www.youtube.com/playlist?list=PL123')
+
+    fireEvent.click(await screen.findByLabelText('720p'))
+    fireEvent.click(screen.getByRole('button', { name: 'Download playlist' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('2 videos queued')
+    expect(window.mediaDownloader.downloadPlaylist).toHaveBeenCalledWith({
+      url: 'https://www.youtube.com/playlist?list=PL123',
+      preset: '720',
+      directory: 'C:\\Downloads'
+    })
+  })
+
+  it('reports skipped entries when starting a playlist download', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
+      playlistResult({
+        id: 'PL123',
+        title: 'My Playlist',
+        website: 'www.youtube.com',
+        entries: [
+          { id: 'v1', title: 'Video One', url: 'https://www.youtube.com/watch?v=v1' }
+        ]
+      })
+    )
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.downloadPlaylist = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { playlistId: 'PL123', created: 0, skipped: 1 }
+    })
+
+    await submitUrl('https://www.youtube.com/playlist?list=PL123')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Download playlist' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('1 already downloaded and skipped')
+  })
+
+  it('shows an error when starting a playlist download fails', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
+      playlistResult({
+        id: 'PL123',
+        title: 'My Playlist',
+        website: 'www.youtube.com',
+        entries: [{ id: 'v1', title: 'Video One', url: 'https://www.youtube.com/watch?v=v1' }]
+      })
+    )
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.downloadPlaylist = vi.fn().mockResolvedValue({
+      ok: false,
+      error: { code: 'DownloadError', message: 'Playlist contains no videos.' }
+    })
+
+    await submitUrl('https://www.youtube.com/playlist?list=PL123')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Download playlist' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Playlist contains no videos.')
   })
 
   it('shows the format button as disabled Downloading while the download is in progress', async () => {

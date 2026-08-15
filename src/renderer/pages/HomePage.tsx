@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { AppError } from '../../shared/types/errors'
-import type { MediaFormat, MediaInfo } from '../../shared/types/media'
+import type { PlaylistFormat } from '../../shared/types/download'
+import type { InspectionResult, MediaFormat, MediaInfo, PlaylistInfo } from '../../shared/types/media'
 import { formatBytes, formatDuration } from '../../shared/utils/format'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 import { useHomeState } from '../state/homeState'
@@ -15,13 +16,16 @@ export function HomePage() {
     setInspection,
     isDownloading,
     markDownloading,
-    unmarkDownloading
+    unmarkDownloading,
+    isPlaylistActive,
+    markPlaylistDownloading,
+    unmarkPlaylistDownloading
   } = useHomeState()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<AppError | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const media = url.trim() === '' ? null : (getInspection(url) ?? null)
+  const inspection = url.trim() === '' ? null : (getInspection(url) ?? null)
 
   async function handleInspect() {
     const targetUrl = url
@@ -46,7 +50,7 @@ export function HomePage() {
   }
 
   async function handleDownload(format: MediaFormat) {
-    if (!media) {
+    if (!inspection || inspection.kind !== 'video') {
       return
     }
     if (!markDownloading(url, format.id)) {
@@ -74,6 +78,45 @@ export function HomePage() {
       }
     } catch (err) {
       unmarkDownloading(url, format.id)
+      setError({
+        code: 'UnknownError',
+        message: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  async function handleDownloadPlaylist(playlist: PlaylistInfo, preset: PlaylistFormat) {
+    if (!markPlaylistDownloading(playlist.id)) {
+      return
+    }
+    setError(null)
+    setNotice(null)
+    try {
+      const settings = await api.getSettings()
+      if (!settings.ok) {
+        unmarkPlaylistDownloading(playlist.id)
+        setError(settings.error)
+        return
+      }
+      const result = await api.downloadPlaylist({
+        url,
+        preset,
+        directory: settings.data.downloadDirectory,
+      })
+      if (result.ok) {
+        const skipped =
+          result.data.skipped > 0
+            ? ` (${result.data.skipped} already downloaded and skipped)`
+            : ''
+        setNotice(
+          `Playlist download started: ${result.data.created} videos queued${skipped}. Track progress on the Downloads page.`
+        )
+      } else {
+        unmarkPlaylistDownloading(playlist.id)
+        setError(result.error)
+      }
+    } catch (err) {
+      unmarkPlaylistDownloading(playlist.id)
       setError({
         code: 'UnknownError',
         message: err instanceof Error ? err.message : String(err),
@@ -132,11 +175,20 @@ export function HomePage() {
         </div>
       )}
 
-      {media && (
+      {inspection && inspection.kind === 'video' && (
         <MediaDetails
-          media={media}
+          media={inspection.media}
           isFormatDownloading={(formatId) => isDownloading(url, formatId)}
           onDownload={(format) => void handleDownload(format)}
+        />
+      )}
+
+      {inspection && inspection.kind === 'playlist' && (
+        <PlaylistCard
+          key={inspection.playlist.id}
+          playlist={inspection.playlist}
+          active={isPlaylistActive(inspection.playlist.id)}
+          onDownload={(preset) => void handleDownloadPlaylist(inspection.playlist, preset)}
         />
       )}
     </section>
@@ -207,6 +259,78 @@ function MediaDetails({
           )
         })}
       </ul>
+    </div>
+  )
+}
+
+const PRESETS: ReadonlyArray<{ value: PlaylistFormat; label: string }> = [
+  { value: 'best', label: 'Best' },
+  { value: '1080', label: '1080p' },
+  { value: '720', label: '720p' },
+  { value: '480', label: '480p' },
+  { value: '360', label: '360p' },
+  { value: 'audio', label: 'Audio' }
+]
+
+function PlaylistCard({
+  playlist,
+  active,
+  onDownload,
+}: {
+  playlist: PlaylistInfo
+  active: boolean
+  onDownload: (preset: PlaylistFormat) => void
+}) {
+  const [preset, setPreset] = useState<PlaylistFormat>('best')
+  const meta: string[] = []
+  if (playlist.website) {
+    meta.push(playlist.website)
+  }
+  meta.push(`${playlist.entries.length} video${playlist.entries.length === 1 ? '' : 's'}`)
+
+  return (
+    <div className='media-card'>
+      <div className='media-header'>
+        {playlist.thumbnail && (
+          <img
+            className='media-thumbnail'
+            src={playlist.thumbnail}
+            alt=''
+          />
+        )}
+        <div className='media-heading'>
+          <h2>{playlist.title}</h2>
+          {meta.length > 0 && <p className='media-meta'>{meta.join(' · ')}</p>}
+        </div>
+      </div>
+
+      <h3>Playlist quality</h3>
+      <div
+        className='playlist-presets'
+        role='radiogroup'
+        aria-label='Playlist quality'>
+        {PRESETS.map((option) => (
+          <label
+            key={option.value}
+            className={preset === option.value ? 'playlist-preset selected' : 'playlist-preset'}>
+            <input
+              type='radio'
+              name='playlist-preset'
+              value={option.value}
+              checked={preset === option.value}
+              onChange={() => setPreset(option.value)}
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+      <button
+        type='button'
+        className='btn'
+        disabled={active}
+        onClick={() => onDownload(preset)}>
+        {active ? 'Downloading…' : 'Download playlist'}
+      </button>
     </div>
   )
 }
