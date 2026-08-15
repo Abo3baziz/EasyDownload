@@ -52,8 +52,19 @@ export const conversionStartSchema = z
   })
   .strict()
 
+export const playlistFormatSchema = z.enum(['best', '1080', '720', '480', '360', 'audio'])
+
+export const playlistDownloadSchema = z
+  .object({
+    url: urlSchema,
+    preset: playlistFormatSchema,
+    directory: z.string().min(1)
+  })
+  .strict()
+
 export type InspectUrlPayload = z.infer<typeof inspectUrlSchema>
 export type DownloadOptionsPayload = z.infer<typeof downloadOptionsSchema>
 export type IdPayload = z.infer<typeof idSchema>
 export type PathPayload = z.infer<typeof pathSchema>
 export type ConversionStartPayload = z.infer<typeof conversionStartSchema>
+export type PlaylistDownloadPayload = z.infer<typeof playlistDownloadSchema>

@@ -22,6 +22,7 @@ function deferred<T>() {
 
 interface MockYtDlp {
   inspect: Mock<(url: string) => Promise<YtDlpMedia>>
+  inspectPlaylist: Mock<(url: string) => Promise<YtDlpMedia>>
   startDownload: Mock<
     (options: DownloadMediaOptions, callbacks?: YtDlpDownloadCallbacks) => DownloadMediaHandle
   >
@@ -30,6 +31,7 @@ interface MockYtDlp {
 function createMockYtDlp(): MockYtDlp {
   return {
     inspect: vi.fn(),
+    inspectPlaylist: vi.fn(),
     startDownload: vi.fn()
   }
 }
@@ -1528,5 +1530,235 @@ describe('createDownloadManager', () => {
 
     expect(remaining.map((download) => download.id)).toEqual(['dl-1'])
     expect(save).toHaveBeenLastCalledWith([])
+  })
+
+  describe('downloadPlaylist', () => {
+    const PLAYLIST_URL = 'https://www.youtube.com/playlist?list=PL123'
+    const MEDIA_FORMATS = [
+      {
+        format_id: '22',
+        ext: 'mp4',
+        height: 720,
+        width: 1280,
+        vcodec: 'avc1',
+        acodec: 'mp4a',
+        url: 'https://example.com/22.mp4'
+      }
+    ]
+
+    function playlist(...entries: Array<{ id: string; title: string; url?: string }>) {
+      return {
+        id: 'PL123',
+        title: 'My Playlist',
+        _type: 'playlist',
+        entries
+      }
+    }
+
+    it('creates one tagged queued job per entry and resolves the preset format at download time', async () => {
+      const ytDlp = createMockYtDlp()
+      ytDlp.inspectPlaylist.mockResolvedValue(
+        playlist(
+          { id: 'v1', title: 'Video One', url: 'https://example.com/watch?v=1' },
+          { id: 'v2', title: 'Video Two', url: 'https://example.com/watch?v=2' }
+        )
+      )
+      ytDlp.inspect.mockResolvedValue({ id: 'v1', title: 'Video One', formats: MEDIA_FORMATS })
+      const { handle, completion } = downloadHandle()
+      ytDlp.startDownload.mockReturnValue(handle)
+      let seq = 0
+      const manager = createDownloadManager({
+        ytDlp,
+        generateId: () => `dl-${++seq}`,
+        getConcurrencyLimit: () => 1
+      })
+
+      const result = await manager.downloadPlaylist({
+        url: PLAYLIST_URL,
+        preset: '720',
+        directory: 'D:\\Downloads'
+      })
+      await flush()
+
+      expect(result).toEqual({ playlistId: 'PL123', created: 2, skipped: 0 })
+      const downloads = await manager.list()
+      expect(downloads).toHaveLength(2)
+      expect(downloads[0]).toMatchObject({
+        url: 'https://example.com/watch?v=1',
+        title: 'Video One',
+        status: 'downloading',
+        directory: 'D:\\Downloads\\My Playlist [PL123]',
+        playlistId: 'PL123',
+        playlistTitle: 'My Playlist',
+        playlistIndex: 1,
+        playlistCount: 2,
+        formatId: '22'
+      })
+      expect(downloads[1]).toMatchObject({
+        url: 'https://example.com/watch?v=2',
+        status: 'queued',
+        playlistIndex: 2,
+        playlistCount: 2
+      })
+      expect(ytDlp.startDownload).toHaveBeenCalledTimes(1)
+      expect(ytDlp.startDownload.mock.calls[0][0]).toMatchObject({
+        url: 'https://example.com/watch?v=1',
+        formatId: '22',
+        directory: 'D:\\Downloads\\My Playlist [PL123]'
+      })
+
+      completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+      await flush()
+    })
+
+    it('skips already-completed entries and duplicate URLs', async () => {
+      const existing = terminalRecord({ id: 'dl-old' })
+      const { history } = createMockHistory([existing])
+      const ytDlp = createMockYtDlp()
+      ytDlp.inspectPlaylist.mockResolvedValue(
+        playlist(
+          { id: 'v1', title: 'Video One', url: 'https://example.com/watch?v=1' },
+          { id: 'v1b', title: 'Video One Again', url: 'https://example.com/watch?v=1' },
+          { id: 'v2', title: 'Video Two', url: 'https://example.com/watch?v=2' }
+        )
+      )
+      ytDlp.inspect.mockResolvedValue({ id: 'v2', title: 'Video Two', formats: MEDIA_FORMATS })
+      ytDlp.startDownload.mockReturnValue(downloadHandle().handle)
+      const manager = createDownloadManager({ ytDlp, history, generateId: () => 'dl-1' })
+
+      const result = await manager.downloadPlaylist({
+        url: PLAYLIST_URL,
+        preset: '720',
+        directory: 'D:\\Downloads'
+      })
+
+      expect(result).toEqual({ playlistId: 'PL123', created: 1, skipped: 2 })
+      const downloads = await manager.list()
+      expect(downloads.filter((download) => download.playlistId === 'PL123')).toHaveLength(1)
+      expect(
+        downloads.filter((download) => download.playlistId === 'PL123').map((d) => d.url)
+      ).toEqual(['https://example.com/watch?v=2'])
+    })
+
+    it('throws a clear error when the playlist has no downloadable entries', async () => {
+      const ytDlp = createMockYtDlp()
+      ytDlp.inspectPlaylist.mockResolvedValue(
+        playlist({ id: 'v1', title: 'No Url Video' })
+      )
+      const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
+
+      await expect(
+        manager.downloadPlaylist({ url: PLAYLIST_URL, preset: 'best', directory: 'D:\\Downloads' })
+      ).rejects.toMatchObject({
+        code: 'DownloadError',
+        message: 'This playlist does not contain any downloadable videos.'
+      })
+    })
+
+    it('continues with other entries when one entry fails to inspect', async () => {
+      const ytDlp = createMockYtDlp()
+      ytDlp.inspectPlaylist.mockResolvedValue(
+        playlist(
+          { id: 'v1', title: 'Video One', url: 'https://example.com/watch?v=1' },
+          { id: 'v2', title: 'Video Two', url: 'https://example.com/watch?v=2' }
+        )
+      )
+      ytDlp.inspect
+        .mockRejectedValueOnce(new Error('inspection failed'))
+        .mockResolvedValueOnce({ id: 'v2', title: 'Video Two', formats: MEDIA_FORMATS })
+      const { handle } = downloadHandle()
+      ytDlp.startDownload.mockReturnValue(handle)
+      let seq = 0
+      const manager = createDownloadManager({
+        ytDlp,
+        generateId: () => `dl-${++seq}`,
+        getConcurrencyLimit: () => 2
+      })
+
+      await manager.downloadPlaylist({
+        url: PLAYLIST_URL,
+        preset: 'best',
+        directory: 'D:\\Downloads'
+      })
+      await flush()
+
+      expect((await manager.get('dl-1')).status).toBe('failed')
+      expect((await manager.get('dl-2')).status).toBe('downloading')
+    })
+
+    it('retries a playlist entry whose format was never resolved', async () => {
+      const ytDlp = createMockYtDlp()
+      ytDlp.inspectPlaylist.mockResolvedValue(
+        playlist({ id: 'v1', title: 'Video One', url: 'https://example.com/watch?v=1' })
+      )
+      ytDlp.inspect
+        .mockRejectedValueOnce(new Error('inspection failed'))
+        .mockResolvedValueOnce({ id: 'v1', title: 'Video One', formats: MEDIA_FORMATS })
+      const { handle, completion } = downloadHandle()
+      ytDlp.startDownload.mockReturnValue(handle)
+      const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
+
+      await manager.downloadPlaylist({
+        url: PLAYLIST_URL,
+        preset: 'best',
+        directory: 'D:\\Downloads'
+      })
+      await flush()
+
+      expect((await manager.get('dl-1')).status).toBe('failed')
+      expect((await manager.get('dl-1')).formatId).toBeUndefined()
+
+      await manager.retry('dl-1')
+      await flush()
+
+      expect(ytDlp.startDownload).toHaveBeenCalledWith(
+        expect.objectContaining({ formatId: '22' }),
+        expect.anything()
+      )
+      completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+      await flush()
+      await expect(manager.get('dl-1')).resolves.toMatchObject({ status: 'completed' })
+    })
+
+    it('cancels every non-terminal download tagged with the playlist id', async () => {
+      const ytDlp = createMockYtDlp()
+      ytDlp.inspectPlaylist.mockResolvedValue(
+        playlist(
+          { id: 'v1', title: 'Video One', url: 'https://example.com/watch?v=1' },
+          { id: 'v2', title: 'Video Two', url: 'https://example.com/watch?v=2' }
+        )
+      )
+      ytDlp.inspect.mockResolvedValue({ id: 'v1', title: 'Video One', formats: MEDIA_FORMATS })
+      const single = downloadHandle()
+      const first = downloadHandle()
+      const second = downloadHandle()
+      ytDlp.startDownload
+        .mockReturnValueOnce(single.handle)
+        .mockReturnValueOnce(first.handle)
+        .mockReturnValueOnce(second.handle)
+      let seq = 0
+      const manager = createDownloadManager({
+        ytDlp,
+        generateId: () => `dl-${++seq}`,
+        getConcurrencyLimit: () => 1
+      })
+
+      await manager.create(OPTIONS)
+      await manager.start('dl-1')
+      await flush()
+      await manager.downloadPlaylist({
+        url: PLAYLIST_URL,
+        preset: '720',
+        directory: 'D:\\Downloads'
+      })
+      await flush()
+
+      await manager.cancelPlaylist('PL123')
+      await flush()
+
+      expect((await manager.get('dl-1')).status).toBe('downloading')
+      expect((await manager.get('dl-2')).status).toBe('cancelled')
+      expect((await manager.get('dl-3')).status).toBe('cancelled')
+    })
   })
 })

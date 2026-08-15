@@ -1,4 +1,5 @@
 import type { MediaFormat, MediaInfo } from '../../../shared/types/media'
+import type { PlaylistFormat } from '../../../shared/types/download'
 import type { YtDlpFormat, YtDlpMedia } from '../ytdlp/types'
 
 export function normalizeMediaInfo(raw: YtDlpMedia): MediaInfo {
@@ -120,4 +121,81 @@ function compareFormats(a: YtDlpFormat, b: YtDlpFormat): number {
     }
   }
   return (a.format_id ?? '').localeCompare(b.format_id ?? '')
+}
+
+const PRESET_HEIGHTS: Record<Exclude<PlaylistFormat, 'best' | 'audio'>, number> = {
+  '1080': 1080,
+  '720': 720,
+  '480': 480,
+  '360': 360
+}
+
+export function resolvePlaylistFormat(
+  media: YtDlpMedia,
+  preset: PlaylistFormat
+): YtDlpFormat | undefined {
+  const usable = (media.formats ?? []).filter(isUsableFormat)
+  if (preset === 'audio') {
+    const audioOnly = usable.filter(
+      (format) => isRealCodec(format.acodec) && !isRealCodec(format.vcodec)
+    )
+    return audioOnly.sort(compareAudioOnly)[0]
+  }
+
+  const videoFormats = usable.filter((format) => isRealCodec(format.vcodec))
+  if (videoFormats.length === 0) {
+    return undefined
+  }
+  if (preset === 'best') {
+    return videoFormats.sort(compareVideo)[0]
+  }
+  const targetHeight = PRESET_HEIGHTS[preset]
+  const withinLimit = videoFormats.filter((format) => (format.height ?? Infinity) <= targetHeight)
+  if (withinLimit.length > 0) {
+    return withinLimit.sort(compareVideo)[0]
+  }
+  return [...videoFormats].sort(compareLowest)[0]
+}
+
+function compareLowest(a: YtDlpFormat, b: YtDlpFormat): number {
+  const aHeight = a.height ?? Infinity
+  const bHeight = b.height ?? Infinity
+  if (aHeight !== bHeight) {
+    return aHeight - bHeight
+  }
+  return extensionPreference(a.ext) - extensionPreference(b.ext)
+}
+
+function compareVideo(a: YtDlpFormat, b: YtDlpFormat): number {
+  const aHeight = a.height ?? -1
+  const bHeight = b.height ?? -1
+  if (aHeight !== bHeight) {
+    return bHeight - aHeight
+  }
+  const aHasAudio = isRealCodec(a.acodec)
+  const bHasAudio = isRealCodec(b.acodec)
+  if (aHasAudio !== bHasAudio) {
+    return aHasAudio ? -1 : 1
+  }
+  return extensionPreference(a.ext) - extensionPreference(b.ext)
+}
+
+function compareAudioOnly(a: YtDlpFormat, b: YtDlpFormat): number {
+  const aPreference = extensionPreference(a.ext)
+  const bPreference = extensionPreference(b.ext)
+  if (aPreference !== bPreference) {
+    return aPreference - bPreference
+  }
+  return (b.abr ?? -1) - (a.abr ?? -1)
+}
+
+function extensionPreference(ext: string | undefined): number {
+  const normalized = (ext ?? '').toLowerCase()
+  if (normalized === 'mp4' || normalized === 'm4a') {
+    return 0
+  }
+  if (normalized === 'mkv' || normalized === 'opus' || normalized === 'mp3' || normalized === 'aac') {
+    return 1
+  }
+  return 2
 }

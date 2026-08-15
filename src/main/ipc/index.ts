@@ -6,22 +6,30 @@ import {
   idSchema,
   inspectUrlSchema,
   pathSchema,
+  playlistDownloadSchema,
   settingsSchema
 } from '../../shared/schemas'
+import type { InspectionResult } from '../../shared/types/media'
 import type { Services } from '../services'
 import { registerIpcHandler } from './handle'
 
 export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.mediaInspect, inspectUrlSchema, async ({ url }) => {
-    const media = await services.media.inspectUrl(url)
+    const result = await services.media.inspectUrl(url)
     await services.inspectionHistory.add({
       url,
-      thumbnail: media.thumbnail
+      thumbnail: thumbnailOf(result)
     })
-    return media
+    return result
   })
   registerIpcHandler(ipcMain, IPC_CHANNELS.downloadCreate, downloadOptionsSchema, (options) =>
     services.downloads.create(options)
+  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.playlistDownload, playlistDownloadSchema, (options) =>
+    services.downloads.downloadPlaylist(options)
+  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.playlistCancel, idSchema, ({ id }) =>
+    services.downloads.cancelPlaylist(id)
   )
   registerIpcHandler(ipcMain, IPC_CHANNELS.downloadStart, idSchema, ({ id }) =>
     services.downloads.start(id)
@@ -122,4 +130,8 @@ export function registerIpc(services: Services): void {
       window.webContents.send(IPC_CHANNELS.inspectionHistoryDeleteEvent, entry)
     }
   })
+}
+
+function thumbnailOf(result: InspectionResult): string | undefined {
+  return result.kind === 'playlist' ? result.playlist.thumbnail : result.media.thumbnail
 }

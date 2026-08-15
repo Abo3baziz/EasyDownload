@@ -9,9 +9,11 @@ import type {
 import {
   buildDownloadArgs,
   buildInspectArgs,
+  buildPlaylistInspectArgs,
   createYtDlpService,
   parseEta,
   parseInspectionOutput,
+  parsePlaylistOutput,
   parseProgressLine,
   parseSize,
   toDownloadError
@@ -177,6 +179,83 @@ describe('parseInspectionOutput', () => {
 
   it('throws a ProcessError for malformed JSON', () => {
     expect(() => parseInspectionOutput('{invalid')).toThrow(AppError)
+  })
+})
+
+describe('buildPlaylistInspectArgs', () => {
+  it('builds flat-playlist inspection arguments with the URL as a single argument', () => {
+    const url = 'https://www.youtube.com/playlist?list=PL123'
+    expect(buildPlaylistInspectArgs(url)).toEqual([
+      '--dump-single-json',
+      '--flat-playlist',
+      '--skip-download',
+      '--no-warnings',
+      '--no-call-home',
+      '--encoding',
+      'utf-8',
+      url
+    ])
+  })
+})
+
+describe('parsePlaylistOutput', () => {
+  it('parses a single-line playlist JSON object', () => {
+    const playlist = {
+      id: 'PL123',
+      title: 'Example Playlist',
+      _type: 'playlist',
+      entries: [{ id: 'v1', title: 'Video One', url: 'https://example.com/v1' }]
+    }
+    expect(parsePlaylistOutput(JSON.stringify(playlist))).toEqual(playlist)
+  })
+
+  it('parses a pretty-printed playlist JSON object spanning multiple lines', () => {
+    const playlist = {
+      id: 'PL123',
+      title: 'Example Playlist',
+      _type: 'playlist',
+      entries: [{ id: 'v1', title: 'Video One', url: 'https://example.com/v1' }]
+    }
+    expect(parsePlaylistOutput(JSON.stringify(playlist, null, 2))).toEqual(playlist)
+  })
+
+  it('throws a ProcessError for malformed playlist JSON', () => {
+    expect(() => parsePlaylistOutput('{invalid')).toThrow(AppError)
+  })
+})
+
+describe('createYtDlpService.inspectPlaylist', () => {
+  it('parses a successful flat-playlist inspection', async () => {
+    const playlist = {
+      id: 'PL123',
+      title: 'Example Playlist',
+      _type: 'playlist',
+      entries: [{ id: 'v1', title: 'Video One', url: 'https://example.com/v1' }]
+    }
+    const processes = createMockProcesses(successResult(JSON.stringify(playlist)))
+    const service = createYtDlpService({ processes })
+
+    await expect(service.inspectPlaylist('https://www.youtube.com/playlist?list=PL123')).resolves.toEqual(
+      playlist
+    )
+    expect(processes.runToCompletion).toHaveBeenCalledWith('yt-dlp', {
+      args: buildPlaylistInspectArgs('https://www.youtube.com/playlist?list=PL123'),
+      timeoutMs: 60_000
+    })
+  })
+
+  it('maps a non-zero exit to an inspection error', async () => {
+    const processes = createMockProcesses({
+      stdout: '',
+      stderr: 'ERROR: Unsupported URL: https://example.com/bad',
+      exitCode: 1,
+      timedOut: false
+    })
+    const service = createYtDlpService({ processes })
+
+    await expect(service.inspectPlaylist('https://example.com/bad')).rejects.toMatchObject({
+      code: 'UnsupportedMediaError'
+    })
   })
 })
 

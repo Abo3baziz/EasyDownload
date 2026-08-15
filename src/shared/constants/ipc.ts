@@ -9,6 +9,8 @@ export const IPC_CHANNELS = {
   downloadGet: 'download:get',
   downloadList: 'download:list',
   downloadRetry: 'download:retry',
+  playlistDownload: 'playlist:download',
+  playlistCancel: 'playlist:cancel',
   downloadDeletedEvent: 'download:deleted',
   historyClear: 'history:clear',
   dialogSelectDirectory: 'dialog:select-directory',
