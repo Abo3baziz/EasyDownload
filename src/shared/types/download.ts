@@ -42,6 +42,7 @@ export interface Download {
   playlistIndex?: number
   playlistCount?: number
   preset?: PlaylistFormat
+  retryCount?: number
   createdAt: number
   updatedAt: number
 }

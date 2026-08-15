@@ -1796,6 +1796,7 @@ describe('createDownloadManager', () => {
 
       expect(ytDlp.startDownload).toHaveBeenCalledTimes(1)
       expect((await manager.get('dl-1')).status).toBe('queued')
+      expect((await manager.get('dl-1')).retryCount).toBe(1)
 
       await vi.advanceTimersByTimeAsync(1)
       await flush()
@@ -1810,14 +1811,17 @@ describe('createDownloadManager', () => {
       })
       await flush()
 
-      await expect(manager.get('dl-1')).resolves.toMatchObject({ status: 'completed' })
+      await expect(manager.get('dl-1')).resolves.toMatchObject({
+        status: 'completed',
+        retryCount: undefined
+      })
     })
 
     it('gives up after the maximum number of transient retries', async () => {
       vi.useFakeTimers()
       const ytDlp = createMockYtDlp()
       ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
-      const handles = Array.from({ length: 4 }, () => downloadHandle())
+      const handles = Array.from({ length: 5 }, () => downloadHandle())
       for (const h of handles) {
         ytDlp.startDownload.mockReturnValueOnce(h.handle)
       }
@@ -1837,8 +1841,11 @@ describe('createDownloadManager', () => {
         await flush()
       }
 
-      expect(ytDlp.startDownload).toHaveBeenCalledTimes(4)
-      await expect(manager.get('dl-1')).resolves.toMatchObject({ status: 'failed' })
+      expect(ytDlp.startDownload).toHaveBeenCalledTimes(5)
+      await expect(manager.get('dl-1')).resolves.toMatchObject({
+        status: 'failed',
+        retryCount: undefined
+      })
     })
 
     it('does not retry a permanently unavailable video', async () => {

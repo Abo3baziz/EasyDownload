@@ -55,9 +55,9 @@ const TERMINAL_STATUSES: DownloadStatus[] = ['completed', 'failed', 'cancelled']
 
 const ACTIVE_STATUSES: Download['status'][] = ['inspecting', 'downloading', 'processing']
 
-const MAX_TRANSIENT_RETRIES = 3
+const MAX_TRANSIENT_RETRIES = 4
 
-const DEFAULT_RETRY_DELAYS = [2_000, 5_000, 10_000]
+const DEFAULT_RETRY_DELAYS = [2_000, 4_000, 8_000, 16_000]
 
 export function createDownloadManager(options: DownloadManagerOptions): DownloadManager {
   const now = options.now ?? (() => Date.now())
@@ -185,7 +185,12 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
   }
 
   function scheduleTransientRetry(id: string, attempts: number): void {
-    update(id, { status: 'queued', progress: {}, error: undefined })
+    update(id, {
+      status: 'queued',
+      progress: {},
+      error: undefined,
+      retryCount: attempts
+    })
     const timer = setTimeout(() => {
       retryTimers.delete(id)
       const current = jobs.get(id)
@@ -253,7 +258,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     if (!config) {
       update(id, {
         status: 'failed',
-        error: { code: 'DownloadError', message: 'The download configuration is missing.' }
+        error: { code: 'DownloadError', message: 'The download configuration is missing.' },
+        retryCount: undefined
       })
       return
     }
@@ -280,7 +286,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
               error: new AppError(
                 'DownloadError',
                 'The download is missing its format configuration.'
-              ).toPayload()
+              ).toPayload(),
+              retryCount: undefined
             })
             return
           }
@@ -291,7 +298,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
               error: new AppError(
                 'DownloadError',
                 `No format is available on this video for the "${preset}" quality.`
-              ).toPayload()
+              ).toPayload(),
+              retryCount: undefined
             })
             return
           }
@@ -327,7 +335,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
             scheduleTransientRetry(id, attempts + 1)
           } else {
             transientAttempts.delete(id)
-            update(id, { status: 'failed', error: appError.toPayload() })
+            update(id, { status: 'failed', error: appError.toPayload(), retryCount: undefined })
           }
         }
         return
@@ -352,7 +360,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
           error: new AppError(
             'DependencyError',
             'FFmpeg is required to merge audio into this format, but it is not available.'
-          ).toPayload()
+          ).toPayload(),
+          retryCount: undefined
         })
         return
       }
@@ -361,7 +370,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     const handle = options.ytDlp.startDownload(mediaOptions, {
       onProgress: (progress) => {
         if (cancelRequests.has(id) || pauseRequests.has(id)) return
-        update(id, { progress, status: 'downloading' })
+        update(id, { progress, status: 'downloading', retryCount: undefined })
       },
       onPhase: (phase) => {
         if (cancelRequests.has(id) || pauseRequests.has(id)) return
@@ -388,7 +397,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
           progress: { percent: 100 },
           fileName: destination ? basename(destination) : undefined,
           destination,
-          fileSize
+          fileSize,
+          retryCount: undefined
         })
       } else {
         const error = toDownloadError(result).toPayload()
@@ -398,7 +408,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
           scheduleTransientRetry(id, attempts + 1)
         } else {
           transientAttempts.delete(id)
-          update(id, { status: 'failed', error })
+          update(id, { status: 'failed', error, retryCount: undefined })
         }
       }
     } catch (err) {
@@ -407,7 +417,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       } else if (pauseRequests.has(id)) {
         pauseRequests.delete(id)
       } else {
-        update(id, { status: 'failed', error: toAppError(err).toPayload() })
+        update(id, { status: 'failed', error: toAppError(err).toPayload(), retryCount: undefined })
       }
     } finally {
       handles.delete(id)
@@ -418,7 +428,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     await cleanupFiles(destination)
     const status = getOrThrow(id).status
     if (status !== 'cancelled' && !isTerminal(status) && status !== 'queued') {
-      update(id, { status: 'cancelled', progress: {} })
+      update(id, { status: 'cancelled', progress: {}, retryCount: undefined })
     }
   }
 
@@ -553,7 +563,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       if (index >= 0) {
         queue.splice(index, 1)
       }
-      return update(id, { status: 'cancelled', progress: {} })
+      return update(id, { status: 'cancelled', progress: {}, retryCount: undefined })
     }
     if (download.status === 'paused') {
       cancelRequests.add(id)
@@ -568,7 +578,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       if (handle) {
         handle.cancel()
       }
-      return update(id, { status: 'cancelled', progress: {} })
+      return update(id, { status: 'cancelled', progress: {}, retryCount: undefined })
     }
     throw new AppError(
       'CancellationError',
@@ -673,7 +683,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       clearTransientRetry(id)
       mediaOptionsById.delete(id)
       mediaMetaById.delete(id)
-      update(id, { status: 'queued', progress: {}, error: undefined })
+      update(id, { status: 'queued', progress: {}, error: undefined, retryCount: undefined })
       if (!queue.includes(id)) {
         queue.push(id)
       }

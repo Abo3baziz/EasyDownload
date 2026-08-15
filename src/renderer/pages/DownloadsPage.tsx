@@ -685,6 +685,7 @@ function DownloadProgressBar({ download }: { download: Download }) {
       </div>
       <span className="progress-label">
         {effectivePercent !== undefined ? `${Math.round(effectivePercent)}%` : ''}
+        {download.retryCount ? ` · Retrying (${download.retryCount})` : ''}
         {progressText.length > 0 ? ` · ${progressText.join(' · ')}` : ''}
       </span>
     </div>

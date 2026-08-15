@@ -881,6 +881,61 @@ describe('DownloadsPage', () => {
     expect(screen.getByText(/66%/)).toBeInTheDocument()
   })
 
+  it('updates the per-video progress bar when progress events arrive', async () => {
+    const entry = (percent?: number): Download => ({
+      id: 'dl-1',
+      url: 'https://www.youtube.com/watch?v=v1',
+      title: 'Video One',
+      status: 'downloading',
+      progress: percent !== undefined ? { percent } : {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 1,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    let listener: ((download: Download) => void) | undefined
+    window.mediaDownloader.listDownloads = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: [entry(10)] })
+    window.mediaDownloader.onDownloadStateChange = vi.fn((callback) => {
+      listener = callback as typeof listener
+      return () => undefined
+    })
+
+    renderSection('queue')
+
+    expect((await screen.findAllByText(/10%/)).length).toBeGreaterThanOrEqual(1)
+
+    act(() => listener?.({ ...entry(60), status: 'downloading' }))
+
+    expect((await screen.findAllByText(/60%/)).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(/10%/)).not.toBeInTheDocument()
+  })
+
+  it('shows a Retrying indicator while a playlist entry is being retried', async () => {
+    const entry: Download = {
+      id: 'dl-1',
+      url: 'https://www.youtube.com/watch?v=v1',
+      title: 'Video One',
+      status: 'queued',
+      progress: {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 1,
+      retryCount: 2,
+      createdAt: 1,
+      updatedAt: 1
+    }
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({ ok: true, data: [entry] })
+
+    renderSection('queue')
+
+    expect(await screen.findByText(/Retrying \(2\)/)).toBeInTheDocument()
+  })
+
   it('cancels the whole playlist through the playlist-level action', async () => {
     const entry = (id: string, status: Download['status']): Download => ({
       id,
