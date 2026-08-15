@@ -77,6 +77,7 @@
 - Playlists fan out into ordinary per-video Download jobs rather than a dedicated entity: queue, concurrency, history, retry, per-video actions, and persistence are reused unchanged, with only optional flat playlist-tag/preset fields added to the record (backward compatible).
 - Playlist entries are saved into a sanitized `<playlist title> [<playlist id>]` subfolder of the configured directory, and each record's `directory` is that subfolder; per-entry preset resolution at download time stores the concrete format ID on the record so retries reuse it, and format IDs are never required at playlist-creation time.
 - Playlist downloads skip entries already completed (compared by normalized URL) and duplicate entries within the playlist; re-running a playlist re-downloads only what is missing. Playlist entries fail independently (continue-on-failure) and do not trigger individual desktop notifications.
+- Playlist entries are serialized per playlist: at most one entry of a given playlist runs at a time (the scheduler defers an entry while another entry of the same playlist is active), so a playlist queues its videos and downloads them one at a time. This avoids parallel requests to the same host that trigger YouTube rate-limiting; entries from different playlists and ordinary downloads still share the global concurrency limit.
 - Transient failures (HTTP 403/429/5xx, rate limiting, connection resets/timeouts) are auto-retried up to three times with escalating backoff before failing, so concurrent playlist fan-out tolerates YouTube throttling; permanent failures (unavailable/geo/private/bot-check) are never retried. Auto-retry reuses the same download id, does not re-inspect on download-phase retries, and is injectable via a `getRetryDelayMs` option for tests.
 
 ## Pending
@@ -85,7 +86,7 @@
 
 ## Current Focus
 
-Playlist downloads (FR-020) are implemented, including live aggregate progress and automatic retries for transient network/rate-limit failures so concurrent fan-out tolerates YouTube throttling. Next feature candidates include dependency version detection (FR-019) or the future Chrome extension.
+Playlist downloads (FR-020) are implemented: entries are queued and downloaded one at a time per playlist, with live aggregate progress and automatic retries for transient network/rate-limit failures. Next feature candidates include dependency version detection (FR-019) or the future Chrome extension.
 
 ## Important References
 

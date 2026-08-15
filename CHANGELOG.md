@@ -4,6 +4,12 @@
 
 ### Changed
 
+- Playlist entries now download one at a time per playlist instead of filling every concurrency slot: the scheduler serializes entries sharing the same `playlistId` (at most one active per playlist), so a playlist queues its videos and downloads them sequentially. This prevents bursts of parallel requests to the same host, which triggered YouTube rate-limiting (HTTP 403) and failed/frozen downloads. Entries from different playlists, and ordinary single downloads, still share the configured concurrency limit normally.
+
+## 2026-08-16
+
+### Changed
+
 - Downloads that fail with a transient network/rate-limit error (HTTP 403/429/5xx, too many requests, connection resets/timeouts, "unable to download video data") are now retried automatically up to four times with escalating backoff (2s, 4s, 8s, 16s) before being marked failed. This makes playlist fan-out resilient to YouTube throttling concurrent requests. Download-phase retries reuse the already-resolved media options (no re-inspection); permanent failures (video unavailable, geo-restricted, private, bot checks) are never retried. Retries reuse the same download id, respect the concurrency limit and cancellation, carry a `retryCount` on the record so the UI can show a "Retrying (n)" indicator while the bar is stalled at 0%, and clear their state on completion, cancellation, deletion, or manual retry.
 
 ## 2026-08-16

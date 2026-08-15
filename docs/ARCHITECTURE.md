@@ -1151,6 +1151,8 @@ The Download Manager enforces a configurable concurrency limit (FR-016): at most
 
 The limit is read from the settings via a `getConcurrencyLimit` option provided to the Download Manager (defaulting to 1 when absent); it is re-read each time the queue is drained, so a settings change applies as soon as the next slot needs to be filled. The renderer does not enforce the limit — the Download Manager centralizes all concurrency and queue management.
 
+Playlist entries are additionally **serialized per playlist**: at most one entry of a given playlist runs at any time, regardless of the global concurrency limit, so a playlist downloads its videos one at a time from the queue. This avoids bursts of parallel requests to the same host (e.g. YouTube rate-limiting concurrent downloads). Entries from different playlists, and non-playlist downloads, still share the global concurrency slots normally.
+
 Queue management (FR-012) is handled by the Download Manager. Starting the same download twice never creates a second process: `start` only accepts queued downloads, queue re-entry is guarded, and a job is never re-executed while its previous process is still exiting.
 
 ---
