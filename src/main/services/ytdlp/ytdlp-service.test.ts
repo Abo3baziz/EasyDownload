@@ -11,6 +11,7 @@ import {
   buildInspectArgs,
   buildPlaylistInspectArgs,
   createYtDlpService,
+  isTransientDownloadFailure,
   parseEta,
   parseInspectionOutput,
   parsePlaylistOutput,
@@ -444,6 +445,50 @@ describe('toDownloadError', () => {
       code: 'ProcessError',
       message: '[foo] 123: Unexpected failure'
     })
+  })
+})
+
+describe('isTransientDownloadFailure', () => {
+  function result(stderr: string): ProcessResult {
+    return { stdout: '', stderr, exitCode: 1, timedOut: false }
+  }
+
+  it('classifies a 403 on video data as transient', () => {
+    expect(
+      isTransientDownloadFailure(result('ERROR: unable to download video data: HTTP Error 403: Forbidden'))
+    ).toBe(true)
+  })
+
+  it('classifies a 429 rate limit as transient', () => {
+    expect(
+      isTransientDownloadFailure(result('ERROR: unable to download webpage: HTTP Error 429: Too Many Requests'))
+    ).toBe(true)
+  })
+
+  it('classifies a connection timeout as transient', () => {
+    expect(isTransientDownloadFailure(result('ERROR: unable to download video data: Read timed out'))).toBe(true)
+  })
+
+  it('does not classify a permanently unavailable video as transient', () => {
+    expect(
+      isTransientDownloadFailure(result('ERROR: [youtube] abc: Video unavailable'))
+    ).toBe(false)
+  })
+
+  it('does not classify a geo-restricted video as transient', () => {
+    expect(
+      isTransientDownloadFailure(result('ERROR: [youtube] abc: The video is not available in this country'))
+    ).toBe(false)
+  })
+
+  it('does not classify a bot-check as transient', () => {
+    expect(
+      isTransientDownloadFailure(result('ERROR: Sign in to confirm you are not a bot'))
+    ).toBe(false)
+  })
+
+  it('does not classify an unrelated failure as transient', () => {
+    expect(isTransientDownloadFailure(result('ERROR: [foo] 123: Unexpected failure'))).toBe(false)
   })
 })
 

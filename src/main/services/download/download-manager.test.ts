@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
+import { AppError } from '../../utils/errors'
 import type { Download, DownloadOptions } from '../../../shared/types/download'
 import type { HistoryManager } from '../history/history-manager'
 import type { YtDlpMedia } from '../ytdlp/types'
@@ -1759,6 +1760,140 @@ describe('createDownloadManager', () => {
       expect((await manager.get('dl-1')).status).toBe('downloading')
       expect((await manager.get('dl-2')).status).toBe('cancelled')
       expect((await manager.get('dl-3')).status).toBe('cancelled')
+    })
+  })
+
+  describe('transient retries', () => {
+    const TRANSIENT = 'ERROR: unable to download video data: HTTP Error 403: Forbidden'
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('automatically retries a transient download failure and succeeds', async () => {
+      vi.useFakeTimers()
+      const ytDlp = createMockYtDlp()
+      ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+      const first = downloadHandle()
+      const second = downloadHandle()
+      ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+      const manager = createDownloadManager({
+        ytDlp,
+        generateId: () => 'dl-1',
+        getRetryDelayMs: () => 0
+      })
+      await manager.create(OPTIONS)
+
+      await manager.start('dl-1')
+      await flush()
+      first.completion.resolve({
+        exitCode: 1,
+        stdout: '',
+        stderr: TRANSIENT,
+        cancelled: false
+      })
+      await flush()
+
+      expect(ytDlp.startDownload).toHaveBeenCalledTimes(1)
+      expect((await manager.get('dl-1')).status).toBe('queued')
+
+      await vi.advanceTimersByTimeAsync(1)
+      await flush()
+
+      expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+      second.completion.resolve({
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+        cancelled: false,
+        destination: 'D:\\Downloads\\Example [abc].mp4'
+      })
+      await flush()
+
+      await expect(manager.get('dl-1')).resolves.toMatchObject({ status: 'completed' })
+    })
+
+    it('gives up after the maximum number of transient retries', async () => {
+      vi.useFakeTimers()
+      const ytDlp = createMockYtDlp()
+      ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+      const handles = Array.from({ length: 4 }, () => downloadHandle())
+      for (const h of handles) {
+        ytDlp.startDownload.mockReturnValueOnce(h.handle)
+      }
+      const manager = createDownloadManager({
+        ytDlp,
+        generateId: () => 'dl-1',
+        getRetryDelayMs: () => 0
+      })
+      await manager.create(OPTIONS)
+
+      await manager.start('dl-1')
+      await flush()
+      for (const h of handles) {
+        h.completion.resolve({ exitCode: 1, stdout: '', stderr: TRANSIENT, cancelled: false })
+        await flush()
+        await vi.advanceTimersByTimeAsync(1)
+        await flush()
+      }
+
+      expect(ytDlp.startDownload).toHaveBeenCalledTimes(4)
+      await expect(manager.get('dl-1')).resolves.toMatchObject({ status: 'failed' })
+    })
+
+    it('does not retry a permanently unavailable video', async () => {
+      const ytDlp = createMockYtDlp()
+      ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+      const { handle, completion } = downloadHandle()
+      ytDlp.startDownload.mockReturnValue(handle)
+      const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
+      await manager.create(OPTIONS)
+
+      await manager.start('dl-1')
+      await flush()
+      completion.resolve({
+        exitCode: 1,
+        stdout: '',
+        stderr: 'ERROR: [youtube] abc: Video unavailable',
+        cancelled: false
+      })
+      await flush()
+
+      expect(ytDlp.startDownload).toHaveBeenCalledTimes(1)
+      await expect(manager.get('dl-1')).resolves.toMatchObject({ status: 'failed' })
+    })
+
+    it('retries a transient inspection failure before giving up', async () => {
+      vi.useFakeTimers()
+      const ytDlp = createMockYtDlp()
+      ytDlp.inspect
+        .mockRejectedValueOnce(
+          new AppError('NetworkError', 'yt-dlp could not fetch media information.')
+        )
+        .mockResolvedValueOnce({ id: 'abc', title: 'Example Video' })
+      const { handle, completion } = downloadHandle()
+      ytDlp.startDownload.mockReturnValue(handle)
+      const manager = createDownloadManager({
+        ytDlp,
+        generateId: () => 'dl-1',
+        getRetryDelayMs: () => 0
+      })
+      await manager.create(OPTIONS)
+
+      await manager.start('dl-1')
+      await flush()
+
+      expect(ytDlp.inspect).toHaveBeenCalledTimes(1)
+      expect((await manager.get('dl-1')).status).toBe('queued')
+
+      await vi.advanceTimersByTimeAsync(1)
+      await flush()
+
+      expect(ytDlp.inspect).toHaveBeenCalledTimes(2)
+      completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+      await flush()
+
+      await expect(manager.get('dl-1')).resolves.toMatchObject({ status: 'completed' })
     })
   })
 })

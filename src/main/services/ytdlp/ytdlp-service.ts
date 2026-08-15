@@ -287,6 +287,22 @@ export function toDownloadError(
   return new AppError('ProcessError', detail ?? `yt-dlp exited with code ${result.exitCode}.`)
 }
 
+const PERMANENT_FAILURE_PATTERNS =
+  /geo[- ]?restricted|not available in (your|this) country|copyright claim|video (is )?unavailable|this video is not available|private video|sign in to confirm|confirm you'?re not a bot|removed by the uploader|no longer available|took down|members only|premium only/i
+
+const TRANSIENT_FAILURE_PATTERNS =
+  /HTTP Error (403|429|5\d\d)|\b429\b|too many requests|rate[- ]?limit|connection (reset|closed|refused|aborted|timed out)|timed out|read timed out|unable to download video data|unable to (fetch|extract) (data|media|webpage): (HTTP )?error/i
+
+export function isTransientDownloadFailure(
+  result: Pick<ProcessResult, 'stdout' | 'stderr'>
+): boolean {
+  const output = `${result.stdout}\n${result.stderr}`
+  if (PERMANENT_FAILURE_PATTERNS.test(output)) {
+    return false
+  }
+  return TRANSIENT_FAILURE_PATTERNS.test(output)
+}
+
 const SIZE_UNITS: Record<string, number> = {
   b: 1,
   kib: 1024,

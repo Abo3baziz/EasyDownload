@@ -18,7 +18,7 @@ import type {
   DownloadMediaOptions,
   YtDlpService
 } from '../ytdlp/ytdlp-service'
-import { toDownloadError } from '../ytdlp/ytdlp-service'
+import { isTransientDownloadFailure, toDownloadError } from '../ytdlp/ytdlp-service'
 import type { YtDlpMedia, YtDlpPlaylistEntry } from '../ytdlp/types'
 
 export interface DownloadManager {
@@ -46,6 +46,7 @@ export interface DownloadManagerOptions {
   fileExists?: (path: string) => boolean
   listDirectory?: (path: string) => Promise<string[]>
   getConcurrencyLimit?: () => number | Promise<number>
+  getRetryDelayMs?: (attempt: number) => number
   now?: () => number
   generateId?: () => string
 }
@@ -54,9 +55,17 @@ const TERMINAL_STATUSES: DownloadStatus[] = ['completed', 'failed', 'cancelled']
 
 const ACTIVE_STATUSES: Download['status'][] = ['inspecting', 'downloading', 'processing']
 
+const MAX_TRANSIENT_RETRIES = 3
+
+const DEFAULT_RETRY_DELAYS = [2_000, 5_000, 10_000]
+
 export function createDownloadManager(options: DownloadManagerOptions): DownloadManager {
   const now = options.now ?? (() => Date.now())
   const generateId = options.generateId ?? (() => randomUUID())
+  const getRetryDelayMs =
+    options.getRetryDelayMs ??
+    ((attempt: number) =>
+      DEFAULT_RETRY_DELAYS[Math.min(attempt - 1, DEFAULT_RETRY_DELAYS.length - 1)])
   const jobs = new Map<string, Download>()
   const configs = new Map<string, DownloadOptions>()
   const queue: string[] = []
@@ -69,6 +78,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
   const cancelRequests = new Set<string>()
   const listeners = new Set<(download: Download) => void>()
   const deleteListeners = new Set<(download: Download) => void>()
+  const transientAttempts = new Map<string, number>()
+  const retryTimers = new Map<string, ReturnType<typeof setTimeout>>()
   let scheduleChain: Promise<void> = Promise.resolve()
   let historyLoaded = false
   let loadingHistory: Promise<void> | undefined
@@ -162,6 +173,32 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     for (const listener of deleteListeners) {
       listener(download)
     }
+  }
+
+  function clearTransientRetry(id: string): void {
+    const timer = retryTimers.get(id)
+    if (timer) {
+      clearTimeout(timer)
+      retryTimers.delete(id)
+    }
+    transientAttempts.delete(id)
+  }
+
+  function scheduleTransientRetry(id: string, attempts: number): void {
+    update(id, { status: 'queued', progress: {}, error: undefined })
+    const timer = setTimeout(() => {
+      retryTimers.delete(id)
+      const current = jobs.get(id)
+      if (!current || cancelRequests.has(id) || pauseRequests.has(id)) {
+        transientAttempts.delete(id)
+        return
+      }
+      if (!queue.includes(id)) {
+        queue.push(id)
+      }
+      schedule()
+    }, getRetryDelayMs(attempts))
+    retryTimers.set(id, timer)
   }
 
   async function cleanupFiles(destination: string | undefined): Promise<void> {
@@ -283,7 +320,15 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
         if (cancelRequests.has(id)) {
           await finishCancelled(id)
         } else if (!pauseRequests.has(id)) {
-          update(id, { status: 'failed', error: toAppError(err).toPayload() })
+          const appError = toAppError(err)
+          const attempts = transientAttempts.get(id) ?? 0
+          if (appError.code === 'NetworkError' && attempts < MAX_TRANSIENT_RETRIES) {
+            transientAttempts.set(id, attempts + 1)
+            scheduleTransientRetry(id, attempts + 1)
+          } else {
+            transientAttempts.delete(id)
+            update(id, { status: 'failed', error: appError.toPayload() })
+          }
         }
         return
       }
@@ -337,6 +382,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       } else if (result.exitCode === 0) {
         const destination = result.destination ?? deriveCompletedDestination(id)
         const fileSize = await readFileSize(destination)
+        transientAttempts.delete(id)
         update(id, {
           status: 'completed',
           progress: { percent: 100 },
@@ -345,7 +391,15 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
           fileSize
         })
       } else {
-        update(id, { status: 'failed', error: toDownloadError(result).toPayload() })
+        const error = toDownloadError(result).toPayload()
+        const attempts = transientAttempts.get(id) ?? 0
+        if (attempts < MAX_TRANSIENT_RETRIES && isTransientDownloadFailure(result)) {
+          transientAttempts.set(id, attempts + 1)
+          scheduleTransientRetry(id, attempts + 1)
+        } else {
+          transientAttempts.delete(id)
+          update(id, { status: 'failed', error })
+        }
       }
     } catch (err) {
       if (cancelRequests.has(id)) {
@@ -492,6 +546,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
   }
 
   async function doCancel(id: string): Promise<Download> {
+    clearTransientRetry(id)
     const download = getOrThrow(id)
     if (download.status === 'queued') {
       const index = queue.indexOf(id)
@@ -615,6 +670,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       configs.set(id, config)
       cancelRequests.delete(id)
       pauseRequests.delete(id)
+      clearTransientRetry(id)
       mediaOptionsById.delete(id)
       mediaMetaById.delete(id)
       update(id, { status: 'queued', progress: {}, error: undefined })
@@ -729,6 +785,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       const mediaOptions = mediaOptionsById.get(id)
       const wasPaused = pauseRequests.delete(id)
       const wasCancelled = cancelRequests.delete(id)
+      clearTransientRetry(id)
       const queueIndex = queue.indexOf(id)
 
       jobs.delete(id)
