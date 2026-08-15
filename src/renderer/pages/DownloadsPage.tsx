@@ -666,7 +666,12 @@ function DownloadProgressBar({ download }: { download: Download }) {
     progressText.push(`ETA ${formatDuration(etaSeconds)}`)
   }
 
-  if (percent === undefined && progressText.length === 0) {
+  const isActive = ['queued', 'inspecting', 'downloading', 'processing', 'paused'].includes(
+    download.status
+  )
+  const effectivePercent =
+    percent ?? (download.playlistId !== undefined && isActive ? 0 : undefined)
+  if (effectivePercent === undefined && progressText.length === 0) {
     return null
   }
 
@@ -675,11 +680,11 @@ function DownloadProgressBar({ download }: { download: Download }) {
       <div className="progress-track">
         <div
           className="progress-fill"
-          style={{ width: `${Math.min(100, Math.max(0, percent ?? 0))}%` }}
+          style={{ width: `${Math.min(100, Math.max(0, effectivePercent ?? 0))}%` }}
         />
       </div>
       <span className="progress-label">
-        {percent !== undefined ? `${Math.round(percent)}%` : ''}
+        {effectivePercent !== undefined ? `${Math.round(effectivePercent)}%` : ''}
         {progressText.length > 0 ? ` · ${progressText.join(' · ')}` : ''}
       </span>
     </div>

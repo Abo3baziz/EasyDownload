@@ -852,6 +852,33 @@ describe('DownloadsPage', () => {
     expect(await screen.findByText('My Playlist')).toBeInTheDocument()
     expect(screen.getByText('0 of 2 videos · 25%')).toBeInTheDocument()
     expect(screen.getByText(/50%/)).toBeInTheDocument()
+    expect(screen.getByText('0%')).toBeInTheDocument()
+  })
+
+  it('shows a progress bar for every active playlist entry even without progress data yet', async () => {
+    const entry = (id: string, status: Download['status'], percent?: number): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: `Video ${id}`,
+      status,
+      progress: percent !== undefined ? { percent } : {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 3,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [entry('dl-1', 'queued'), entry('dl-2', 'inspecting'), entry('dl-3', 'downloading', 66)]
+    })
+
+    renderSection('queue')
+
+    expect(await screen.findByText('My Playlist')).toBeInTheDocument()
+    expect(screen.getAllByText('0%')).toHaveLength(2)
+    expect(screen.getByText(/66%/)).toBeInTheDocument()
   })
 
   it('cancels the whole playlist through the playlist-level action', async () => {
