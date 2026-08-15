@@ -1,15 +1,17 @@
 import type { Conversion, ConversionStartOptions } from './conversion'
 import type { DependencyStatus } from './dependencies'
-import type { Download, DownloadOptions } from './download'
+import type { Download, DownloadOptions, PlaylistDownloadOptions, PlaylistStartResult } from './download'
 import type { AppError } from './errors'
 import type { HistoryEntry } from './history'
 import type { IpcResult } from './ipc'
-import type { MediaInfo } from './media'
+import type { InspectionResult } from './media'
 import type { AppSettings } from './settings'
 
 export interface PreloadApi {
-  inspectUrl(url: string): Promise<IpcResult<MediaInfo>>
+  inspectUrl(url: string): Promise<IpcResult<InspectionResult>>
   startDownload(options: DownloadOptions): Promise<IpcResult<Download>>
+  downloadPlaylist(options: PlaylistDownloadOptions): Promise<IpcResult<PlaylistStartResult>>
+  cancelPlaylist(playlistId: string): Promise<IpcResult<void>>
   pauseDownload(id: string): Promise<IpcResult<Download>>
   resumeDownload(id: string): Promise<IpcResult<Download>>
   cancelDownload(id: string): Promise<IpcResult<Download>>

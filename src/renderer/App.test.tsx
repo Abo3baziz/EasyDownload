@@ -9,6 +9,8 @@ function createApiMock(): PreloadApi {
   return {
     inspectUrl: vi.fn(),
     startDownload: vi.fn(),
+    downloadPlaylist: vi.fn(),
+    cancelPlaylist: vi.fn(),
     pauseDownload: vi.fn(),
     resumeDownload: vi.fn(),
     cancelDownload: vi.fn(),
@@ -163,12 +165,15 @@ describe('App', () => {
     window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue({
       ok: true,
       data: {
-        id: 'abc',
-        title: 'Example Video',
-        website: 'www.example.com',
-        formats: [
-          { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
-        ]
+        kind: 'video',
+        media: {
+          id: 'abc',
+          title: 'Example Video',
+          website: 'www.example.com',
+          formats: [
+            { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
+          ]
+        }
       }
     })
 
@@ -194,12 +199,15 @@ describe('App', () => {
     window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue({
       ok: true,
       data: {
-        id: 'abc',
-        title: 'Example Video',
-        website: 'www.example.com',
-        formats: [
-          { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
-        ]
+        kind: 'video',
+        media: {
+          id: 'abc',
+          title: 'Example Video',
+          website: 'www.example.com',
+          formats: [
+            { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
+          ]
+        }
       }
     })
 
@@ -225,12 +233,15 @@ describe('App', () => {
     window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue({
       ok: true,
       data: {
-        id: 'abc',
-        title: 'Example Video',
-        website: 'www.example.com',
-        formats: [
-          { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
-        ]
+        kind: 'video',
+        media: {
+          id: 'abc',
+          title: 'Example Video',
+          website: 'www.example.com',
+          formats: [
+            { id: '18', label: '360p MP4', extension: 'mp4', hasVideo: true, hasAudio: true }
+          ]
+        }
       }
     })
     window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({

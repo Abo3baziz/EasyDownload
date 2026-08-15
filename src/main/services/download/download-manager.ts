@@ -1,19 +1,25 @@
 import { randomUUID } from 'node:crypto'
 import { unlink } from 'node:fs/promises'
 import { basename, join } from 'node:path'
-import type { Download, DownloadOptions, DownloadStatus } from '../../../shared/types/download'
+import type {
+  Download,
+  DownloadOptions,
+  DownloadStatus,
+  PlaylistDownloadOptions,
+  PlaylistStartResult
+} from '../../../shared/types/download'
 import type { DependencyStatus } from '../../../shared/types/dependencies'
 import { normalizeUrl } from '../../../shared/utils/url'
 import { AppError, toAppError } from '../../utils/errors'
 import type { HistoryManager } from '../history/history-manager'
-import { buildResolution, isRealCodec } from '../media/normalize'
+import { buildResolution, isRealCodec, resolvePlaylistFormat } from '../media/normalize'
 import type {
   DownloadMediaHandle,
   DownloadMediaOptions,
   YtDlpService
 } from '../ytdlp/ytdlp-service'
-import { toDownloadError } from '../ytdlp/ytdlp-service'
-import type { YtDlpMedia } from '../ytdlp/types'
+import { isTransientDownloadFailure, toDownloadError } from '../ytdlp/ytdlp-service'
+import type { YtDlpMedia, YtDlpPlaylistEntry } from '../ytdlp/types'
 
 export interface DownloadManager {
   create(options: DownloadOptions): Promise<Download>
@@ -26,6 +32,8 @@ export interface DownloadManager {
   get(id: string): Promise<Download>
   list(): Promise<Download[]>
   clearHistory(): Promise<Download[]>
+  downloadPlaylist(options: PlaylistDownloadOptions): Promise<PlaylistStartResult>
+  cancelPlaylist(playlistId: string): Promise<void>
   onUpdate(listener: (download: Download) => void): () => void
   onDelete(listener: (download: Download) => void): () => void
 }
@@ -38,6 +46,7 @@ export interface DownloadManagerOptions {
   fileExists?: (path: string) => boolean
   listDirectory?: (path: string) => Promise<string[]>
   getConcurrencyLimit?: () => number | Promise<number>
+  getRetryDelayMs?: (attempt: number) => number
   now?: () => number
   generateId?: () => string
 }
@@ -46,9 +55,17 @@ const TERMINAL_STATUSES: DownloadStatus[] = ['completed', 'failed', 'cancelled']
 
 const ACTIVE_STATUSES: Download['status'][] = ['inspecting', 'downloading', 'processing']
 
+const MAX_TRANSIENT_RETRIES = 4
+
+const DEFAULT_RETRY_DELAYS = [2_000, 4_000, 8_000, 16_000]
+
 export function createDownloadManager(options: DownloadManagerOptions): DownloadManager {
   const now = options.now ?? (() => Date.now())
   const generateId = options.generateId ?? (() => randomUUID())
+  const getRetryDelayMs =
+    options.getRetryDelayMs ??
+    ((attempt: number) =>
+      DEFAULT_RETRY_DELAYS[Math.min(attempt - 1, DEFAULT_RETRY_DELAYS.length - 1)])
   const jobs = new Map<string, Download>()
   const configs = new Map<string, DownloadOptions>()
   const queue: string[] = []
@@ -61,6 +78,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
   const cancelRequests = new Set<string>()
   const listeners = new Set<(download: Download) => void>()
   const deleteListeners = new Set<(download: Download) => void>()
+  const transientAttempts = new Map<string, number>()
+  const retryTimers = new Map<string, ReturnType<typeof setTimeout>>()
   let scheduleChain: Promise<void> = Promise.resolve()
   let historyLoaded = false
   let loadingHistory: Promise<void> | undefined
@@ -156,6 +175,37 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     }
   }
 
+  function clearTransientRetry(id: string): void {
+    const timer = retryTimers.get(id)
+    if (timer) {
+      clearTimeout(timer)
+      retryTimers.delete(id)
+    }
+    transientAttempts.delete(id)
+  }
+
+  function scheduleTransientRetry(id: string, attempts: number): void {
+    update(id, {
+      status: 'queued',
+      progress: {},
+      error: undefined,
+      retryCount: attempts
+    })
+    const timer = setTimeout(() => {
+      retryTimers.delete(id)
+      const current = jobs.get(id)
+      if (!current || cancelRequests.has(id) || pauseRequests.has(id)) {
+        transientAttempts.delete(id)
+        return
+      }
+      if (!queue.includes(id)) {
+        queue.push(id)
+      }
+      schedule()
+    }, getRetryDelayMs(attempts))
+    retryTimers.set(id, timer)
+  }
+
   async function cleanupFiles(destination: string | undefined): Promise<void> {
     if (!destination) {
       return
@@ -184,14 +234,32 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     scheduleChain = scheduleChain.then(executeNext).catch(() => undefined)
   }
 
+  function canStartJob(id: string): boolean {
+    const download = jobs.get(id)
+    if (!download?.playlistId) {
+      return true
+    }
+    return !hasActivePlaylistEntry(download.playlistId)
+  }
+
+  function hasActivePlaylistEntry(playlistId: string): boolean {
+    for (const activeId of activeIds) {
+      const download = jobs.get(activeId)
+      if (download?.playlistId === playlistId) {
+        return true
+      }
+    }
+    return false
+  }
+
   async function executeNext(): Promise<void> {
     const limit = await resolveConcurrencyLimit()
     while (queue.length > 0 && activeIds.size < limit) {
-      const id = queue.shift() as string
-      if (activeIds.has(id)) {
-        queue.unshift(id)
+      const index = queue.findIndex((id) => !activeIds.has(id) && canStartJob(id))
+      if (index === -1) {
         break
       }
+      const id = queue.splice(index, 1)[0] as string
       activeIds.add(id)
       const execution = execute(id).catch(() => undefined)
       executionPromises.set(id, execution)
@@ -208,7 +276,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     if (!config) {
       update(id, {
         status: 'failed',
-        error: { code: 'DownloadError', message: 'The download configuration is missing.' }
+        error: { code: 'DownloadError', message: 'The download configuration is missing.' },
+        retryCount: undefined
       })
       return
     }
@@ -226,10 +295,39 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
           update(id, { status: 'paused' })
           return
         }
-        mediaOptions = buildDownloadMediaOptions(config, media)
+        let formatId = config.formatId
+        if (!formatId) {
+          const preset = config.preset
+          if (!preset) {
+            update(id, {
+              status: 'failed',
+              error: new AppError(
+                'DownloadError',
+                'The download is missing its format configuration.'
+              ).toPayload(),
+              retryCount: undefined
+            })
+            return
+          }
+          const resolved = resolvePlaylistFormat(media, preset)
+          if (!resolved || !resolved.format_id) {
+            update(id, {
+              status: 'failed',
+              error: new AppError(
+                'DownloadError',
+                `No format is available on this video for the "${preset}" quality.`
+              ).toPayload(),
+              retryCount: undefined
+            })
+            return
+          }
+          formatId = resolved.format_id
+          configs.set(id, { ...config, formatId })
+        }
+        mediaOptions = buildDownloadMediaOptions(config, media, formatId)
         mediaOptionsById.set(id, mediaOptions)
         const format = (media.formats ?? []).find(
-          (candidate) => candidate.format_id === config.formatId
+          (candidate) => candidate.format_id === formatId
         )
         mediaMetaById.set(id, {
           id: media.id,
@@ -237,17 +335,26 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
           extension: mediaOptions.mergeOutputFormat ?? format?.ext ?? 'mp4'
         })
         update(id, {
+          formatId,
           title: media.title,
           thumbnail: media.thumbnail,
           duration: media.duration,
-          ...formatMetadata(media, config.formatId),
+          ...formatMetadata(media, formatId),
           status: 'downloading'
         })
       } catch (err) {
         if (cancelRequests.has(id)) {
           await finishCancelled(id)
         } else if (!pauseRequests.has(id)) {
-          update(id, { status: 'failed', error: toAppError(err).toPayload() })
+          const appError = toAppError(err)
+          const attempts = transientAttempts.get(id) ?? 0
+          if (appError.code === 'NetworkError' && attempts < MAX_TRANSIENT_RETRIES) {
+            transientAttempts.set(id, attempts + 1)
+            scheduleTransientRetry(id, attempts + 1)
+          } else {
+            transientAttempts.delete(id)
+            update(id, { status: 'failed', error: appError.toPayload(), retryCount: undefined })
+          }
         }
         return
       }
@@ -271,7 +378,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
           error: new AppError(
             'DependencyError',
             'FFmpeg is required to merge audio into this format, but it is not available.'
-          ).toPayload()
+          ).toPayload(),
+          retryCount: undefined
         })
         return
       }
@@ -280,7 +388,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     const handle = options.ytDlp.startDownload(mediaOptions, {
       onProgress: (progress) => {
         if (cancelRequests.has(id) || pauseRequests.has(id)) return
-        update(id, { progress, status: 'downloading' })
+        update(id, { progress, status: 'downloading', retryCount: undefined })
       },
       onPhase: (phase) => {
         if (cancelRequests.has(id) || pauseRequests.has(id)) return
@@ -301,15 +409,25 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       } else if (result.exitCode === 0) {
         const destination = result.destination ?? deriveCompletedDestination(id)
         const fileSize = await readFileSize(destination)
+        transientAttempts.delete(id)
         update(id, {
           status: 'completed',
           progress: { percent: 100 },
           fileName: destination ? basename(destination) : undefined,
           destination,
-          fileSize
+          fileSize,
+          retryCount: undefined
         })
       } else {
-        update(id, { status: 'failed', error: toDownloadError(result).toPayload() })
+        const error = toDownloadError(result).toPayload()
+        const attempts = transientAttempts.get(id) ?? 0
+        if (attempts < MAX_TRANSIENT_RETRIES && isTransientDownloadFailure(result)) {
+          transientAttempts.set(id, attempts + 1)
+          scheduleTransientRetry(id, attempts + 1)
+        } else {
+          transientAttempts.delete(id)
+          update(id, { status: 'failed', error, retryCount: undefined })
+        }
       }
     } catch (err) {
       if (cancelRequests.has(id)) {
@@ -317,7 +435,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       } else if (pauseRequests.has(id)) {
         pauseRequests.delete(id)
       } else {
-        update(id, { status: 'failed', error: toAppError(err).toPayload() })
+        update(id, { status: 'failed', error: toAppError(err).toPayload(), retryCount: undefined })
       }
     } finally {
       handles.delete(id)
@@ -328,7 +446,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     await cleanupFiles(destination)
     const status = getOrThrow(id).status
     if (status !== 'cancelled' && !isTerminal(status) && status !== 'queued') {
-      update(id, { status: 'cancelled', progress: {} })
+      update(id, { status: 'cancelled', progress: {}, retryCount: undefined })
     }
   }
 
@@ -419,10 +537,71 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
   }
 
   function configFromDownload(download: Download): DownloadOptions {
-    if (!download.formatId || !download.directory) {
+    if (!download.directory) {
       throw new AppError('DownloadError', 'The original download configuration is missing.')
     }
-    return { url: download.url, formatId: download.formatId, directory: download.directory }
+    const playlistFields = {
+      playlistId: download.playlistId,
+      playlistTitle: download.playlistTitle,
+      playlistIndex: download.playlistIndex,
+      playlistCount: download.playlistCount,
+      preset: download.preset
+    }
+    if (download.formatId) {
+      return {
+        url: download.url,
+        formatId: download.formatId,
+        directory: download.directory,
+        ...playlistFields
+      }
+    }
+    if (download.preset) {
+      return {
+        url: download.url,
+        directory: download.directory,
+        ...playlistFields
+      }
+    }
+    throw new AppError('DownloadError', 'The original download configuration is missing.')
+  }
+
+  function hasCompletedUrl(url: string): boolean {
+    const normalized = normalizeUrl(url)
+    return [...jobs.values()].some(
+      (download) =>
+        download.status === 'completed' && normalizeUrl(download.url) === normalized
+    )
+  }
+
+  async function doCancel(id: string): Promise<Download> {
+    clearTransientRetry(id)
+    const download = getOrThrow(id)
+    if (download.status === 'queued') {
+      const index = queue.indexOf(id)
+      if (index >= 0) {
+        queue.splice(index, 1)
+      }
+      return update(id, { status: 'cancelled', progress: {}, retryCount: undefined })
+    }
+    if (download.status === 'paused') {
+      cancelRequests.add(id)
+      pauseRequests.delete(id)
+      await finishCancelled(id, download.destination)
+      return getOrThrow(id)
+    }
+    if (ACTIVE_STATUSES.includes(download.status)) {
+      cancelRequests.add(id)
+      pauseRequests.delete(id)
+      const handle = handles.get(id)
+      if (handle) {
+        handle.cancel()
+      }
+      return update(id, { status: 'cancelled', progress: {}, retryCount: undefined })
+    }
+    throw new AppError(
+      'CancellationError',
+      `Cannot cancel a download in state "${download.status}".`
+    )
   }
 
   return {
@@ -503,33 +682,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
 
     async cancel(id: string): Promise<Download> {
       await ensureLoaded()
-      const download = getOrThrow(id)
-      if (download.status === 'queued') {
-        const index = queue.indexOf(id)
-        if (index >= 0) {
-          queue.splice(index, 1)
-        }
-        return update(id, { status: 'cancelled', progress: {} })
-      }
-      if (download.status === 'paused') {
-        cancelRequests.add(id)
-        pauseRequests.delete(id)
-        await finishCancelled(id, download.destination)
-        return getOrThrow(id)
-      }
-      if (ACTIVE_STATUSES.includes(download.status)) {
-        cancelRequests.add(id)
-        pauseRequests.delete(id)
-        const handle = handles.get(id)
-        if (handle) {
-          handle.cancel()
-        }
-        return update(id, { status: 'cancelled', progress: {} })
-      }
-      throw new AppError(
-        'CancellationError',
-        `Cannot cancel a download in state "${download.status}".`
-      )
+      return doCancel(id)
     },
 
     async retry(id: string): Promise<Download> {
@@ -545,15 +698,87 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       configs.set(id, config)
       cancelRequests.delete(id)
       pauseRequests.delete(id)
+      clearTransientRetry(id)
       mediaOptionsById.delete(id)
       mediaMetaById.delete(id)
-      update(id, { status: 'queued', progress: {}, error: undefined })
+      update(id, { status: 'queued', progress: {}, error: undefined, retryCount: undefined })
       if (!queue.includes(id)) {
         queue.push(id)
       }
       void persistHistory()
       schedule()
       return getOrThrow(id)
+    },
+
+    async downloadPlaylist(playlistOptions: PlaylistDownloadOptions): Promise<PlaylistStartResult> {
+      await ensureLoaded()
+      const raw = await options.ytDlp.inspectFlat(playlistOptions.url)
+      const playlistId = raw.id
+      const playlistTitle = raw.title
+      const entries = normalizePlaylistEntries(raw.entries ?? [])
+      if (entries.length === 0) {
+        throw new AppError(
+          'DownloadError',
+          'This playlist does not contain any downloadable videos.'
+        )
+      }
+      const playlistDirectory = join(
+        playlistOptions.directory,
+        sanitizeFolderName(`${playlistTitle} [${playlistId}]`)
+      )
+
+      let created = 0
+      let skipped = 0
+      const seenUrls = new Set<string>()
+      for (const [index, entry] of entries.entries()) {
+        const normalizedUrl = normalizeUrl(entry.url)
+        if (seenUrls.has(normalizedUrl) || hasCompletedUrl(entry.url)) {
+          skipped += 1
+          continue
+        }
+        seenUrls.add(normalizedUrl)
+        const playlistIndex = index + 1
+        const download: Download = {
+          id: generateId(),
+          url: entry.url,
+          title: entry.title,
+          status: 'queued',
+          progress: {},
+          directory: playlistDirectory,
+          thumbnail: entry.thumbnail,
+          duration: entry.duration,
+          playlistId,
+          playlistTitle,
+          playlistIndex,
+          playlistCount: entries.length,
+          preset: playlistOptions.preset,
+          createdAt: now(),
+          updatedAt: now()
+        }
+        jobs.set(download.id, download)
+        configs.set(download.id, {
+          url: entry.url,
+          directory: playlistDirectory,
+          playlistId,
+          playlistTitle,
+          playlistIndex,
+          playlistCount: entries.length,
+          preset: playlistOptions.preset
+        })
+        emit(download)
+        queue.push(download.id)
+        created += 1
+      }
+      schedule()
+      return { playlistId, created, skipped }
+    },
+
+    async cancelPlaylist(playlistId: string): Promise<void> {
+      await ensureLoaded()
+      const targets = [...jobs.values()]
+        .filter((download) => download.playlistId === playlistId)
+        .map((download) => download.id)
+      await Promise.allSettled(targets.map((id) => doCancel(id)))
     },
 
     async remove(id: string): Promise<Download | undefined> {
@@ -588,6 +813,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       const mediaOptions = mediaOptionsById.get(id)
       const wasPaused = pauseRequests.delete(id)
       const wasCancelled = cancelRequests.delete(id)
+      clearTransientRetry(id)
       const queueIndex = queue.indexOf(id)
 
       jobs.delete(id)
@@ -663,15 +889,16 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
 
 function buildDownloadMediaOptions(
   config: DownloadOptions,
-  media: YtDlpMedia
+  media: YtDlpMedia,
+  formatId: string
 ): DownloadMediaOptions {
   const optionsPayload: DownloadMediaOptions = {
     url: config.url,
-    formatId: config.formatId,
+    formatId,
     directory: config.directory
   }
   const format = (media.formats ?? []).find(
-    (candidate) => candidate.format_id === config.formatId
+    (candidate) => candidate.format_id === formatId
   )
   if (format && isRealCodec(format.vcodec) && !isRealCodec(format.acodec)) {
     optionsPayload.mergeAudio = true
@@ -712,4 +939,34 @@ function formatMetadata(
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normalizePlaylistEntries(entries: YtDlpPlaylistEntry[]): Array<{
+  url: string
+  title: string
+  duration?: number
+  thumbnail?: string
+}> {
+  return entries.flatMap((entry) => {
+    if (!entry.url) {
+      return []
+    }
+    return [
+      {
+        url: entry.url,
+        title: entry.title ?? entry.id ?? 'Untitled',
+        duration: entry.duration,
+        thumbnail: entry.thumbnails?.find((t) => t.url)?.url
+      }
+    ]
+  })
+}
+
+function sanitizeFolderName(value: string): string {
+  const cleaned = value
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+    .replace(/[\s.]+$/g, '')
+    .trim()
+    .slice(0, 100)
+  return cleaned.length > 0 ? cleaned : 'Playlist'
 }

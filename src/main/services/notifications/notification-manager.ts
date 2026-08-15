@@ -34,6 +34,9 @@ export function createNotificationManager(options: NotificationManagerOptions): 
 }
 
 function notificationContent(download: Download): { title: string; body: string } | undefined {
+  if (download.playlistId) {
+    return undefined
+  }
   const subject = download.title ?? download.fileName ?? download.url
   switch (download.status) {
     case 'completed':

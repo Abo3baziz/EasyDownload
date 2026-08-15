@@ -9,9 +9,12 @@ import type {
 import {
   buildDownloadArgs,
   buildInspectArgs,
+  buildPlaylistInspectArgs,
   createYtDlpService,
+  isTransientDownloadFailure,
   parseEta,
   parseInspectionOutput,
+  parsePlaylistOutput,
   parseProgressLine,
   parseSize,
   toDownloadError
@@ -177,6 +180,83 @@ describe('parseInspectionOutput', () => {
 
   it('throws a ProcessError for malformed JSON', () => {
     expect(() => parseInspectionOutput('{invalid')).toThrow(AppError)
+  })
+})
+
+describe('buildPlaylistInspectArgs', () => {
+  it('builds flat-playlist inspection arguments with the URL as a single argument', () => {
+    const url = 'https://www.youtube.com/playlist?list=PL123'
+    expect(buildPlaylistInspectArgs(url)).toEqual([
+      '--dump-single-json',
+      '--flat-playlist',
+      '--skip-download',
+      '--no-warnings',
+      '--no-call-home',
+      '--encoding',
+      'utf-8',
+      url
+    ])
+  })
+})
+
+describe('parsePlaylistOutput', () => {
+  it('parses a single-line playlist JSON object', () => {
+    const playlist = {
+      id: 'PL123',
+      title: 'Example Playlist',
+      _type: 'playlist',
+      entries: [{ id: 'v1', title: 'Video One', url: 'https://example.com/v1' }]
+    }
+    expect(parsePlaylistOutput(JSON.stringify(playlist))).toEqual(playlist)
+  })
+
+  it('parses a pretty-printed playlist JSON object spanning multiple lines', () => {
+    const playlist = {
+      id: 'PL123',
+      title: 'Example Playlist',
+      _type: 'playlist',
+      entries: [{ id: 'v1', title: 'Video One', url: 'https://example.com/v1' }]
+    }
+    expect(parsePlaylistOutput(JSON.stringify(playlist, null, 2))).toEqual(playlist)
+  })
+
+  it('throws a ProcessError for malformed playlist JSON', () => {
+    expect(() => parsePlaylistOutput('{invalid')).toThrow(AppError)
+  })
+})
+
+describe('createYtDlpService.inspectFlat', () => {
+  it('parses a successful flat-playlist inspection', async () => {
+    const playlist = {
+      id: 'PL123',
+      title: 'Example Playlist',
+      _type: 'playlist',
+      entries: [{ id: 'v1', title: 'Video One', url: 'https://example.com/v1' }]
+    }
+    const processes = createMockProcesses(successResult(JSON.stringify(playlist)))
+    const service = createYtDlpService({ processes })
+
+    await expect(service.inspectFlat('https://www.youtube.com/playlist?list=PL123')).resolves.toEqual(
+      playlist
+    )
+    expect(processes.runToCompletion).toHaveBeenCalledWith('yt-dlp', {
+      args: buildPlaylistInspectArgs('https://www.youtube.com/playlist?list=PL123'),
+      timeoutMs: 60_000
+    })
+  })
+
+  it('maps a non-zero exit to an inspection error', async () => {
+    const processes = createMockProcesses({
+      stdout: '',
+      stderr: 'ERROR: Unsupported URL: https://example.com/bad',
+      exitCode: 1,
+      timedOut: false
+    })
+    const service = createYtDlpService({ processes })
+
+    await expect(service.inspectFlat('https://example.com/bad')).rejects.toMatchObject({
+      code: 'UnsupportedMediaError'
+    })
   })
 })
 
@@ -365,6 +445,50 @@ describe('toDownloadError', () => {
       code: 'ProcessError',
       message: '[foo] 123: Unexpected failure'
     })
+  })
+})
+
+describe('isTransientDownloadFailure', () => {
+  function result(stderr: string): ProcessResult {
+    return { stdout: '', stderr, exitCode: 1, timedOut: false }
+  }
+
+  it('classifies a 403 on video data as transient', () => {
+    expect(
+      isTransientDownloadFailure(result('ERROR: unable to download video data: HTTP Error 403: Forbidden'))
+    ).toBe(true)
+  })
+
+  it('classifies a 429 rate limit as transient', () => {
+    expect(
+      isTransientDownloadFailure(result('ERROR: unable to download webpage: HTTP Error 429: Too Many Requests'))
+    ).toBe(true)
+  })
+
+  it('classifies a connection timeout as transient', () => {
+    expect(isTransientDownloadFailure(result('ERROR: unable to download video data: Read timed out'))).toBe(true)
+  })
+
+  it('does not classify a permanently unavailable video as transient', () => {
+    expect(
+      isTransientDownloadFailure(result('ERROR: [youtube] abc: Video unavailable'))
+    ).toBe(false)
+  })
+
+  it('does not classify a geo-restricted video as transient', () => {
+    expect(
+      isTransientDownloadFailure(result('ERROR: [youtube] abc: The video is not available in this country'))
+    ).toBe(false)
+  })
+
+  it('does not classify a bot-check as transient', () => {
+    expect(
+      isTransientDownloadFailure(result('ERROR: Sign in to confirm you are not a bot'))
+    ).toBe(false)
+  })
+
+  it('does not classify an unrelated failure as transient', () => {
+    expect(isTransientDownloadFailure(result('ERROR: [foo] 123: Unexpected failure'))).toBe(false)
   })
 })
 

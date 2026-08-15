@@ -101,6 +101,13 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
     }
   }
 
+  async function handleCancelPlaylist(playlistId: string) {
+    const result = await api.cancelPlaylist(playlistId)
+    if (!result.ok) {
+      setError(result.error)
+    }
+  }
+
   async function handleDelete(download: Download) {
     const result = await api.deleteDownload(download.id)
     if (!result.ok) {
@@ -200,6 +207,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
   const downloadListProps = {
     conversions,
     onCancel: (item: Download) => void handleCancel(item),
+    onCancelPlaylist: (playlistId: string) => void handleCancelPlaylist(playlistId),
     onDelete: (item: Download) => void handleDelete(item),
     onPause: (item: Download) => void handlePause(item),
     onResume: (item: Download) => void handleResume(item),
@@ -291,6 +299,7 @@ interface DownloadListProps {
   downloads: Download[]
   conversions: Record<string, Conversion>
   onCancel: (download: Download) => void
+  onCancelPlaylist: (playlistId: string) => void
   onDelete: (download: Download) => void
   onPause: (download: Download) => void
   onResume: (download: Download) => void
@@ -302,13 +311,108 @@ interface DownloadListProps {
   onOpenConversion: (path: string) => void
 }
 
-function DownloadList({ downloads, ...props }: DownloadListProps) {
+interface PlaylistGroupEntry {
+  key: string
+  playlistId?: string
+  playlistTitle?: string
+  items: Download[]
+}
+
+function groupByPlaylist(downloads: Download[]): PlaylistGroupEntry[] {
+  const groups: PlaylistGroupEntry[] = []
+  for (const download of downloads) {
+    if (!download.playlistId) {
+      groups.push({ key: download.id, items: [download] })
+      continue
+    }
+    const last = groups[groups.length - 1]
+    if (last && last.playlistId === download.playlistId) {
+      last.items.push(download)
+    } else {
+      groups.push({
+        key: download.playlistId,
+        playlistId: download.playlistId,
+        playlistTitle: download.playlistTitle,
+        items: [download]
+      })
+    }
+  }
+  return groups
+}
+
+function DownloadList({ downloads, onCancelPlaylist, ...props }: DownloadListProps) {
   return (
-    <ul className="download-list">
-      {downloads.map((download) => (
-        <DownloadListItem key={download.id} download={download} {...props} />
-      ))}
+    <ul className='download-list'>
+      {groupByPlaylist(downloads).map((group) =>
+        group.playlistId ? (
+          <PlaylistGroup
+            key={group.key}
+            group={group}
+            onCancelPlaylist={onCancelPlaylist}
+            {...props}
+          />
+        ) : (
+          <DownloadListItem
+            key={group.key}
+            download={group.items[0]!}
+            {...props}
+          />
+        )
+      )}
     </ul>
+  )
+}
+
+function PlaylistGroup({
+  group,
+  onCancelPlaylist,
+  ...props
+}: {
+  group: PlaylistGroupEntry
+  onCancelPlaylist: (playlistId: string) => void
+} & Omit<DownloadListProps, 'downloads' | 'onCancelPlaylist'>) {
+  const total = group.items[0]?.playlistCount ?? group.items.length
+  const completed = group.items.filter((download) => download.status === 'completed').length
+  const activeCredit = group.items
+    .filter((download) => download.status === 'downloading' || download.status === 'processing')
+    .reduce((sum, download) => sum + (download.progress.percent ?? 0) / 100, 0)
+  const overall =
+    total > 0 ? Math.min(100, Math.round(((completed + activeCredit) / total) * 100)) : 0
+  const hasActive = group.items.some((download) => canCancel(download))
+  return (
+    <li className='playlist-group'>
+      <div className='playlist-group-header'>
+        <span className='playlist-group-title'>{group.playlistTitle ?? 'Playlist'}</span>
+        <span className='playlist-group-count'>
+          {completed} of {total} videos · {overall}%
+        </span>
+        {hasActive && (
+          <button
+            type='button'
+            className='btn'
+            onClick={() => onCancelPlaylist(group.playlistId!)}>
+            Cancel playlist
+          </button>
+        )}
+      </div>
+      <div className='playlist-group-progress'>
+        <div className='progress-track'>
+          <div
+            className='progress-fill'
+            style={{ width: `${overall}%` }}
+          />
+        </div>
+      </div>
+      <ul className='download-list'>
+        {group.items.map((download) => (
+          <DownloadListItem
+            key={download.id}
+            download={download}
+            {...props}
+          />
+        ))}
+      </ul>
+    </li>
   )
 }
 
@@ -562,7 +666,12 @@ function DownloadProgressBar({ download }: { download: Download }) {
     progressText.push(`ETA ${formatDuration(etaSeconds)}`)
   }
 
-  if (percent === undefined && progressText.length === 0) {
+  const isActive = ['queued', 'inspecting', 'downloading', 'processing', 'paused'].includes(
+    download.status
+  )
+  const effectivePercent =
+    percent ?? (download.playlistId !== undefined && isActive ? 0 : undefined)
+  if (effectivePercent === undefined && progressText.length === 0) {
     return null
   }
 
@@ -571,11 +680,12 @@ function DownloadProgressBar({ download }: { download: Download }) {
       <div className="progress-track">
         <div
           className="progress-fill"
-          style={{ width: `${Math.min(100, Math.max(0, percent ?? 0))}%` }}
+          style={{ width: `${Math.min(100, Math.max(0, effectivePercent ?? 0))}%` }}
         />
       </div>
       <span className="progress-label">
-        {percent !== undefined ? `${Math.round(percent)}%` : ''}
+        {effectivePercent !== undefined ? `${Math.round(effectivePercent)}%` : ''}
+        {download.retryCount ? ` · Retrying (${download.retryCount})` : ''}
         {progressText.length > 0 ? ` · ${progressText.join(' · ')}` : ''}
       </span>
     </div>

@@ -9,7 +9,7 @@ import {
 } from 'react'
 import type { ReactNode } from 'react'
 import type { Download, DownloadStatus } from '../../shared/types/download'
-import type { MediaInfo } from '../../shared/types/media'
+import type { InspectionResult } from '../../shared/types/media'
 import { normalizeUrl } from '../../shared/utils/url'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 
@@ -17,11 +17,14 @@ export interface HomeState {
   url: string
   setUrl: (url: string) => void
   clearUrl: () => void
-  getInspection: (url: string) => MediaInfo | undefined
-  setInspection: (url: string, media: MediaInfo) => void
+  getInspection: (url: string) => InspectionResult | undefined
+  setInspection: (url: string, result: InspectionResult) => void
   isDownloading: (url: string, formatId: string) => boolean
   markDownloading: (url: string, formatId: string) => boolean
   unmarkDownloading: (url: string, formatId: string) => void
+  isPlaylistActive: (playlistId: string) => boolean
+  markPlaylistDownloading: (playlistId: string) => boolean
+  unmarkPlaylistDownloading: (playlistId: string) => void
 }
 
 const IN_PROGRESS_STATUSES: DownloadStatus[] = ['queued', 'inspecting', 'downloading', 'processing']
@@ -36,11 +39,30 @@ function downloadKey(url: string, formatId: string): string {
 export function HomeStateProvider({ children }: { children: ReactNode }) {
   const api = useMediaDownloader()
   const [url, setUrlState] = useState('')
-  const [inspections, setInspections] = useState<Record<string, MediaInfo>>({})
+  const [inspections, setInspections] = useState<Record<string, InspectionResult>>({})
   const [downloadingKeys, setDownloadingKeys] = useState<ReadonlySet<string>>(new Set())
   const downloadingRef = useRef<Set<string>>(new Set())
+  const [activePlaylists, setActivePlaylists] = useState<ReadonlySet<string>>(new Set())
+  const activePlaylistEntries = useRef<Map<string, Set<string>>>(new Map())
+  const playlistGuard = useRef<Set<string>>(new Set())
 
   const applyDownload = useCallback((download: Download) => {
+    if (download.playlistId) {
+      const entries = activePlaylistEntries.current
+      const ids = entries.get(download.playlistId) ?? new Set<string>()
+      if (IN_PROGRESS_STATUSES.includes(download.status)) {
+        ids.add(download.id)
+      } else if (TERMINAL_STATUSES.includes(download.status)) {
+        ids.delete(download.id)
+      }
+      if (ids.size === 0) {
+        entries.delete(download.playlistId)
+        playlistGuard.current.delete(download.playlistId)
+      } else {
+        entries.set(download.playlistId, ids)
+      }
+      setActivePlaylists(new Set(entries.keys()))
+    }
     if (!download.formatId) {
       return
     }
@@ -61,8 +83,8 @@ export function HomeStateProvider({ children }: { children: ReactNode }) {
 
   const setUrl = useCallback((next: string) => setUrlState(next), [])
   const clearUrl = useCallback(() => setUrlState(''), [])
-  const setInspection = useCallback((inspectedUrl: string, media: MediaInfo) => {
-    setInspections((previous) => ({ ...previous, [normalizeUrl(inspectedUrl)]: media }))
+  const setInspection = useCallback((inspectedUrl: string, result: InspectionResult) => {
+    setInspections((previous) => ({ ...previous, [normalizeUrl(inspectedUrl)]: result }))
   }, [])
   const getInspection = useCallback(
     (candidate: string) => inspections[normalizeUrl(candidate)],
@@ -86,6 +108,21 @@ export function HomeStateProvider({ children }: { children: ReactNode }) {
     downloadingRef.current.delete(downloadKey(candidateUrl, formatId))
     setDownloadingKeys(new Set(downloadingRef.current))
   }, [])
+  const isPlaylistActive = useCallback(
+    (playlistId: string) =>
+      playlistGuard.current.has(playlistId) || activePlaylists.has(playlistId),
+    [activePlaylists]
+  )
+  const markPlaylistDownloading = useCallback((playlistId: string) => {
+    if (playlistGuard.current.has(playlistId)) {
+      return false
+    }
+    playlistGuard.current.add(playlistId)
+    return true
+  }, [])
+  const unmarkPlaylistDownloading = useCallback((playlistId: string) => {
+    playlistGuard.current.delete(playlistId)
+  }, [])
 
   const value = useMemo<HomeState>(
     () => ({
@@ -96,7 +133,10 @@ export function HomeStateProvider({ children }: { children: ReactNode }) {
       setInspection,
       isDownloading,
       markDownloading,
-      unmarkDownloading
+      unmarkDownloading,
+      isPlaylistActive,
+      markPlaylistDownloading,
+      unmarkPlaylistDownloading
     }),
     [
       url,
@@ -106,7 +146,10 @@ export function HomeStateProvider({ children }: { children: ReactNode }) {
       setInspection,
       isDownloading,
       markDownloading,
-      unmarkDownloading
+      unmarkDownloading,
+      isPlaylistActive,
+      markPlaylistDownloading,
+      unmarkPlaylistDownloading
     ]
   )
 

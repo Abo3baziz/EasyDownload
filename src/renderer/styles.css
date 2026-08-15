@@ -411,6 +411,36 @@ button:disabled {
   font-size: 12px;
 }
 
+.playlist-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.playlist-preset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  background: var(--bg);
+}
+
+.playlist-preset.selected {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+  color: var(--accent);
+}
+
+.playlist-preset input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .directory-row {
   display: flex;
   gap: 8px;
@@ -449,6 +479,48 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-elevated);
+}
+
+.playlist-group {
+  list-style: none;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.playlist-group-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 6px 10px;
+  flex-wrap: wrap;
+}
+
+.playlist-group-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.playlist-group-count {
+  color: var(--text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.playlist-group-progress {
+  padding: 0 6px 10px;
+}
+
+.playlist-download-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 420px;
 }
 
 .download-header {

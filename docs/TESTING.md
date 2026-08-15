@@ -87,6 +87,7 @@ Cover:
 * Settings persistence (FR-016).
 * Notification Manager behavior (FR-015).
 * Conversion Manager behavior (convert / audio extraction, progress, cancellation).
+* Playlist downloads (FR-020): flat playlist inspection parsing, preset-to-format resolution, fan-out job creation with playlist tagging and subfolder derivation, skip of already-downloaded/duplicate entries, per-entry failure isolation, and playlist-level cancellation.
 
 External executables must be represented by test doubles.
 

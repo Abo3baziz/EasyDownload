@@ -6,6 +6,7 @@ import type { YtDlpMedia } from './types'
 
 export interface YtDlpService {
   inspect(url: string): Promise<YtDlpMedia>
+  inspectFlat(url: string): Promise<YtDlpMedia>
   startDownload(
     options: DownloadMediaOptions,
     callbacks?: YtDlpDownloadCallbacks
@@ -65,6 +66,19 @@ export function buildInspectArgs(url: string): readonly string[] {
   ]
 }
 
+export function buildPlaylistInspectArgs(url: string): readonly string[] {
+  return [
+    '--dump-single-json',
+    '--flat-playlist',
+    '--skip-download',
+    '--no-warnings',
+    '--no-call-home',
+    '--encoding',
+    'utf-8',
+    url
+  ]
+}
+
 export function buildDownloadArgs(
   url: string,
   formatId: string,
@@ -103,30 +117,42 @@ export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
   const ffmpegLocation = options.ffmpegLocation
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
+  async function runInspection(
+    url: string,
+    buildArgs: (url: string) => readonly string[],
+    parse: (stdout: string) => YtDlpMedia = parseInspectionOutput
+  ): Promise<YtDlpMedia> {
+    let result: ProcessResult
+    try {
+      result = await options.processes.runToCompletion(ytDlpCommand, {
+        args: buildArgs(url),
+        timeoutMs
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (/ENOENT/.test(message)) {
+        throw new AppError('DependencyError', 'yt-dlp is not available.')
+      }
+      throw new AppError('ProcessError', `Failed to launch yt-dlp: ${message}`)
+    }
+
+    if (result.timedOut) {
+      throw new AppError('ProcessError', 'yt-dlp inspection timed out.')
+    }
+    if (result.exitCode !== 0) {
+      throw toInspectionError(result)
+    }
+
+    return parse(result.stdout)
+  }
+
   return {
     async inspect(url: string): Promise<YtDlpMedia> {
-      let result: ProcessResult
-      try {
-        result = await options.processes.runToCompletion(ytDlpCommand, {
-          args: buildInspectArgs(url),
-          timeoutMs
-        })
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        if (/ENOENT/.test(message)) {
-          throw new AppError('DependencyError', 'yt-dlp is not available.')
-        }
-        throw new AppError('ProcessError', `Failed to launch yt-dlp: ${message}`)
-      }
+      return runInspection(url, buildInspectArgs)
+    },
 
-      if (result.timedOut) {
-        throw new AppError('ProcessError', 'yt-dlp inspection timed out.')
-      }
-      if (result.exitCode !== 0) {
-        throw toInspectionError(result)
-      }
-
-      return parseInspectionOutput(result.stdout)
+    async inspectFlat(url: string): Promise<YtDlpMedia> {
+      return runInspection(url, buildPlaylistInspectArgs, parsePlaylistOutput)
     },
 
     startDownload(
@@ -261,6 +287,22 @@ export function toDownloadError(
   return new AppError('ProcessError', detail ?? `yt-dlp exited with code ${result.exitCode}.`)
 }
 
+const PERMANENT_FAILURE_PATTERNS =
+  /geo[- ]?restricted|not available in (your|this) country|copyright claim|video (is )?unavailable|this video is not available|private video|sign in to confirm|confirm you'?re not a bot|removed by the uploader|no longer available|took down|members only|premium only/i
+
+const TRANSIENT_FAILURE_PATTERNS =
+  /HTTP Error (403|429|5\d\d)|\b429\b|too many requests|rate[- ]?limit|connection (reset|closed|refused|aborted|timed out)|timed out|read timed out|unable to download video data|unable to (fetch|extract) (data|media|webpage): (HTTP )?error/i
+
+export function isTransientDownloadFailure(
+  result: Pick<ProcessResult, 'stdout' | 'stderr'>
+): boolean {
+  const output = `${result.stdout}\n${result.stderr}`
+  if (PERMANENT_FAILURE_PATTERNS.test(output)) {
+    return false
+  }
+  return TRANSIENT_FAILURE_PATTERNS.test(output)
+}
+
 const SIZE_UNITS: Record<string, number> = {
   b: 1,
   kib: 1024,
@@ -366,6 +408,29 @@ export function parseInspectionOutput(stdout: string): YtDlpMedia {
   } catch {
     throw new AppError('ProcessError', 'yt-dlp returned malformed metadata.')
   }
+}
+
+export function parsePlaylistOutput(stdout: string): YtDlpMedia {
+  const candidates: string[] = []
+  const trimmed = stdout.trim()
+  if (trimmed !== '') {
+    candidates.push(trimmed)
+  }
+  const firstLine = stdout.split(/\r?\n/).find((line) => line.trim() !== '')
+  if (firstLine) {
+    candidates.push(firstLine)
+  }
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as YtDlpMedia
+      if (parsed && typeof parsed.title === 'string' && typeof parsed.id === 'string') {
+        return parsed
+      }
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  throw new AppError('ProcessError', 'yt-dlp returned malformed playlist metadata.')
 }
 
 function extractErrorLine(stderr: string): string | undefined {

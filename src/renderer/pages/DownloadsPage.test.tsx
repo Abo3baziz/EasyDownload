@@ -11,6 +11,8 @@ function createApiMock(): PreloadApi {
   return {
     inspectUrl: vi.fn(),
     startDownload: vi.fn(),
+    downloadPlaylist: vi.fn(),
+    cancelPlaylist: vi.fn(),
     pauseDownload: vi.fn(),
     resumeDownload: vi.fn(),
     cancelDownload: vi.fn(),
@@ -791,5 +793,198 @@ describe('DownloadsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open audio file' }))
 
     expect(window.mediaDownloader.openFile).toHaveBeenCalledWith('C:\\Downloads\\video.mp3')
+  })
+
+  it('groups playlist downloads under a playlist header with aggregate progress', async () => {
+    const entry = (id: string, status: Download['status'], playlistIndex: number): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: `Video ${playlistIndex}`,
+      status,
+      progress: {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex,
+      playlistCount: 3,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        entry('dl-1', 'downloading', 1),
+        entry('dl-2', 'queued', 2),
+        { ...downloadingDownload(), id: 'dl-standalone' }
+      ]
+    })
+
+    renderSection('queue')
+
+    expect(await screen.findByText('My Playlist')).toBeInTheDocument()
+    expect(screen.getByText('0 of 3 videos · 0%')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel playlist' })).toBeInTheDocument()
+    expect(screen.getByText('Video 1')).toBeInTheDocument()
+    expect(screen.getByText('Video 2')).toBeInTheDocument()
+    expect(screen.getByText('Example Video')).toBeInTheDocument()
+  })
+
+  it('shows the aggregate playlist progress while entries download', async () => {
+    const entry = (id: string, status: Download['status'], percent?: number): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: `Video ${id}`,
+      status,
+      progress: percent !== undefined ? { percent } : {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 2,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [entry('dl-1', 'downloading', 50), entry('dl-2', 'queued')]
+    })
+
+    renderSection('queue')
+
+    expect(await screen.findByText('My Playlist')).toBeInTheDocument()
+    expect(screen.getByText('0 of 2 videos · 25%')).toBeInTheDocument()
+    expect(screen.getByText(/50%/)).toBeInTheDocument()
+    expect(screen.getByText('0%')).toBeInTheDocument()
+  })
+
+  it('shows a progress bar for every active playlist entry even without progress data yet', async () => {
+    const entry = (id: string, status: Download['status'], percent?: number): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: `Video ${id}`,
+      status,
+      progress: percent !== undefined ? { percent } : {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 3,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [entry('dl-1', 'queued'), entry('dl-2', 'inspecting'), entry('dl-3', 'downloading', 66)]
+    })
+
+    renderSection('queue')
+
+    expect(await screen.findByText('My Playlist')).toBeInTheDocument()
+    expect(screen.getAllByText('0%')).toHaveLength(2)
+    expect(screen.getByText(/66%/)).toBeInTheDocument()
+  })
+
+  it('updates the per-video progress bar when progress events arrive', async () => {
+    const entry = (percent?: number): Download => ({
+      id: 'dl-1',
+      url: 'https://www.youtube.com/watch?v=v1',
+      title: 'Video One',
+      status: 'downloading',
+      progress: percent !== undefined ? { percent } : {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 1,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    let listener: ((download: Download) => void) | undefined
+    window.mediaDownloader.listDownloads = vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: [entry(10)] })
+    window.mediaDownloader.onDownloadStateChange = vi.fn((callback) => {
+      listener = callback as typeof listener
+      return () => undefined
+    })
+
+    renderSection('queue')
+
+    expect((await screen.findAllByText(/10%/)).length).toBeGreaterThanOrEqual(1)
+
+    act(() => listener?.({ ...entry(60), status: 'downloading' }))
+
+    expect((await screen.findAllByText(/60%/)).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(/10%/)).not.toBeInTheDocument()
+  })
+
+  it('shows a Retrying indicator while a playlist entry is being retried', async () => {
+    const entry: Download = {
+      id: 'dl-1',
+      url: 'https://www.youtube.com/watch?v=v1',
+      title: 'Video One',
+      status: 'queued',
+      progress: {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 1,
+      retryCount: 2,
+      createdAt: 1,
+      updatedAt: 1
+    }
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({ ok: true, data: [entry] })
+
+    renderSection('queue')
+
+    expect(await screen.findByText(/Retrying \(2\)/)).toBeInTheDocument()
+  })
+
+  it('cancels the whole playlist through the playlist-level action', async () => {
+    const entry = (id: string, status: Download['status']): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: id,
+      status,
+      progress: {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 2,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [entry('dl-1', 'downloading'), entry('dl-2', 'queued')]
+    })
+    window.mediaDownloader.cancelPlaylist = vi.fn().mockResolvedValue({ ok: true, data: undefined })
+
+    renderSection('queue')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel playlist' }))
+
+    expect(window.mediaDownloader.cancelPlaylist).toHaveBeenCalledWith('PL123')
+  })
+
+  it('does not show the playlist cancel action once every entry is terminal', async () => {
+    const entry = (id: string): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: id,
+      status: 'completed',
+      progress: { percent: 100 },
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 2,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [entry('dl-1'), entry('dl-2')]
+    })
+
+    renderSection('completed')
+
+    expect(await screen.findByText('2 of 2 videos · 100%')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel playlist' })).not.toBeInTheDocument()
   })
 })

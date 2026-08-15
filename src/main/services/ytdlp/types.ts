@@ -30,4 +30,16 @@ export interface YtDlpMedia {
   extractor?: string
   extractor_key?: string
   formats?: YtDlpFormat[]
+  _type?: string
+  entries?: YtDlpPlaylistEntry[]
+  playlist_id?: string
+  playlist_title?: string
+}
+
+export interface YtDlpPlaylistEntry {
+  id?: string
+  title?: string
+  url?: string
+  duration?: number
+  thumbnails?: Array<{ url?: string }>
 }
