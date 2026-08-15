@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-15
+
+### Fixed
+
+- Concurrent downloads no longer fail when a second download is started while the first is still being scheduled: `create` no longer enqueues the job (only `start`/`resume`/`retry` do), so a pending scheduler pass can never pick up a not-yet-started download and move it to `inspecting` before `start()` runs — previously this surfaced as `Cannot start a download in state "inspecting"` for the second download. Regression test added.
+- Downloads, Completed, Cancelled, and Failed sections now group downloads by local calendar day with the same `Today`, `Yesterday`, and readable-date headers used by inspection History. Items and day groups remain newest first; Queue stays as a flat active-work list.
+
 ## 2026-08-14
 
 ### Added
