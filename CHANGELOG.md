@@ -2,6 +2,12 @@
 
 ## 2026-08-16
 
+### Added
+
+- Playlist downloads (FR-020): inspecting a URL that yt-dlp identifies as a playlist now returns the playlist (title, thumbnail, website, entry count) instead of only its first video. The Home page shows a playlist card with quality presets (Best, 1080p, 720p, 480p, 360p, Audio) and a "Download playlist" action. The Download Manager fans each entry out into an ordinary tagged download job (playlist id/title/index/count plus the selected preset) saved into a sanitized `<playlist title> [<playlist id>]` subfolder of the download directory, so the queue, concurrency limit, history, retry, per-video file actions, pause, and cancel all apply per entry. The concrete format is resolved per entry at download time from the preset (format IDs vary per video), entries without a matching format fail individually, and other entries continue. Entries already downloaded or duplicated within the playlist are skipped and reported. A playlist-level Cancel stops all its active entries, playlist downloads skip per-entry desktop notifications, and the Downloads page groups playlist entries under a header with an aggregate "X of Y videos completed" indicator and a playlist-level Cancel action.
+
+## 2026-08-16
+
 ### Fixed
 
 - Some completed downloads were missing Open file, Open File Location, and Convert actions because their final file path was not captured. The yt-dlp service now requests `--print after_move:filepath` and treats the bare absolute path printed on stdout as the authoritative destination, keeping the parsed `Destination:`/`Merger` lines as fallbacks. On completion the manager also derives the destination from known template parts when capture failed (verified against the filesystem), and on history load it backfills completed records with missing paths by matching a unique file in the download directory.

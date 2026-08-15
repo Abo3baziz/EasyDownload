@@ -53,6 +53,7 @@ docs/ADR/
 | [006](006-ffmpeg-integration.md) | FFmpeg Integration |
 | [007](007-electron-security.md) | Electron Security Model |
 | [008](008-chrome-extension-integration.md) | Chrome Extension Integration |
+| [009](009-playlist-downloads.md) | Playlist Downloads Fan Out into Individual Download Jobs |
 
 ---
 

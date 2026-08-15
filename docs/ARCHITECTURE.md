@@ -211,6 +211,8 @@ Example:
 ```text
 window.mediaDownloader.inspectUrl()
 window.mediaDownloader.startDownload()
+window.mediaDownloader.downloadPlaylist()
+window.mediaDownloader.cancelPlaylist()
 window.mediaDownloader.cancelDownload()
 window.mediaDownloader.selectDirectory()
 window.mediaDownloader.openFile()
@@ -328,6 +330,8 @@ Responsibilities:
 * Coordinate yt-dlp and FFmpeg.
 * Notify the renderer about state changes.
 
+The Download Manager also owns **playlist downloads** (FR-020). A playlist is not a separate download entity: `downloadPlaylist` enumerates the playlist entries through the yt-dlp service (`--flat-playlist` inspection), then fans each entry out into an ordinary `Download` job tagged with optional `playlistId`, `playlistTitle`, `playlistIndex`, and `playlistCount` fields plus a quality `preset`. Because format IDs vary per video, playlist jobs do not carry a concrete format ID at creation; when a job executes, it re-inspects its entry, resolves the concrete format from the preset via `resolvePlaylistFormat`, and stores it on the record so retries reuse it. Entries are saved into a sanitized subfolder `<playlist title> [<playlist id>]` of the configured download directory, and each record's `directory` is that subfolder, so file actions, conversions, path repair, and pruning work unchanged. Entries already completed (by normalized URL) or duplicated within the playlist are skipped and reported in the result. Each entry remains an independent job: failures mark only that entry, the queue and concurrency limit apply normally, and `cancelPlaylist` cancels all non-terminal jobs sharing the playlist id. Playlist-tagged downloads do not trigger individual desktop notifications.
+
 The final file path is captured through yt-dlp's `--print after_move:filepath` output (a bare absolute path printed on stdout after post-processing), with the `[download] Destination:` and `[Merger]` output lines kept as fallbacks for paused and cancelled downloads. When a completed download still has no captured path, the manager derives it from the known output template parts (directory, title, media id, format id, extension) and stores it only after verifying the file exists. On history load, completed records missing a path are backfilled by scanning their download directory for a uniquely matching file, so file actions (Open file, Open File Location, conversions) remain available for records created before these safeguards.
 
 Example lifecycle:
@@ -369,7 +373,10 @@ Responsibilities:
 * Parse yt-dlp output.
 * Normalize metadata.
 * Normalize available formats.
+* Detect whether an inspection is a single video or a playlist.
 * Return structured data to the application.
+
+`inspectUrl` returns a discriminated union: `{ kind: 'video', media: MediaInfo }` when yt-dlp reports a single video, or `{ kind: 'playlist', playlist: PlaylistInfo }` when it reports a playlist (`_type === 'playlist'` or an `entries` array). `PlaylistInfo` contains the playlist id, title, thumbnail, website, and a normalized list of `PlaylistEntry` records (id, title, url, optional duration/thumbnail).
 
 Conceptual flow:
 
@@ -421,6 +428,8 @@ The yt-dlp service is responsible for:
 * Cancelling execution.
 * Stopping execution for pause while preserving yt-dlp partial files for continuation.
 * Returning structured results.
+
+Single-video inspection runs with `--dump-json --no-playlist --skip-download`. Playlist inspection runs with `--dump-single-json --flat-playlist --skip-download` (no `--no-playlist`), producing one JSON object whose `_type` is `playlist` and whose `entries` are flat entry records (id, title, url, optional duration/thumbnail) without per-entry formats; entry formats are resolved later at download time.
 
 ---
 
@@ -705,6 +714,8 @@ download:retry
 download:get
 download:list
 download:deleted
+playlist:download
+playlist:cancel
 history:clear
 inspectionHistory:list
 inspectionHistory:delete
@@ -777,6 +788,8 @@ sequenceDiagram
 ```
 
 On a successful inspection, the main process also records an entry through the Inspection History Manager (URL, thumbnail reference, `INSPECTED` operation, absolute timestamp) and broadcasts it so the sidebar History section can update live. History recording never prevents the inspection result from being returned.
+
+The inspection result is the video/playlist union described in section 11; the Home page renders the single-video card for `kind: 'video'` and a playlist card (title, thumbnail, entry count, quality presets, Download playlist action) for `kind: 'playlist'`. Playlist downloads are initiated through the `playlist:download` IPC channel rather than the per-video `download:create`/`download:start` flow.
 
 ---
 
@@ -1280,7 +1293,8 @@ docs/ADR/
 ├── 005-yt-dlp-integration.md
 ├── 006-ffmpeg-integration.md
 ├── 007-electron-security.md
-└── 008-chrome-extension-integration.md
+├── 008-chrome-extension-integration.md
+└── 009-playlist-downloads.md
 ```
 
 Not all decisions need an ADR.

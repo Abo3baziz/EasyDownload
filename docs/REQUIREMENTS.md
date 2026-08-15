@@ -424,6 +424,26 @@ Application-level auto-updates may be added in a future version.
 
 ---
 
+## FR-020 — Playlist Downloads
+
+The application must allow the user to download an entire playlist.
+
+When the inspected URL is identified by yt-dlp as a playlist (for example a YouTube playlist URL, a video URL that is part of a playlist, or a playlist-like channel listing), the application must present the playlist instead of only its first entry.
+
+The playlist download must:
+
+* Display the playlist title, thumbnail, source/site, and entry count.
+* Let the user choose a single download quality for the whole playlist using understandable presets (Best, 1080p, 720p, 480p, 360p, Audio).
+* Enqueue each playlist entry as an independent download so the existing queue, concurrency limit, history, retry, per-video file actions, pause, and cancel behavior apply to every entry.
+* Save all entries into a dedicated subfolder of the configured download directory named after the playlist.
+* Resolve the concrete format for each entry at download time, since format IDs vary per video; entries without a matching format fail individually with a clear error.
+* Continue to the next entry when one entry fails (private, geo-blocked, or otherwise unavailable).
+* Skip entries that were already downloaded (and duplicate entries within the playlist) rather than treating them as failures.
+* Support cancelling the whole playlist, which cancels all of its still-active entries.
+* Not send per-entry desktop notifications for playlist downloads.
+
+---
+
 # 6. Electron Architecture Requirements
 
 ## ER-001 — Process Separation
@@ -882,9 +902,7 @@ Agents working on this project must:
 * Chrome extension
 * Browser integration
 * Extension-to-desktop communication
-* Playlist downloads
 * Subtitle downloads
-* Audio-only downloads
 * Advanced presets
 * Multi-download concurrency
 * Proxy / network configuration (FR-018)
