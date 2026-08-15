@@ -334,6 +334,8 @@ The Download Manager also owns **playlist downloads** (FR-020). A playlist is no
 
 The final file path is captured through yt-dlp's `--print after_move:filepath` output (a bare absolute path printed on stdout after post-processing), with the `[download] Destination:` and `[Merger]` output lines kept as fallbacks for paused and cancelled downloads. When a completed download still has no captured path, the manager derives it from the known output template parts (directory, title, media id, format id, extension) and stores it only after verifying the file exists. On history load, completed records missing a path are backfilled by scanning their download directory for a uniquely matching file, so file actions (Open file, Open File Location, conversions) remain available for records created before these safeguards.
 
+Transient download and inspection failures (HTTP 403/429/5xx, rate limiting, connection resets/timeouts) are retried automatically up to three times with escalating backoff (2s, 5s, 10s) before a download is marked failed. The download is re-queued under the same id and, for download-phase failures, resumes from the already-resolved media options without re-inspecting; permanent failures (video unavailable, geo-restricted, private, bot checks) are never auto-retried. Retries respect the concurrency limit, can still be cancelled, and clear their backoff state on completion, cancellation, deletion, or manual retry.
+
 Example lifecycle:
 
 ```mermaid

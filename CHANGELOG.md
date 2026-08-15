@@ -2,6 +2,12 @@
 
 ## 2026-08-16
 
+### Changed
+
+- Downloads that fail with a transient network/rate-limit error (HTTP 403/429/5xx, too many requests, connection resets/timeouts, "unable to download video data") are now retried automatically up to three times with escalating backoff (2s, 5s, 10s) before being marked failed. This makes playlist fan-out resilient to YouTube throttling concurrent requests. Download-phase retries reuse the already-resolved media options (no re-inspection); permanent failures (video unavailable, geo-restricted, private, bot checks) are never retried. Retries reuse the same download id, respect the concurrency limit and cancellation, and clear their backoff state on completion, cancellation, deletion, or manual retry.
+
+## 2026-08-16
+
 ### Added
 
 - Playlist downloads (FR-020): inspecting a URL that yt-dlp identifies as a playlist now returns the playlist (title, thumbnail, website, entry count) instead of only its first video. The Home page shows a playlist card with quality presets (Best, 1080p, 720p, 480p, 360p, Audio) and a "Download playlist" action. The Download Manager fans each entry out into an ordinary tagged download job (playlist id/title/index/count plus the selected preset) saved into a sanitized `<playlist title> [<playlist id>]` subfolder of the download directory, so the queue, concurrency limit, history, retry, per-video file actions, pause, and cancel all apply per entry. The concrete format is resolved per entry at download time from the preset (format IDs vary per video), entries without a matching format fail individually, and other entries continue. Entries already downloaded or duplicated within the playlist are skipped and reported. A playlist-level Cancel stops all its active entries, playlist downloads skip per-entry desktop notifications, and the Downloads page groups playlist entries under a header with an aggregate "X of Y videos completed" indicator and a playlist-level Cancel action.
