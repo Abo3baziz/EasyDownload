@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Conversion } from '../../shared/types/conversion'
+import type { Download } from '../../shared/types/download'
 import type { PreloadApi } from '../../shared/types/preload'
 import { DownloadsPage, type DownloadSection } from './DownloadsPage'
 
@@ -76,6 +77,37 @@ function downloadingDownload() {
   }
 }
 
+function downloadOnDay(
+  id: string,
+  title: string,
+  status: Download['status'],
+  daysAgo: number
+): Download {
+  const date = new Date()
+  date.setHours(12, 0, 0, 0)
+  date.setDate(date.getDate() - daysAgo)
+  const timestamp = date.getTime()
+  return {
+    id,
+    url: `https://example.com/${id}`,
+    title,
+    status,
+    progress: {},
+    createdAt: timestamp,
+    updatedAt: timestamp
+  }
+}
+
+const groupedSectionCases: Array<{
+  section: DownloadSection
+  statuses: [Download['status'], Download['status']]
+}> = [
+  { section: 'downloads', statuses: ['downloading', 'completed'] },
+  { section: 'completed', statuses: ['completed', 'completed'] },
+  { section: 'cancelled', statuses: ['cancelled', 'cancelled'] },
+  { section: 'failed', statuses: ['failed', 'failed'] }
+]
+
 function renderSection(section: DownloadSection) {
   return render(<DownloadsPage section={section} />)
 }
@@ -130,6 +162,26 @@ describe('DownloadsPage', () => {
     expect(await screen.findByText('Example Video')).toBeInTheDocument()
     expect(screen.queryByText('Finished Video')).not.toBeInTheDocument()
   })
+
+  it.each(groupedSectionCases)(
+    'groups $section downloads by local day',
+    async ({ section, statuses }) => {
+      window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+        ok: true,
+        data: [
+          downloadOnDay(`${section}-today`, 'Today Video', statuses[0], 0),
+          downloadOnDay(`${section}-yesterday`, 'Yesterday Video', statuses[1], 1)
+        ]
+      })
+
+      renderSection(section)
+
+      expect(await screen.findByRole('heading', { name: 'Today', level: 3 })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Yesterday', level: 3 })).toBeInTheDocument()
+      expect(screen.getByText('Today Video')).toBeInTheDocument()
+      expect(screen.getByText('Yesterday Video')).toBeInTheDocument()
+    }
+  )
 
   it('shows an empty state on a dedicated section page with no items', async () => {
     window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({

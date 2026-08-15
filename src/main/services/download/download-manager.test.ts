@@ -547,6 +547,29 @@ describe('createDownloadManager', () => {
     expect((await manager.get('dl-5')).status).toBe('downloading')
   })
 
+  it('allows creating and starting a second download while the first is still scheduling', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: async () => 2
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await expect(manager.start('dl-2')).resolves.toMatchObject({ status: 'queued' })
+    await flush()
+
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+    expect((await manager.get('dl-2')).status).toBe('downloading')
+  })
+
   it('does not start the same download twice', async () => {
     const ytDlp = createMockYtDlp()
     ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })

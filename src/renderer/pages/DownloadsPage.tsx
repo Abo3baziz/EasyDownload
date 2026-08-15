@@ -9,6 +9,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { useDownloads } from '../hooks/useDownloads'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 import { formatBytes, formatDate, formatDuration } from '../../shared/utils/format'
+import { groupByDay } from '../utils/history'
 
 export type DownloadSection = 'downloads' | 'queue' | 'completed' | 'cancelled' | 'failed'
 
@@ -44,6 +45,12 @@ const SECTION_DEFINITIONS: Record<
 }
 
 const TERMINAL_STATUSES: DownloadStatus[] = ['completed', 'failed', 'cancelled']
+const GROUPED_SECTIONS: ReadonlySet<DownloadSection> = new Set([
+  'downloads',
+  'completed',
+  'cancelled',
+  'failed'
+])
 
 export function DownloadsPage({ section }: { section: DownloadSection }) {
   const api = useMediaDownloader()
@@ -171,12 +178,26 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
     setConversions({})
   }
 
+  const downloadListProps = {
+    conversions,
+    onCancel: (item: Download) => void handleCancel(item),
+    onPause: (item: Download) => void handlePause(item),
+    onResume: (item: Download) => void handleResume(item),
+    onRetry: (item: Download) => void handleRetry(item),
+    onOpenFile: (item: Download) => void handleOpenFile(item),
+    onOpenFileLocation: (path: string) => void handleOpenFileLocation(path),
+    onStartConversion: (item: Download, options: Omit<ConversionStartOptions, 'input'>) =>
+      void handleStartConversion(item, options),
+    onCancelConversion: (id: string) => void handleCancelConversion(id),
+    onOpenConversion: (path: string) => void handleOpenConversion(path)
+  }
   const definition = SECTION_DEFINITIONS[section]
   const statuses = definition.statuses
   const items =
     statuses === null
       ? downloads
       : downloads.filter((download) => statuses.includes(download.status))
+  const groups = GROUPED_SECTIONS.has(section) ? groupByDay(items) : undefined
   const hasHistory = downloads.some((download) => TERMINAL_STATUSES.includes(download.status))
   const shownError = loadError ?? error
 
@@ -217,25 +238,47 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
           </button>
         )}
       </div>
-      <ul className="download-list">
-        {items.map((download) => (
-          <DownloadListItem
-            key={download.id}
-            download={download}
-            conversions={conversions}
-            onCancel={(item) => void handleCancel(item)}
-            onPause={(item) => void handlePause(item)}
-            onResume={(item) => void handleResume(item)}
-            onRetry={(item) => void handleRetry(item)}
-            onOpenFile={(item) => void handleOpenFile(item)}
-            onOpenFileLocation={(path) => void handleOpenFileLocation(path)}
-            onStartConversion={(item, options) => void handleStartConversion(item, options)}
-            onCancelConversion={(id) => void handleCancelConversion(id)}
-            onOpenConversion={(path) => void handleOpenConversion(path)}
-          />
-        ))}
-      </ul>
+      {groups ? (
+        groups.map((group) => (
+          <div key={group.key} className="history-day-group">
+            <h3 className="history-day-label">{group.label}</h3>
+            <DownloadList
+              {...downloadListProps}
+              downloads={group.entries}
+            />
+          </div>
+        ))
+      ) : (
+        <DownloadList
+          {...downloadListProps}
+          downloads={items}
+        />
+      )}
     </section>
+  )
+}
+
+interface DownloadListProps {
+  downloads: Download[]
+  conversions: Record<string, Conversion>
+  onCancel: (download: Download) => void
+  onPause: (download: Download) => void
+  onResume: (download: Download) => void
+  onRetry: (download: Download) => void
+  onOpenFile: (download: Download) => void
+  onOpenFileLocation: (path: string) => void
+  onStartConversion: (download: Download, options: Omit<ConversionStartOptions, 'input'>) => void
+  onCancelConversion: (id: string) => void
+  onOpenConversion: (path: string) => void
+}
+
+function DownloadList({ downloads, ...props }: DownloadListProps) {
+  return (
+    <ul className="download-list">
+      {downloads.map((download) => (
+        <DownloadListItem key={download.id} download={download} {...props} />
+      ))}
+    </ul>
   )
 }
 

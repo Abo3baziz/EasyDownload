@@ -354,7 +354,6 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       }
       jobs.set(download.id, download)
       configs.set(download.id, optionsPayload)
-      queue.push(download.id)
       emit(download)
       return download
     },
