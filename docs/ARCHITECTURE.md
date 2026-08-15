@@ -429,7 +429,7 @@ The yt-dlp service is responsible for:
 * Stopping execution for pause while preserving yt-dlp partial files for continuation.
 * Returning structured results.
 
-Single-video inspection runs with `--dump-json --no-playlist --skip-download`. Playlist inspection runs with `--dump-single-json --flat-playlist --skip-download` (no `--no-playlist`), producing one JSON object whose `_type` is `playlist` and whose `entries` are flat entry records (id, title, url, optional duration/thumbnail) without per-entry formats; entry formats are resolved later at download time.
+Single-video inspection runs with `--dump-json --no-playlist --skip-download`. The Media Service's initial inspection and playlist enumeration run with `--dump-single-json --flat-playlist --skip-download` (no `--no-playlist`), producing a single JSON object: a playlist with `_type: 'playlist'` and an `entries` array when the URL is a playlist, or an ordinary video object (with formats) when it is not. Entry formats are resolved later at download time.
 
 ---
 
