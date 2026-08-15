@@ -1,6 +1,6 @@
 import { Notification } from 'electron'
 import { existsSync } from 'node:fs'
-import { stat } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { Conversion } from '../../shared/types/conversion'
 import type { AppSettings } from '../../shared/types/settings'
@@ -121,6 +121,13 @@ export function createServices(deps: ServicesDeps): Services {
     checkFfmpeg: () => dependencies.checkFfmpeg(),
     history,
     fileExists: existsSync,
+    listDirectory: async (dir) => {
+      try {
+        return await readdir(dir)
+      } catch {
+        return []
+      }
+    },
     getConcurrencyLimit: async () => (await settings.load()).concurrencyLimit,
     statFile: async (path) => {
       try {

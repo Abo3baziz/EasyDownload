@@ -324,8 +324,11 @@ Responsibilities:
 * Handle completion.
 * Handle failure.
 * Record download history.
+* Capture the final downloaded file path deterministically, even when the process output changes.
 * Coordinate yt-dlp and FFmpeg.
 * Notify the renderer about state changes.
+
+The final file path is captured through yt-dlp's `--print after_move:filepath` output (a bare absolute path printed on stdout after post-processing), with the `[download] Destination:` and `[Merger]` output lines kept as fallbacks for paused and cancelled downloads. When a completed download still has no captured path, the manager derives it from the known output template parts (directory, title, media id, format id, extension) and stores it only after verifying the file exists. On history load, completed records missing a path are backfilled by scanning their download directory for a uniquely matching file, so file actions (Open file, Open File Location, conversions) remain available for records created before these safeguards.
 
 Example lifecycle:
 

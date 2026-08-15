@@ -81,7 +81,9 @@ export function buildDownloadArgs(
     '-f',
     formatSelector,
     '-o',
-    join(directory, `%(title)s [%(id)s] [${escapeTemplateLiteral(formatId)}].%(ext)s`)
+    join(directory, `%(title)s [%(id)s] [${escapeTemplateLiteral(formatId)}].%(ext)s`),
+    '--print',
+    'after_move:filepath'
   ]
   if (options.resume) {
     args.unshift('--continue')
@@ -148,18 +150,22 @@ export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
             resume: downloadOptions.resume
           }
         ),
-        onStdout: (line) => handleLine(line),
-        onStderr: (line) => handleLine(line)
+        onStdout: (line) => handleLine(line, 'stdout'),
+        onStderr: (line) => handleLine(line, 'stderr')
       })
 
-      function handleLine(line: string): void {
-        const destinationMatch = /^\[download\] Destination: (.+)$/i.exec(line.trim())
+      function handleLine(line: string, source: 'stdout' | 'stderr'): void {
+        const trimmed = line.trim()
+        const destinationMatch = /^\[download\] Destination: (.+)$/i.exec(trimmed)
         if (destinationMatch) {
           destination = destinationMatch[1].trim()
         }
-        const mergerMatch = /^\[merger\] Merging formats into "(.+)"$/i.exec(line.trim())
+        const mergerMatch = /^\[merger\] Merging formats into "(.+)"$/i.exec(trimmed)
         if (mergerMatch) {
           destination = mergerMatch[1].trim()
+        }
+        if (source === 'stdout' && isAbsolutePathLine(trimmed)) {
+          destination = trimmed
         }
         const progress = parseProgressLine(line)
         if (progress) {
@@ -330,6 +336,10 @@ export function parseProgressLine(line: string): DownloadProgress | undefined {
   }
 
   return progress
+}
+
+export function isAbsolutePathLine(line: string): boolean {
+  return /^[A-Za-z]:[\\/]/.test(line) || /^[\\/]/.test(line)
 }
 
 function escapeTemplateLiteral(value: string): string {
