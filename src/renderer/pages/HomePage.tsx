@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import type { AppError } from '../../shared/types/errors'
 import type { PlaylistFormat } from '../../shared/types/download'
+import type { Download } from '../../shared/types/download'
 import type { InspectionResult, MediaFormat, MediaInfo, PlaylistInfo } from '../../shared/types/media'
 import { formatBytes, formatDuration } from '../../shared/utils/format'
+import { useDownloads } from '../hooks/useDownloads'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 import { useHomeState } from '../state/homeState'
 
 export function HomePage() {
   const api = useMediaDownloader()
+  const { downloads } = useDownloads()
   const {
     url,
     setUrl,
@@ -188,6 +191,7 @@ export function HomePage() {
           key={inspection.playlist.id}
           playlist={inspection.playlist}
           active={isPlaylistActive(inspection.playlist.id)}
+          downloads={downloads.filter((download) => download.playlistId === inspection.playlist.id)}
           onDownload={(preset) => void handleDownloadPlaylist(inspection.playlist, preset)}
         />
       )}
@@ -275,10 +279,12 @@ const PRESETS: ReadonlyArray<{ value: PlaylistFormat; label: string }> = [
 function PlaylistCard({
   playlist,
   active,
+  downloads,
   onDownload,
 }: {
   playlist: PlaylistInfo
   active: boolean
+  downloads: Download[]
   onDownload: (preset: PlaylistFormat) => void
 }) {
   const [preset, setPreset] = useState<PlaylistFormat>('best')
@@ -287,6 +293,16 @@ function PlaylistCard({
     meta.push(playlist.website)
   }
   meta.push(`${playlist.entries.length} video${playlist.entries.length === 1 ? '' : 's'}`)
+
+  const total = downloads[0]?.playlistCount ?? downloads.length
+  const completed = downloads.filter((download) => download.status === 'completed').length
+  const activeCredit = downloads
+    .filter(
+      (download) => download.status === 'downloading' || download.status === 'processing'
+    )
+    .reduce((sum, download) => sum + (download.progress.percent ?? 0) / 100, 0)
+  const overall =
+    total > 0 ? Math.min(100, Math.round(((completed + activeCredit) / total) * 100)) : 0
 
   return (
     <div className='media-card'>
@@ -324,13 +340,27 @@ function PlaylistCard({
           </label>
         ))}
       </div>
-      <button
-        type='button'
-        className='btn'
-        disabled={active}
-        onClick={() => onDownload(preset)}>
-        {active ? 'Downloading…' : 'Download playlist'}
-      </button>
+      {active ? (
+        <div className='playlist-download-progress'>
+          <div className='progress-track'>
+            <div
+              className='progress-fill'
+              style={{ width: `${overall}%` }}
+            />
+          </div>
+          <span className='progress-label'>
+            {completed} of {total} videos · {overall}%
+          </span>
+        </div>
+      ) : (
+        <button
+          type='button'
+          className='btn'
+          disabled={active}
+          onClick={() => onDownload(preset)}>
+          Download playlist
+        </button>
+      )}
     </div>
   )
 }

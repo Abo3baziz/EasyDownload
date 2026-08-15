@@ -273,6 +273,51 @@ describe('HomePage', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('1 already downloaded and skipped')
   })
 
+  it('shows live playlist progress after starting a playlist download', async () => {
+    window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
+      playlistResult({
+        id: 'PL123',
+        title: 'My Playlist',
+        website: 'www.youtube.com',
+        entries: [
+          { id: 'v1', title: 'Video One', url: 'https://www.youtube.com/watch?v=v1' },
+          { id: 'v2', title: 'Video Two', url: 'https://www.youtube.com/watch?v=v2' }
+        ]
+      })
+    )
+    window.mediaDownloader.getSettings = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { downloadDirectory: 'C:\\Downloads', notificationsEnabled: true, concurrencyLimit: 1 }
+    })
+    window.mediaDownloader.downloadPlaylist = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { playlistId: 'PL123', created: 2, skipped: 0 }
+    })
+    const entry = (id: string, status: string, percent?: number) => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: id,
+      status,
+      progress: percent !== undefined ? { percent } : {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 2,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [entry('dl-1', 'downloading', 50), entry('dl-2', 'queued')]
+    })
+
+    await submitUrl('https://www.youtube.com/playlist?list=PL123')
+    fireEvent.click(await screen.findByRole('button', { name: 'Download playlist' }))
+
+    expect(await screen.findByText('0 of 2 videos · 25%')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Download playlist' })).not.toBeInTheDocument()
+  })
+
   it('shows an error when starting a playlist download fails', async () => {
     window.mediaDownloader.inspectUrl = vi.fn().mockResolvedValue(
       playlistResult({

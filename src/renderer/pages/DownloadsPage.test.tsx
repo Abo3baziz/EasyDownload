@@ -821,11 +821,37 @@ describe('DownloadsPage', () => {
     renderSection('queue')
 
     expect(await screen.findByText('My Playlist')).toBeInTheDocument()
-    expect(screen.getByText('0 of 3 videos completed')).toBeInTheDocument()
+    expect(screen.getByText('0 of 3 videos · 0%')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancel playlist' })).toBeInTheDocument()
     expect(screen.getByText('Video 1')).toBeInTheDocument()
     expect(screen.getByText('Video 2')).toBeInTheDocument()
     expect(screen.getByText('Example Video')).toBeInTheDocument()
+  })
+
+  it('shows the aggregate playlist progress while entries download', async () => {
+    const entry = (id: string, status: Download['status'], percent?: number): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: `Video ${id}`,
+      status,
+      progress: percent !== undefined ? { percent } : {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 2,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [entry('dl-1', 'downloading', 50), entry('dl-2', 'queued')]
+    })
+
+    renderSection('queue')
+
+    expect(await screen.findByText('My Playlist')).toBeInTheDocument()
+    expect(screen.getByText('0 of 2 videos · 25%')).toBeInTheDocument()
+    expect(screen.getByText(/50%/)).toBeInTheDocument()
   })
 
   it('cancels the whole playlist through the playlist-level action', async () => {
@@ -876,7 +902,7 @@ describe('DownloadsPage', () => {
 
     renderSection('completed')
 
-    expect(await screen.findByText('2 of 2 videos completed')).toBeInTheDocument()
+    expect(await screen.findByText('2 of 2 videos · 100%')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel playlist' })).not.toBeInTheDocument()
   })
 })

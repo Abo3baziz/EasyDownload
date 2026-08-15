@@ -373,13 +373,18 @@ function PlaylistGroup({
 } & Omit<DownloadListProps, 'downloads' | 'onCancelPlaylist'>) {
   const total = group.items[0]?.playlistCount ?? group.items.length
   const completed = group.items.filter((download) => download.status === 'completed').length
+  const activeCredit = group.items
+    .filter((download) => download.status === 'downloading' || download.status === 'processing')
+    .reduce((sum, download) => sum + (download.progress.percent ?? 0) / 100, 0)
+  const overall =
+    total > 0 ? Math.min(100, Math.round(((completed + activeCredit) / total) * 100)) : 0
   const hasActive = group.items.some((download) => canCancel(download))
   return (
     <li className='playlist-group'>
       <div className='playlist-group-header'>
         <span className='playlist-group-title'>{group.playlistTitle ?? 'Playlist'}</span>
         <span className='playlist-group-count'>
-          {completed} of {total} videos completed
+          {completed} of {total} videos · {overall}%
         </span>
         {hasActive && (
           <button
@@ -389,6 +394,14 @@ function PlaylistGroup({
             Cancel playlist
           </button>
         )}
+      </div>
+      <div className='playlist-group-progress'>
+        <div className='progress-track'>
+          <div
+            className='progress-fill'
+            style={{ width: `${overall}%` }}
+          />
+        </div>
       </div>
       <ul className='download-list'>
         {group.items.map((download) => (

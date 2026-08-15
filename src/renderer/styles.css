@@ -512,6 +512,17 @@ button:disabled {
   white-space: nowrap;
 }
 
+.playlist-group-progress {
+  padding: 0 6px 10px;
+}
+
+.playlist-download-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 420px;
+}
+
 .download-header {
   display: flex;
   gap: 12px;
