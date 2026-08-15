@@ -45,6 +45,7 @@ function downloadHandle(result?: {
     stdout: string
     stderr: string
     cancelled: boolean
+    paused?: boolean
     destination?: string
   }>()
   const cancel = vi.fn()
@@ -81,6 +82,11 @@ function terminalRecord(overrides: Partial<Download> = {}): Download {
 }
 
 async function flush(): Promise<void> {
+  await Promise.resolve()
+  await Promise.resolve()
+  await Promise.resolve()
+  await Promise.resolve()
+  await Promise.resolve()
   await Promise.resolve()
   await Promise.resolve()
   await Promise.resolve()
@@ -152,7 +158,8 @@ describe('createDownloadManager', () => {
     const manager = createDownloadManager({
       ytDlp,
       generateId: () => `dl-${++sequence}`,
-      now: () => 0
+      now: () => 0,
+      getConcurrencyLimit: () => 1
     })
     await manager.create(OPTIONS)
     await manager.create({ ...OPTIONS, formatId: '18' })
@@ -172,6 +179,500 @@ describe('createDownloadManager', () => {
 
     expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
     expect((await manager.get('dl-2')).status).not.toBe('queued')
+  })
+
+  it('runs two downloads concurrently and starts the third when one completes', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    const third = downloadHandle()
+    ytDlp.startDownload
+      .mockReturnValueOnce(first.handle)
+      .mockReturnValueOnce(second.handle)
+      .mockReturnValueOnce(third.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: async () => 2
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-2')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '22' })
+    await manager.start('dl-3')
+    await flush()
+
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+    expect((await manager.get('dl-2')).status).toBe('downloading')
+    expect((await manager.get('dl-3')).status).toBe('queued')
+
+    first.completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\one.mp4'
+    })
+    await flush()
+
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(3)
+    expect((await manager.get('dl-3')).status).toBe('downloading')
+  })
+
+  it('runs three downloads concurrently and keeps additional downloads queued', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    const third = downloadHandle()
+    const fourth = downloadHandle()
+    ytDlp.startDownload
+      .mockReturnValueOnce(first.handle)
+      .mockReturnValueOnce(second.handle)
+      .mockReturnValueOnce(third.handle)
+      .mockReturnValueOnce(fourth.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: () => 3
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-2')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '22' })
+    await manager.start('dl-3')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '139' })
+    await manager.start('dl-4')
+    await flush()
+
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(3)
+    expect((await manager.get('dl-4')).status).toBe('queued')
+
+    third.completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\three.mp4'
+    })
+    await flush()
+
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(4)
+    expect((await manager.get('dl-4')).status).toBe('downloading')
+  })
+
+  it('starts the next queued download when an active download is cancelled', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: () => 1
+    })
+    await manager.create(OPTIONS)
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-1')
+    await flush()
+    await manager.start('dl-2')
+    await flush()
+
+    await manager.cancel('dl-1')
+    first.completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
+    await flush()
+
+    expect((await manager.get('dl-1')).status).toBe('cancelled')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+    expect((await manager.get('dl-2')).status).toBe('downloading')
+  })
+
+  it('starts the next queued download when an active download fails', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: () => 1
+    })
+    await manager.create(OPTIONS)
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-1')
+    await flush()
+    await manager.start('dl-2')
+    await flush()
+
+    first.completion.resolve({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'ERROR: Something failed',
+      cancelled: false
+    })
+    await flush()
+
+    expect((await manager.get('dl-1')).status).toBe('failed')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+    expect((await manager.get('dl-2')).status).toBe('downloading')
+  })
+
+  it('re-enters a failed download into the queue when retried while others are active', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    const third = downloadHandle()
+    const fourth = downloadHandle()
+    ytDlp.startDownload
+      .mockReturnValueOnce(first.handle)
+      .mockReturnValueOnce(second.handle)
+      .mockReturnValueOnce(third.handle)
+      .mockReturnValueOnce(fourth.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: () => 2
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-2')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '22' })
+    await manager.start('dl-3')
+    await flush()
+
+    first.completion.resolve({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'ERROR: Something failed',
+      cancelled: false
+    })
+    await flush()
+    expect((await manager.get('dl-1')).status).toBe('failed')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(3)
+    expect((await manager.get('dl-3')).status).toBe('downloading')
+
+    await manager.retry('dl-1')
+    await flush()
+    expect((await manager.get('dl-1')).status).toBe('queued')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(3)
+
+    third.completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\three.mp4'
+    })
+    await flush()
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(4)
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+  })
+
+  it('re-enters a cancelled download into the queue when retried while others are active', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    const third = downloadHandle()
+    const fourth = downloadHandle()
+    ytDlp.startDownload
+      .mockReturnValueOnce(first.handle)
+      .mockReturnValueOnce(second.handle)
+      .mockReturnValueOnce(third.handle)
+      .mockReturnValueOnce(fourth.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: () => 2
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-2')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '22' })
+    await manager.start('dl-3')
+    await flush()
+
+    await manager.cancel('dl-1')
+    first.completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
+    await flush()
+    expect((await manager.get('dl-1')).status).toBe('cancelled')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(3)
+    expect((await manager.get('dl-3')).status).toBe('downloading')
+
+    await manager.retry('dl-1')
+    await flush()
+    expect((await manager.get('dl-1')).status).toBe('queued')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(3)
+
+    second.completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\two.mp4'
+    })
+    await flush()
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(4)
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+  })
+
+  it('frees the slot when a download pauses and resumes into the queue while others run', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    const third = downloadHandle()
+    const fourth = downloadHandle()
+    ytDlp.startDownload
+      .mockReturnValueOnce(first.handle)
+      .mockReturnValueOnce(second.handle)
+      .mockReturnValueOnce(third.handle)
+      .mockReturnValueOnce(fourth.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: () => 2
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-2')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '22' })
+    await manager.start('dl-3')
+    await flush()
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+
+    await manager.pause('dl-1')
+    first.completion.resolve({
+      exitCode: null,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      paused: true
+    })
+    await flush()
+
+    expect((await manager.get('dl-1')).status).toBe('paused')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(3)
+    expect((await manager.get('dl-3')).status).toBe('downloading')
+
+    await manager.resume('dl-1')
+    await flush()
+    expect((await manager.get('dl-1')).status).toBe('queued')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(3)
+
+    second.completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\two.mp4'
+    })
+    await flush()
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(4)
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+  })
+
+  it('never exceeds the configured concurrency limit', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const handles = Array.from({ length: 5 }, () => downloadHandle())
+    for (const { handle } of handles) {
+      ytDlp.startDownload.mockReturnValueOnce(handle)
+    }
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: () => 2
+    })
+    const formatIds = ['18', '22', '139', '140', '251']
+    for (let i = 0; i < formatIds.length; i += 1) {
+      await manager.create({ ...OPTIONS, formatId: formatIds[i] })
+      await manager.start(`dl-${i + 1}`)
+      await flush()
+    }
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+    expect((await manager.get('dl-3')).status).toBe('queued')
+    expect((await manager.get('dl-4')).status).toBe('queued')
+    expect((await manager.get('dl-5')).status).toBe('queued')
+
+    handles[0].completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(3)
+
+    handles[1].completion.resolve({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'ERROR: Something failed',
+      cancelled: false
+    })
+    await flush()
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(4)
+
+    handles[2].completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(5)
+
+    handles[3].completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(5)
+    expect((await manager.get('dl-5')).status).toBe('downloading')
+  })
+
+  it('allows creating and starting a second download while the first is still scheduling', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: async () => 2
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await expect(manager.start('dl-2')).resolves.toMatchObject({ status: 'queued' })
+    await flush()
+
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+    expect((await manager.get('dl-2')).status).toBe('downloading')
+  })
+
+  it('does not start the same download twice', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const { handle, completion } = downloadHandle()
+    ytDlp.startDownload.mockReturnValue(handle)
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
+    await manager.create(OPTIONS)
+
+    await manager.start('dl-1')
+    await flush()
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(1)
+
+    await expect(manager.start('dl-1')).rejects.toThrow(
+      'Cannot start a download in state "downloading"'
+    )
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(1)
+
+    completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\one.mp4'
+    })
+    await flush()
+
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(1)
+    expect((await manager.get('dl-1')).status).toBe('completed')
+  })
+
+  it('keeps queued and active downloads consistent when listed while running', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    const third = downloadHandle()
+    ytDlp.startDownload
+      .mockReturnValueOnce(first.handle)
+      .mockReturnValueOnce(second.handle)
+      .mockReturnValueOnce(third.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: () => 2
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-2')
+    await flush()
+    await manager.create({ ...OPTIONS, formatId: '22' })
+    await manager.start('dl-3')
+    await flush()
+
+    const listed = await manager.list()
+    expect(listed.map((download) => download.status).sort()).toEqual([
+      'downloading',
+      'downloading',
+      'queued'
+    ])
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+
+    first.completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\one.mp4'
+    })
+    await flush()
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not re-cancel a retried download while its old process is still exiting', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${++sequence}`,
+      getConcurrencyLimit: () => 1
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+
+    await manager.cancel('dl-1')
+    await manager.retry('dl-1')
+    await flush()
+
+    expect((await manager.get('dl-1')).status).toBe('queued')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(1)
+
+    first.completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
+    await flush()
+
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
   })
 
   it('keeps two same-video downloads with different formats independent', async () => {

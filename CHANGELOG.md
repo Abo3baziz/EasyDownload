@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-08-15
+
+### Fixed
+
+- Concurrent downloads no longer fail when a second download is started while the first is still being scheduled: `create` no longer enqueues the job (only `start`/`resume`/`retry` do), so a pending scheduler pass can never pick up a not-yet-started download and move it to `inspecting` before `start()` runs — previously this surfaced as `Cannot start a download in state "inspecting"` for the second download. Regression test added.
+- Downloads, Completed, Cancelled, and Failed sections now group downloads by local calendar day with the same `Today`, `Yesterday`, and readable-date headers used by inspection History. Items and day groups remain newest first; Queue stays as a flat active-work list.
+
+## 2026-08-14
+
+### Added
+
+- Concurrent downloads (FR-012, FR-016): the Download Manager now enforces the configured concurrency limit instead of the hardcoded single-slot scheduler. The manager reads the persisted `concurrencyLimit` setting (1–10) via a new `getConcurrencyLimit` option wired from the settings service, starts up to that many downloads simultaneously, and never exceeds the limit. Each job occupies one slot for its full lifecycle; when a download completes, fails, cancels, or pauses, its slot is released and the next queued download starts automatically. Retrying a failed or cancelled download re-enters the queue and respects the limit, pausing frees the slot (resume re-queues), and starting the same download twice cannot create a second process (status guards, queue re-entry guards, and an active-execution guard that defers a re-queued job until its previous process has fully exited). Cancellation cleanup no longer clobbers a download that was retried while its old process was still exiting, and per-download state, processes, progress events, and cleanup remain fully isolated across concurrent jobs.
+
 ## 2026-08-14
 
 ### Changed

@@ -1,10 +1,12 @@
 import type { HistoryEntry } from '../../shared/types/history'
 
-export interface HistoryDayGroup {
+export interface DayGroup<T> {
   key: string
   label: string
-  entries: HistoryEntry[]
+  entries: T[]
 }
+
+export type HistoryDayGroup = DayGroup<HistoryEntry>
 
 export function localDayKey(timestamp: number): string {
   const date = new Date(timestamp)
@@ -59,14 +61,14 @@ export function formatEntryTime(timestamp: number, now: number = Date.now()): st
   return `${formatLocalDate(timestamp)} · ${formatLocalTime(timestamp)}`
 }
 
-export function groupHistoryByDay(
-  entries: HistoryEntry[],
+export function groupByDay<T extends { createdAt: number }>(
+  entries: T[],
   now: number = Date.now()
-): HistoryDayGroup[] {
+): DayGroup<T>[] {
   const todayKey = localDayKey(now)
   const yesterdayKey = localDayKeyOffset(now, -1)
   const sorted = [...entries].sort((a, b) => b.createdAt - a.createdAt)
-  const groups = new Map<string, HistoryEntry[]>()
+  const groups = new Map<string, T[]>()
   for (const entry of sorted) {
     const key = localDayKey(entry.createdAt)
     const list = groups.get(key) ?? []
@@ -85,4 +87,11 @@ export function groupHistoryByDay(
       entries: groupEntries
     }))
     .sort((a, b) => (a.key < b.key ? 1 : -1))
+}
+
+export function groupHistoryByDay(
+  entries: HistoryEntry[],
+  now: number = Date.now()
+): HistoryDayGroup[] {
+  return groupByDay(entries, now)
 }
