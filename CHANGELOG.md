@@ -2,6 +2,12 @@
 
 ## 2026-08-16
 
+### Documentation
+
+- Added `docs/PORTFOLIO.md`, a project case study covering the problem, solution, architecture, key features, engineering decisions, security model, testing, and deployment, written for portfolio use.
+
+## 2026-08-16
+
 ### Fixed
 
 - Some completed downloads were missing Open file, Open File Location, and Convert actions because their final file path was not captured. The yt-dlp service now requests `--print after_move:filepath` and treats the bare absolute path printed on stdout as the authoritative destination, keeping the parsed `Destination:`/`Merger` lines as fallbacks. On completion the manager also derives the destination from known template parts when capture failed (verified against the filesystem), and on history load it backfills completed records with missing paths by matching a unique file in the download directory.
