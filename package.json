@@ -1,6 +1,6 @@
 {
   "name": "easydownload",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Cross-platform desktop media downloader built with Electron, React, and TypeScript.",
   "main": "./out/main/index.js",
   "private": true,
