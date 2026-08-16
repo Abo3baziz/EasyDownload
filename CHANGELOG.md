@@ -2,6 +2,12 @@
 
 ## 2026-08-16
 
+### Changed
+
+- The application icon now uses the dark logo: the `icon:generate` script input was switched from `resources/logo.png` to `Logo-dark.png` (square 1024×1024 source at the repository root), and the `build/icons` set (Windows `.ico`, macOS `.icns`, Linux PNG set) was regenerated from it.
+
+## 2026-08-16
+
 ### Documentation
 
 - Added `docs/PORTFOLIO.md`, a project case study covering the problem, solution, architecture, key features, engineering decisions, security model, testing, and deployment, written for portfolio use.
