@@ -19,8 +19,8 @@ Each task has its own file. Update the Status column here when a task changes st
 | ID    | Title                                                            | Priority | Status | Task File                                            |
 | ----- | ---------------------------------------------------------------- | -------- | ------ | ---------------------------------------------------- |
 | B-001 | IPC path validation gaps (open/download/conversion)               | Critical | Open   | [B-001-ipc-path-validation.md](B-001-ipc-path-validation.md) |
-| B-002 | Cancel→retry race deletes retried download files                  | Critical | Open   | [B-002-cancel-retry-file-race.md](B-002-cancel-retry-file-race.md) |
-| B-003 | Corrupt settings file silently bricks download queue              | High     | Open   | [B-003-settings-validation.md](B-003-settings-validation.md) |
+| B-002 | Cancel→retry race deletes retried download files                  | Critical | Done   | [B-002-cancel-retry-file-race.md](B-002-cancel-retry-file-race.md) |
+| B-003 | Corrupt settings file silently bricks download queue              | High     | In Progress | [B-003-settings-validation.md](B-003-settings-validation.md) |
 | B-004 | No child-process/history cleanup on app quit                      | High     | Open   | [B-004-app-quit-cleanup.md](B-004-app-quit-cleanup.md) |
 | B-005 | Non-atomic JSON writes risk corrupting persisted stores           | High     | Open   | [B-005-atomic-json-writes.md](B-005-atomic-json-writes.md) |
 | B-006 | Conversion output collisions overwrite files; partials left behind | High     | Open   | [B-006-conversion-output-handling.md](B-006-conversion-output-handling.md) |

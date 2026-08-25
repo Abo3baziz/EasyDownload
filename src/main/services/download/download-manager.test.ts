@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
+import { unlink } from 'node:fs/promises'
+
+vi.mock('node:fs/promises', () => ({
+  unlink: vi.fn().mockResolvedValue(undefined)
+}))
 import type { Download, DownloadOptions } from '../../../shared/types/download'
 import type { HistoryManager } from '../history/history-manager'
 import type { YtDlpMedia } from '../ytdlp/types'
@@ -997,6 +1002,53 @@ describe('createDownloadManager', () => {
     expect(ytDlp.inspect).toHaveBeenCalledTimes(2)
     expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
     expect((await manager.get('dl-1')).status).toBe('downloading')
+  })
+
+  it('does not let a stale cancelled run delete files of a retried run', async () => {
+    const unlinkMock = vi.mocked(unlink)
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
+    await manager.create(OPTIONS)
+
+    await manager.start('dl-1')
+    await flush()
+
+    await manager.cancel('dl-1')
+    await manager.retry('dl-1')
+
+    first.completion.resolve({
+      exitCode: null,
+      stdout: '',
+      stderr: '',
+      cancelled: true,
+      destination: 'D:\\Downloads\\Example Video [abc] [137].mp4'
+    })
+    await flush()
+    await flush()
+    await flush()
+
+    expect(ytDlp.inspect).toHaveBeenCalledTimes(2)
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+    const deletionsBeforeRetriedRun = unlinkMock.mock.calls.length
+
+    second.completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\Example Video [abc] [137].mp4'
+    })
+    await flush()
+
+    expect(unlinkMock).toHaveBeenCalledTimes(deletionsBeforeRetriedRun)
+    await expect(manager.get('dl-1')).resolves.toMatchObject({
+      status: 'completed',
+      destination: 'D:\\Downloads\\Example Video [abc] [137].mp4'
+    })
   })
 
   it('pauses an active download and resumes it with continuation', async () => {
