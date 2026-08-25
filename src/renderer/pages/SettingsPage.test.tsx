@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppSettings } from '../../shared/types/settings'
 import type { PreloadApi } from '../../shared/types/preload'
-import { SettingsPage } from './SettingsPage'
+import { SettingsPage, parseConcurrencyLimit } from './SettingsPage'
 
 function createApiMock(): PreloadApi {
   return {
@@ -92,5 +92,48 @@ describe('SettingsPage', () => {
     })
     expect(screen.getByLabelText('Download directory')).toBeInTheDocument()
     expect(screen.getByLabelText('Enable desktop notifications')).toBeInTheDocument()
+  })
+
+  it('clamps out-of-range concurrency values and saves the clamped value', async () => {
+    api.updateSettings = vi.fn().mockResolvedValue({ ok: true, data: defaultSettings() })
+    render(<SettingsPage />)
+
+    const input = await screen.findByLabelText('Concurrent downloads')
+
+    fireEvent.change(input, { target: { value: '99' } })
+    expect(input).toHaveValue(10)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }))
+
+    await waitFor(() => {
+      expect(api.updateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ concurrencyLimit: 10 })
+      )
+    })
+  })
+
+  it('falls back to the default concurrency limit when the field is cleared', async () => {
+    render(<SettingsPage />)
+
+    const input = await screen.findByLabelText('Concurrent downloads')
+
+    fireEvent.change(input, { target: { value: '' } })
+
+    expect(input).toHaveValue(1)
+  })
+})
+
+describe('parseConcurrencyLimit', () => {
+  it('returns the default for empty or non-numeric input', () => {
+    expect(parseConcurrencyLimit('')).toBe(1)
+    expect(parseConcurrencyLimit('   ')).toBe(1)
+    expect(parseConcurrencyLimit('abc')).toBe(1)
+  })
+
+  it('clamps values into the allowed range', () => {
+    expect(parseConcurrencyLimit('0')).toBe(1)
+    expect(parseConcurrencyLimit('-3')).toBe(1)
+    expect(parseConcurrencyLimit('2.9')).toBe(2)
+    expect(parseConcurrencyLimit('99')).toBe(10)
   })
 })

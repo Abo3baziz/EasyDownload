@@ -1,6 +1,6 @@
 # B-011: Concurrency setting accepts invalid values
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Medium
 - **Category:** Bug
 - **Branch:** `bugfix/concurrency-input-validation`

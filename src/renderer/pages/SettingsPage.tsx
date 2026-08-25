@@ -4,6 +4,17 @@ import type { AppSettings } from '../../shared/types/settings'
 import { DEFAULT_SETTINGS } from '../../shared/constants/defaults'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 
+export function parseConcurrencyLimit(raw: string): number {
+  const parsed = Number(raw)
+  if (raw.trim() === '' || !Number.isFinite(parsed)) {
+    return DEFAULT_SETTINGS.concurrencyLimit
+  }
+  return Math.min(
+    DEFAULT_SETTINGS.maxConcurrencyLimit,
+    Math.max(1, Math.floor(parsed))
+  )
+}
+
 export function SettingsPage() {
   const api = useMediaDownloader()
   const [settings, setSettings] = useState<AppSettings | null>(null)
@@ -134,8 +145,9 @@ export function SettingsPage() {
             min={1}
             max={DEFAULT_SETTINGS.maxConcurrencyLimit}
             value={settings.concurrencyLimit}
+            aria-label="Concurrent downloads"
             onChange={(event) =>
-              setSettings({ ...settings, concurrencyLimit: Number(event.target.value) })
+              setSettings({ ...settings, concurrencyLimit: parseConcurrencyLimit(event.target.value) })
             }
           />
         </label>
