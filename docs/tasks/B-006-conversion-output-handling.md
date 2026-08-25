@@ -1,6 +1,6 @@
 # B-006: Conversion output collisions overwrite files; partials left behind
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** High
 - **Category:** Bug
 - **Branch:** `bugfix/conversion-output-handling`

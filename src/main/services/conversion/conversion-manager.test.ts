@@ -131,6 +131,7 @@ describe('createConversionManager', () => {
       {
         input: OPTIONS.input,
         output: join('C:\\Downloads', 'Example [abc].mp3'),
+        overwrite: false,
         audioCodec: 'mp3'
       },
       expect.objectContaining({ onProgress: expect.any(Function) })
@@ -155,6 +156,7 @@ describe('createConversionManager', () => {
       {
         input: options.input,
         output: join('C:\\Downloads', 'in.mp4'),
+        overwrite: false,
         videoCodec: 'h264',
         audioCodec: 'copy'
       },
@@ -458,5 +460,105 @@ describe('createConversionManager', () => {
     const manager = createConversionManager({ ffmpeg: createMockFfmpeg() })
 
     await expect(manager.shutdown()).resolves.toBeUndefined()
+  })
+
+  it('picks a non-colliding output path when the default already exists', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const defaultOutput = join('C:\\Downloads', 'Example [abc].mp3')
+    const suffixedOutput = join('C:\\Downloads', 'Example [abc] [2].mp3')
+    const manager = createConversionManager({
+      ffmpeg,
+      generateId: () => 'cv-1',
+      fileExists: (path) => path === defaultOutput
+    })
+
+    const conversion = await manager.start(OPTIONS)
+
+    expect(conversion.output).toBe(suffixedOutput)
+    expect(ffmpeg.extractAudio).toHaveBeenCalledWith(
+      expect.objectContaining({ output: suffixedOutput, overwrite: false }),
+      expect.anything()
+    )
+  })
+
+  it('skips multiple colliding output paths', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const manager = createConversionManager({
+      ffmpeg,
+      generateId: () => 'cv-1',
+      fileExists: (path) => !/\[4\]\.mp3$/.test(path)
+    })
+
+    const conversion = await manager.start(OPTIONS)
+
+    expect(conversion.output).toBe(join('C:\\Downloads', 'Example [abc] [4].mp3'))
+  })
+
+  it('never requests overwrite of existing output files', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle } = mockHandle()
+    ffmpeg.convert.mockReturnValue(handle)
+    const manager = createConversionManager({
+      ffmpeg,
+      generateId: () => 'cv-1',
+      fileExists: () => false
+    })
+    const options: ConversionStartOptions = {
+      type: 'convert',
+      input: 'C:\\Downloads\\in.mkv',
+      videoCodec: 'h264'
+    }
+
+    await manager.start(options)
+
+    expect(ffmpeg.convert).toHaveBeenCalledWith(
+      expect.objectContaining({ overwrite: false }),
+      expect.anything()
+    )
+  })
+
+  it('deletes a partial output file when a conversion fails', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle, completion } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const deleteFile = vi.fn().mockResolvedValue(undefined)
+    const manager = createConversionManager({
+      ffmpeg,
+      generateId: () => 'cv-1',
+      deleteFile
+    })
+    await manager.start(OPTIONS)
+
+    completion.reject(new Error('ffmpeg exploded'))
+    await flush()
+    await flush()
+
+    expect(deleteFile).toHaveBeenCalledWith(join('C:\\Downloads', 'Example [abc].mp3'))
+    await expect(manager.list()).resolves.toMatchObject([
+      expect.objectContaining({ id: 'cv-1', status: 'failed' })
+    ])
+  })
+
+  it('deletes a partial output file when a conversion is cancelled', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle, completion } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const deleteFile = vi.fn().mockResolvedValue(undefined)
+    const manager = createConversionManager({
+      ffmpeg,
+      generateId: () => 'cv-1',
+      deleteFile
+    })
+    await manager.start(OPTIONS)
+
+    completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
+    await flush()
+    await flush()
+
+    expect(deleteFile).toHaveBeenCalledWith(join('C:\\Downloads', 'Example [abc].mp3'))
   })
 })

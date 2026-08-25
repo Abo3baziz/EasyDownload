@@ -1,6 +1,6 @@
 import { Notification } from 'electron'
 import { existsSync } from 'node:fs'
-import { readdir, stat } from 'node:fs/promises'
+import { readdir, stat, unlink } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { Conversion } from '../../shared/types/conversion'
 import type { AppSettings } from '../../shared/types/settings'
@@ -106,6 +106,10 @@ export function createServices(deps: ServicesDeps): Services {
   const conversions = createConversionManager({
     ffmpeg,
     history: conversionHistory,
+    fileExists: existsSync,
+    deleteFile: async (path) => {
+      await unlink(path).catch(() => undefined)
+    },
     statFile: async (path) => {
       try {
         const info = await stat(path)

@@ -21,6 +21,8 @@ export interface ConversionManagerOptions {
   history?: JsonStore<Conversion>
   now?: () => number
   generateId?: () => string
+  fileExists?: (path: string) => boolean
+  deleteFile?: (path: string) => Promise<void>
 }
 
 export function createConversionManager(options: ConversionManagerOptions): ConversionManager {
@@ -121,6 +123,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
             {
               input,
               output: conversion.output,
+              overwrite: false,
               videoCodec: startOptions.videoCodec,
               audioCodec: startOptions.audioCodec
             },
@@ -130,6 +133,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
             {
               input,
               output: conversion.output,
+              overwrite: false,
               audioCodec: startOptions.audioCodec
             },
             { onProgress: (progress) => update(conversion.id, { progress, status: 'running' }) }
@@ -139,6 +143,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
     try {
       const result = await handle.result
       if (result.cancelled) {
+        await deletePartialOutput(conversion.output)
         update(conversion.id, { status: 'cancelled' })
       } else {
         const fileSize = await readOutputFileSize(conversion.output)
@@ -149,10 +154,39 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
         })
       }
     } catch (err) {
+      await deletePartialOutput(conversion.output)
       update(conversion.id, { status: 'failed', error: toAppError(err).toPayload() })
     } finally {
       handles.delete(conversion.id)
     }
+  }
+
+  async function deletePartialOutput(output: string): Promise<void> {
+    if (!options.deleteFile) {
+      return
+    }
+    try {
+      await options.deleteFile(output)
+    } catch {
+      // Best-effort cleanup; a missing file is not an error.
+    }
+  }
+
+  async function resolveConversionOutputPath(
+    input: string,
+    startOptions: ConversionStartOptions
+  ): Promise<string> {
+    const candidate = buildConversionOutputPath(input, startOptions)
+    if (!options.fileExists) {
+      return candidate
+    }
+    let current = candidate
+    let index = 1
+    while (options.fileExists(current)) {
+      index += 1
+      current = withNumericSuffix(candidate, index)
+    }
+    return current
   }
 
   return {
@@ -164,7 +198,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
           throw new AppError('FilesystemError', 'The source file does not exist.')
         }
       }
-      const output = buildConversionOutputPath(startOptions.input, startOptions)
+      const output = await resolveConversionOutputPath(startOptions.input, startOptions)
       const conversion: Conversion = {
         id: generateId(),
         type: startOptions.type,
@@ -308,4 +342,11 @@ function buildPath(input: string, extension: string): string {
     return join(dir, `${base} [converted].${extension}`)
   }
   return candidate
+}
+
+export function withNumericSuffix(filePath: string, index: number): string {
+  const dir = dirname(filePath)
+  const extension = extname(filePath)
+  const base = basename(filePath, extension)
+  return join(dir, `${base} [${index}]${extension}`)
 }

@@ -23,7 +23,7 @@ Each task has its own file. Update the Status column here when a task changes st
 | B-003 | Corrupt settings file silently bricks download queue              | High     | Done | [B-003-settings-validation.md](B-003-settings-validation.md) |
 | B-004 | No child-process/history cleanup on app quit                      | High     | Done   | [B-004-app-quit-cleanup.md](B-004-app-quit-cleanup.md) |
 | B-005 | Non-atomic JSON writes risk corrupting persisted stores           | High     | Done   | [B-005-atomic-json-writes.md](B-005-atomic-json-writes.md) |
-| B-006 | Conversion output collisions overwrite files; partials left behind | High     | Open   | [B-006-conversion-output-handling.md](B-006-conversion-output-handling.md) |
+| B-006 | Conversion output collisions overwrite files; partials left behind | High     | Done   | [B-006-conversion-output-handling.md](B-006-conversion-output-handling.md) |
 | B-007 | Downloads snapshot overwrite race in renderer                     | Medium   | Open   | [B-007-downloads-snapshot-race.md](B-007-downloads-snapshot-race.md) |
 | B-008 | Download URL scheme not restricted to http(s)                     | Medium   | Open   | [B-008-url-scheme-restriction.md](B-008-url-scheme-restriction.md) |
 | B-009 | Destination detection uses unsanitized media title                | Medium   | Open   | [B-009-destination-title-sanitization.md](B-009-destination-title-sanitization.md) |
