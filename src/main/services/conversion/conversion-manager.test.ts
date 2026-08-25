@@ -434,4 +434,29 @@ describe('createConversionManager', () => {
     expect(remaining).toEqual([])
     expect(save).toHaveBeenLastCalledWith([])
   })
+
+  it('shutdown cancels running conversions and waits for them to settle', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle, completion, cancel } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const { history, save } = createMockHistory()
+    const manager = createConversionManager({ ffmpeg, history, generateId: () => 'cv-1' })
+    await manager.start(OPTIONS)
+
+    const shutdown = manager.shutdown()
+    completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
+    await shutdown
+
+    expect(cancel).toHaveBeenCalled()
+    await expect(manager.list()).resolves.toMatchObject([
+      expect.objectContaining({ id: 'cv-1', status: 'cancelled' })
+    ])
+    expect(save).toHaveBeenLastCalledWith([])
+  })
+
+  it('shutdown completes when there are no running conversions', async () => {
+    const manager = createConversionManager({ ffmpeg: createMockFfmpeg() })
+
+    await expect(manager.shutdown()).resolves.toBeUndefined()
+  })
 })

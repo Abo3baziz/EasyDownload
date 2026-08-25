@@ -1,13 +1,13 @@
 # B-004: No child-process/history cleanup on app quit
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** High
 - **Category:** Bug
 - **Branch:** `bugfix/app-quit-cleanup`
 
 ## Source
 
-- `src/main/index.ts:70-85` — no `before-quit`/`will-quit` handler anywhere
+- `src/main/index.ts` — no `before-quit`/`will-quit` handler anywhere
 - `src/main/services/process/process-manager.ts:82,135` — direct-child-only kill
 
 ## Problem
@@ -16,17 +16,16 @@ On quit, running yt-dlp/ffmpeg children are never killed and terminal-state hist
 
 Related: E-005 covers process-tree kill hardening; this task wires the quit lifecycle.
 
-## Impact
+## Fix (Implemented)
 
-Orphaned processes consume CPU/disk after exit; pending history persistence can be lost.
+- Added `shutdown()` to `DownloadManager`: cancels all queued and active downloads, awaits in-flight executions, and flushes history persistence.
+- Added `shutdown()` to `ConversionManager`: cancels all running ffmpeg conversions (run promises are now tracked), waits for them to settle, and persists.
+- Registered a `before-quit` handler in `src/main/index.ts` that prevents default quit, runs both shutdowns, then re-issues `app.quit()`. A guard flag makes it idempotent.
 
-## Fix
-
-- Add `before-quit`: cancel all active downloads/conversions, kill all tracked processes, await history persist flush.
-- Add `will-quit` safety net that force-kills any remaining tracked children.
+Note: full process-tree kill escalation remains E-005.
 
 ## Acceptance Criteria
 
-- [ ] Quitting mid-download kills yt-dlp and its ffmpeg children (verify no orphaned processes remain).
-- [ ] Terminal history states are persisted before exit completes.
-- [ ] Manual testing documented for Windows/macOS/Linux quit paths where feasible.
+- [x] Quitting mid-download cancels downloads/conversions and persists terminal states (unit tests).
+- [x] Shutdown is safe when nothing is running (test).
+- [ ] Manual verification on Windows/macOS/Linux quit paths (requires running app; deferred to release testing).

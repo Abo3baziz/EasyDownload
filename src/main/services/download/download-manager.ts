@@ -26,6 +26,7 @@ export interface DownloadManager {
   get(id: string): Promise<Download>
   list(): Promise<Download[]>
   clearHistory(): Promise<Download[]>
+  shutdown(): Promise<void>
   onUpdate(listener: (download: Download) => void): () => void
   onDelete(listener: (download: Download) => void): () => void
 }
@@ -644,6 +645,29 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       }
       await persistHistory()
       return [...jobs.values()]
+    },
+
+    async shutdown(): Promise<void> {
+      await ensureLoaded()
+      for (const [id, download] of [...jobs]) {
+        if (download.status === 'queued') {
+          const index = queue.indexOf(id)
+          if (index >= 0) {
+            queue.splice(index, 1)
+          }
+          update(id, { status: 'cancelled', progress: {} })
+          continue
+        }
+        if (!ACTIVE_STATUSES.includes(download.status)) {
+          continue
+        }
+        cancelRequests.add(id)
+        pauseRequests.delete(id)
+        handles.get(id)?.cancel()
+        update(id, { status: 'cancelled', progress: {} })
+      }
+      await Promise.allSettled([...executionPromises.values()])
+      await persistHistory()
     },
 
     onUpdate(listener: (download: Download) => void): () => void {

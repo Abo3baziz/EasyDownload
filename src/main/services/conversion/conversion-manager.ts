@@ -11,6 +11,7 @@ export interface ConversionManager {
   removeForInput(input: string): Promise<Conversion[]>
   list(): Promise<Conversion[]>
   clearHistory(): Promise<Conversion[]>
+  shutdown(): Promise<void>
   onUpdate(listener: (conversion: Conversion) => void): () => void
 }
 
@@ -27,6 +28,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
   const generateId = options.generateId ?? (() => randomUUID())
   const conversions = new Map<string, Conversion>()
   const handles = new Map<string, FfmpegHandle>()
+  const runPromises = new Map<string, Promise<void>>()
   const listeners = new Set<(conversion: Conversion) => void>()
   let historyLoaded = false
   let loadingHistory: Promise<void> | undefined
@@ -178,7 +180,12 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       }
       conversions.set(conversion.id, conversion)
       emit(conversion)
-      void run(conversion, startOptions.input, startOptions)
+      const runPromise = run(conversion, startOptions.input, startOptions)
+        .catch(() => undefined)
+        .finally(() => {
+          runPromises.delete(conversion.id)
+        })
+      runPromises.set(conversion.id, runPromise)
       return conversion
     },
 
@@ -236,6 +243,15 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       }
       await persistHistory()
       return [...conversions.values()]
+    },
+
+    async shutdown(): Promise<void> {
+      await ensureLoaded()
+      for (const handle of handles.values()) {
+        handle.cancel()
+      }
+      await Promise.allSettled([...runPromises.values()])
+      await persistHistory()
     },
 
     onUpdate(listener: (conversion: Conversion) => void): () => void {

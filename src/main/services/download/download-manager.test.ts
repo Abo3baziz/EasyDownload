@@ -1606,4 +1606,38 @@ describe('createDownloadManager', () => {
     expect(remaining.map((download) => download.id)).toEqual(['dl-1'])
     expect(save).toHaveBeenLastCalledWith([])
   })
+
+  it('shutdown cancels active and queued downloads and flushes history', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    const { history, save } = createMockHistory()
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      history,
+      generateId: () => `dl-${++sequence}`
+    })
+    await manager.create(OPTIONS)
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-1')
+    await manager.start('dl-2')
+    await flush()
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+    expect((await manager.get('dl-2')).status).toBe('queued')
+
+    first.completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
+    await manager.shutdown()
+
+    expect(first.cancel).toHaveBeenCalled()
+    expect(second.cancel).not.toHaveBeenCalled()
+    expect((await manager.get('dl-1')).status).toBe('cancelled')
+    expect((await manager.get('dl-2')).status).toBe('cancelled')
+    expect(save).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'dl-1', status: 'cancelled' }),
+      expect.objectContaining({ id: 'dl-2', status: 'cancelled' })
+    ])
+  })
 })

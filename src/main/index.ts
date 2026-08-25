@@ -2,7 +2,11 @@ import { app, BrowserWindow, dialog, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { registerIpc } from './ipc'
+import type { Services } from './services'
 import { createServices } from './services'
+
+let activeServices: Services | undefined
+let shutdownComplete = false
 
 function resolveWindowIcon(): string | undefined {
   const icon = join(app.getAppPath(), 'build', 'icons', '1024x1024.png')
@@ -46,7 +50,7 @@ function createMainWindow(): BrowserWindow {
 }
 
 function setupServices(): void {
-  const services = createServices({
+  activeServices = createServices({
     userDataDir: app.getPath('userData'),
     defaultDownloadDirectory: app.getPath('downloads'),
     selectDirectory: async () => {
@@ -64,7 +68,7 @@ function setupServices(): void {
     resourcesPath: process.resourcesPath,
     appPath: app.getAppPath()
   })
-  registerIpc(services)
+  registerIpc(activeServices)
 }
 
 app.whenReady().then(() => {
@@ -76,6 +80,20 @@ app.whenReady().then(() => {
       createMainWindow()
     }
   })
+})
+
+app.on('before-quit', (event) => {
+  const services = activeServices
+  if (!services || shutdownComplete) {
+    return
+  }
+  event.preventDefault()
+  void Promise.all([services.downloads.shutdown(), services.conversions.shutdown()])
+    .catch(() => undefined)
+    .finally(() => {
+      shutdownComplete = true
+      app.quit()
+    })
 })
 
 app.on('window-all-closed', () => {
