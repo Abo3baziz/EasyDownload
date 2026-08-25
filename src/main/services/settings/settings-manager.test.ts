@@ -98,6 +98,17 @@ describe('createSettingsManager', () => {
       await expect(manager.load()).resolves.toEqual(defaults)
     })
   })
+
+  it('falls back to the backup file when the settings file is corrupt', async () => {
+    await withTempDir(async (dir) => {
+      await writeFile(join(dir, 'settings.json'), '{"downloadDir', 'utf8')
+      const backup = { downloadDirectory: 'C:\\Media', concurrencyLimit: 3 }
+      await writeFile(join(dir, 'settings.json.bak'), JSON.stringify(backup), 'utf8')
+      const manager = createSettingsManager({ dir, defaults })
+
+      await expect(manager.load()).resolves.toEqual({ ...defaults, ...backup })
+    })
+  })
 })
 
 describe('sanitizePersistedSettings', () => {

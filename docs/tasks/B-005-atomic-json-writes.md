@@ -1,6 +1,6 @@
 # B-005: Non-atomic JSON writes risk corrupting persisted stores
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** High
 - **Category:** Bug
 - **Branch:** `bugfix/atomic-json-writes`

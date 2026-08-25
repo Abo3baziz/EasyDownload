@@ -1,9 +1,10 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
 import type { AppSettings } from '../../../shared/types/settings'
 import { DEFAULT_SETTINGS } from '../../../shared/constants/defaults'
 import { AppError } from '../../utils/errors'
+import { backupPathFor, writeFileAtomic } from '../../utils/atomic-file'
 
 export interface SettingsManager {
   load(): Promise<AppSettings>
@@ -39,23 +40,31 @@ export function sanitizePersistedSettings(raw: unknown): Partial<AppSettings> {
 
 export function createSettingsManager(options: SettingsManagerOptions): SettingsManager {
   const filePath = join(options.dir, options.fileName ?? 'settings.json')
+  const backupPath = backupPathFor(filePath)
 
   async function load(): Promise<AppSettings> {
     try {
-      const raw = await readFile(filePath, 'utf8')
-      return { ...options.defaults, ...sanitizePersistedSettings(JSON.parse(raw)) }
+      return await readSettings(filePath)
     } catch (err) {
       if (isMissingFileError(err)) {
         return options.defaults
       }
-      throw new AppError('FilesystemError', 'Failed to read settings.', describeError(err))
+      try {
+        return await readSettings(backupPath)
+      } catch {
+        throw new AppError('FilesystemError', 'Failed to read settings.', describeError(err))
+      }
     }
+  }
+
+  async function readSettings(path: string): Promise<AppSettings> {
+    const raw = await readFile(path, 'utf8')
+    return { ...options.defaults, ...sanitizePersistedSettings(JSON.parse(raw)) }
   }
 
   async function save(settings: AppSettings): Promise<AppSettings> {
     try {
-      await mkdir(options.dir, { recursive: true })
-      await writeFile(filePath, JSON.stringify(settings, null, 2), 'utf8')
+      await writeFileAtomic(filePath, JSON.stringify(settings, null, 2))
       return settings
     } catch (err) {
       throw new AppError('FilesystemError', 'Failed to write settings.', describeError(err))
