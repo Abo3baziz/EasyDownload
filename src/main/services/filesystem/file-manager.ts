@@ -17,6 +17,11 @@ export interface FileManagerDeps {
   exists?: (path: string) => boolean
 }
 
+export function isPathWithin(parent: string, child: string): boolean {
+  const rel = relative(resolve(parent), resolve(child))
+  return !rel.startsWith('..') && !isAbsolute(rel)
+}
+
 export function createFileManager(deps: FileManagerDeps): FileManager {
   function isPathInside(parent: string, child: string): boolean {
     const rel = relative(resolve(parent), resolve(child))
