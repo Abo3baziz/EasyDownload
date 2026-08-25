@@ -7,7 +7,8 @@ import { useMediaDownloader } from '../hooks/useMediaDownloader'
 export function SettingsPage() {
   const api = useMediaDownloader()
   const [settings, setSettings] = useState<AppSettings | null>(null)
-  const [error, setError] = useState<AppError | null>(null)
+  const [loadError, setLoadError] = useState<AppError | null>(null)
+  const [saveError, setSaveError] = useState<AppError | null>(null)
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -20,11 +21,11 @@ export function SettingsPage() {
         if (result.ok) {
           setSettings(result.data)
         } else {
-          setError(result.error)
+          setLoadError(result.error)
         }
       } catch (err) {
         if (cancelled) return
-        setError({
+        setLoadError({
           code: 'UnknownError',
           message: err instanceof Error ? err.message : String(err)
         })
@@ -46,16 +47,17 @@ export function SettingsPage() {
     if (!settings) return
     setBusy(true)
     setSaved(false)
+    setSaveError(null)
     try {
       const result = await api.updateSettings(settings)
       if (result.ok) {
         setSettings(result.data)
         setSaved(true)
       } else {
-        setError(result.error)
+        setSaveError(result.error)
       }
     } catch (err) {
-      setError({
+      setSaveError({
         code: 'UnknownError',
         message: err instanceof Error ? err.message : String(err)
       })
@@ -64,12 +66,12 @@ export function SettingsPage() {
     }
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <section className="page">
         <h1>Settings</h1>
         <div className="alert" role="alert">
-          <strong>{error.code}</strong> {error.message}
+          <strong>{loadError.code}</strong> {loadError.message}
         </div>
       </section>
     )
@@ -87,6 +89,11 @@ export function SettingsPage() {
   return (
     <section className="page">
       <h1>Settings</h1>
+      {saveError && (
+        <div className="alert" role="alert">
+          <strong>{saveError.code}</strong> {saveError.message}
+        </div>
+      )}
       <form
         className="settings-form"
         onSubmit={(event) => {

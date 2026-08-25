@@ -1,6 +1,6 @@
 # B-010: SettingsPage save failure destroys form UI
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** High
 - **Category:** Bug
 - **Branch:** `bugfix/settings-form-save-error`

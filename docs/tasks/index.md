@@ -27,7 +27,7 @@ Each task has its own file. Update the Status column here when a task changes st
 | B-007 | Downloads snapshot overwrite race in renderer                     | Medium   | Open   | [B-007-downloads-snapshot-race.md](B-007-downloads-snapshot-race.md) |
 | B-008 | Download URL scheme not restricted to http(s)                     | Medium   | Open   | [B-008-url-scheme-restriction.md](B-008-url-scheme-restriction.md) |
 | B-009 | Destination detection uses unsanitized media title                | Medium   | Open   | [B-009-destination-title-sanitization.md](B-009-destination-title-sanitization.md) |
-| B-010 | SettingsPage save failure destroys form UI                        | High     | Open   | [B-010-settings-form-save-error.md](B-010-settings-form-save-error.md) |
+| B-010 | SettingsPage save failure destroys form UI                        | High     | Done   | [B-010-settings-form-save-error.md](B-010-settings-form-save-error.md) |
 | B-011 | Concurrency setting accepts invalid values                        | Medium   | Open   | [B-011-concurrency-input-validation.md](B-011-concurrency-input-validation.md) |
 | B-012 | Notification manager reads settings from disk per progress tick   | Low      | Open   | [B-012-notification-settings-cache.md](B-012-notification-settings-cache.md) |
 | B-013 | Double-click starts duplicate conversions                         | Medium   | Open   | [B-013-duplicate-conversion-guard.md](B-013-duplicate-conversion-guard.md) |
