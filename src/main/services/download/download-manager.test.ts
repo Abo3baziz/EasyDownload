@@ -1076,6 +1076,31 @@ describe('createDownloadManager', () => {
     )
   })
 
+  it('falls back to a concurrency limit of 1 when the configured limit is not finite', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${ids.shift()}`,
+      getConcurrencyLimit: async () => Number.NaN
+    })
+    const ids = ['1', '2']
+    await manager.create(OPTIONS)
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-1')
+    await flush()
+
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(1)
+
+    await manager.start('dl-2')
+    await flush()
+    expect((await manager.get('dl-2')).status).toBe('queued')
+  })
+
   it('cancels a queued download without starting it', async () => {
     const ytDlp = createMockYtDlp()
     ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })

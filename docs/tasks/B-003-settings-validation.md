@@ -1,6 +1,6 @@
 # B-003: Corrupt settings file silently bricks download queue
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** High
 - **Category:** Bug
 - **Branch:** `bugfix/settings-validation`

@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { z } from 'zod'
 import type { AppSettings } from '../../../shared/types/settings'
+import { DEFAULT_SETTINGS } from '../../../shared/constants/defaults'
 import { AppError } from '../../utils/errors'
 
 export interface SettingsManager {
@@ -14,14 +16,34 @@ export interface SettingsManagerOptions {
   defaults: AppSettings
 }
 
+const persistedFieldSchemas = {
+  downloadDirectory: z.string().min(1),
+  notificationsEnabled: z.boolean(),
+  concurrencyLimit: z.number().int().min(1).max(DEFAULT_SETTINGS.maxConcurrencyLimit)
+} as const
+
+export function sanitizePersistedSettings(raw: unknown): Partial<AppSettings> {
+  if (typeof raw !== 'object' || raw === null) {
+    return {}
+  }
+  const candidate = raw as Record<string, unknown>
+  const clean: Partial<AppSettings> = {}
+  for (const [key, schema] of Object.entries(persistedFieldSchemas)) {
+    const result = schema.safeParse(candidate[key])
+    if (result.success) {
+      ;(clean as Record<string, unknown>)[key] = result.data
+    }
+  }
+  return clean
+}
+
 export function createSettingsManager(options: SettingsManagerOptions): SettingsManager {
   const filePath = join(options.dir, options.fileName ?? 'settings.json')
 
   async function load(): Promise<AppSettings> {
     try {
       const raw = await readFile(filePath, 'utf8')
-      const parsed = JSON.parse(raw) as Partial<AppSettings>
-      return { ...options.defaults, ...parsed }
+      return { ...options.defaults, ...sanitizePersistedSettings(JSON.parse(raw)) }
     } catch (err) {
       if (isMissingFileError(err)) {
         return options.defaults

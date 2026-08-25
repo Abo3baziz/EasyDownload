@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { AppSettings } from '../../../shared/types/settings'
-import { createSettingsManager } from './settings-manager'
+import { createSettingsManager, sanitizePersistedSettings } from './settings-manager'
 
 const defaults: AppSettings = {
   downloadDirectory: 'C:\\Downloads',
@@ -54,5 +54,66 @@ describe('createSettingsManager', () => {
       const manager = createSettingsManager({ dir, defaults })
       await expect(manager.load()).resolves.toEqual({ ...defaults, concurrencyLimit: 2 })
     })
+  })
+
+  it('falls back to defaults per field when stored values have invalid types', async () => {
+    await withTempDir(async (dir) => {
+      await writeFile(
+        join(dir, 'settings.json'),
+        JSON.stringify({
+          downloadDirectory: '',
+          notificationsEnabled: 'yes',
+          concurrencyLimit: 'abc',
+          unrelated: true
+        }),
+        'utf8'
+      )
+      const manager = createSettingsManager({ dir, defaults })
+      await expect(manager.load()).resolves.toEqual(defaults)
+    })
+  })
+
+  it('keeps valid fields while dropping invalid ones', async () => {
+    await withTempDir(async (dir) => {
+      await writeFile(
+        join(dir, 'settings.json'),
+        JSON.stringify({
+          downloadDirectory: 'C:\\Media',
+          concurrencyLimit: 99
+        }),
+        'utf8'
+      )
+      const manager = createSettingsManager({ dir, defaults })
+      await expect(manager.load()).resolves.toEqual({
+        ...defaults,
+        downloadDirectory: 'C:\\Media'
+      })
+    })
+  })
+
+  it('ignores non-object settings files and returns defaults', async () => {
+    await withTempDir(async (dir) => {
+      await writeFile(join(dir, 'settings.json'), '"garbage"', 'utf8')
+      const manager = createSettingsManager({ dir, defaults })
+      await expect(manager.load()).resolves.toEqual(defaults)
+    })
+  })
+})
+
+describe('sanitizePersistedSettings', () => {
+  it('accepts boundary concurrency limits', () => {
+    expect(
+      sanitizePersistedSettings({ concurrencyLimit: defaults.concurrencyLimit })
+    ).toEqual({ concurrencyLimit: defaults.concurrencyLimit })
+    expect(sanitizePersistedSettings({ concurrencyLimit: 10 })).toEqual({
+      concurrencyLimit: 10
+    })
+  })
+
+  it('rejects out-of-range or fractional concurrency limits', () => {
+    expect(sanitizePersistedSettings({ concurrencyLimit: 0 })).toEqual({})
+    expect(sanitizePersistedSettings({ concurrencyLimit: 11 })).toEqual({})
+    expect(sanitizePersistedSettings({ concurrencyLimit: 2.5 })).toEqual({})
+    expect(sanitizePersistedSettings({ concurrencyLimit: Number.NaN })).toEqual({})
   })
 })

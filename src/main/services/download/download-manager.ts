@@ -174,7 +174,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       return 1
     }
     try {
-      return Math.max(1, await options.getConcurrencyLimit())
+      const limit = await options.getConcurrencyLimit()
+      return Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 1
     } catch {
       return 1
     }
