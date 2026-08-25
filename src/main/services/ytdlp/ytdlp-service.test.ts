@@ -180,11 +180,18 @@ describe('parseInspectionOutput', () => {
 })
 
 describe('buildDownloadArgs', () => {
+  it('forces progress output because --print implies quiet mode', () => {
+    const args = buildDownloadArgs('https://example.com/watch?v=1', '137', 'D:\\Downloads')
+    expect(args).toContain('--progress')
+    expect(args).toContain('--print')
+  })
+
   it('builds download arguments with the format id, output template, and URL', () => {
     const args = buildDownloadArgs('https://example.com/watch?v=1', '137', 'D:\\Downloads')
     expect(args).toEqual([
       '--newline',
       '--no-playlist',
+      '--progress',
       '--encoding',
       'utf-8',
       '-f',
@@ -204,6 +211,7 @@ describe('buildDownloadArgs', () => {
     expect(args).toEqual([
       '--newline',
       '--no-playlist',
+      '--progress',
       '--encoding',
       'utf-8',
       '-f',
@@ -225,6 +233,7 @@ describe('buildDownloadArgs', () => {
     expect(args).toEqual([
       '--newline',
       '--no-playlist',
+      '--progress',
       '--encoding',
       'utf-8',
       '-f',
@@ -245,6 +254,7 @@ describe('buildDownloadArgs', () => {
     expect(args).toEqual([
       '--newline',
       '--no-playlist',
+      '--progress',
       '--encoding',
       'utf-8',
       '-f',

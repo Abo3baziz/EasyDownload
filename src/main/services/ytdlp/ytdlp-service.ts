@@ -74,6 +74,7 @@ export function buildDownloadArgs(
   const args = [
     '--newline',
     '--no-playlist',
+    '--progress',
     '--encoding',
     'utf-8',
     '-f',

@@ -34,6 +34,7 @@ Each task has its own file. Update the Status column here when a task changes st
 | B-014 | Stale closure allows duplicate history deletes                    | Low      | Open   | [B-014-history-delete-stale-closure.md](B-014-history-delete-stale-closure.md) |
 | B-015 | Relative timestamps never refresh                                 | Low      | Open   | [B-015-relative-time-refresh.md](B-015-relative-time-refresh.md) |
 | B-017 | Downloads fail with generic NetworkError (stale yt-dlp, hidden detail) | Critical | Done | [B-017-ytdlp-error-reporting.md](B-017-ytdlp-error-reporting.md) |
+| B-018 | Progress bar not showing (--print implies quiet mode)            | High     | Done   | [B-018-download-progress-suppressed.md](B-018-download-progress-suppressed.md) |
 | B-016 | Renderer downloads state never reconciles (deletedIds, merge)     | Medium   | Open   | [B-016-downloads-state-reconciliation.md](B-016-downloads-state-reconciliation.md) |
 
 ## Security Hardening
