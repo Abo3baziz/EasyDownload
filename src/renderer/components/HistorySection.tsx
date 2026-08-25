@@ -5,6 +5,7 @@ import { useHistoryState } from '../state/historyState'
 import { useHomeState } from '../state/homeState'
 import { formatEntryTime, groupHistoryByDay } from '../utils/history'
 import { EmptyState } from './EmptyState'
+import { ErrorAlert } from './ErrorAlert'
 import { DeleteIcon, InspectIcon } from './icons'
 import { MediaThumbnail } from './MediaThumbnail'
 
@@ -30,16 +31,8 @@ export function HistorySection({ onInspect }: { onInspect: (url: string) => void
 
   return (
     <section className='history-section'>
-      {error && (
-        <div className='alert' role='alert'>
-          <strong>{error.code}</strong> {error.message}
-        </div>
-      )}
-      {actionError && (
-        <div className='alert' role='alert'>
-          <strong>{actionError.code}</strong> {actionError.message}
-        </div>
-      )}
+      {error && <ErrorAlert error={error} />}
+      {actionError && <ErrorAlert error={actionError} />}
       {!error && !loaded && <p className='empty-state'>Loading history…</p>}
       {!error && loaded && groups.length === 0 && (
         <EmptyState message='No history yet. URLs you inspect will appear here.' />

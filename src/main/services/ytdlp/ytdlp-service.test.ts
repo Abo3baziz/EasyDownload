@@ -68,7 +68,6 @@ describe('buildInspectArgs', () => {
       '--no-playlist',
       '--skip-download',
       '--no-warnings',
-      '--no-call-home',
       '--encoding',
       'utf-8',
       url
@@ -186,7 +185,6 @@ describe('buildDownloadArgs', () => {
     expect(args).toEqual([
       '--newline',
       '--no-playlist',
-      '--no-call-home',
       '--encoding',
       'utf-8',
       '-f',
@@ -206,7 +204,6 @@ describe('buildDownloadArgs', () => {
     expect(args).toEqual([
       '--newline',
       '--no-playlist',
-      '--no-call-home',
       '--encoding',
       'utf-8',
       '-f',
@@ -228,7 +225,6 @@ describe('buildDownloadArgs', () => {
     expect(args).toEqual([
       '--newline',
       '--no-playlist',
-      '--no-call-home',
       '--encoding',
       'utf-8',
       '-f',
@@ -249,7 +245,6 @@ describe('buildDownloadArgs', () => {
     expect(args).toEqual([
       '--newline',
       '--no-playlist',
-      '--no-call-home',
       '--encoding',
       'utf-8',
       '-f',
@@ -346,6 +341,24 @@ describe('toDownloadError', () => {
     expect(toDownloadError(result('ERROR: Unable to download webpage: HTTP Error 404')).code).toBe(
       'NetworkError'
     )
+  })
+
+  it('attaches the yt-dlp error line as details for network failures', () => {
+    expect(
+      toDownloadError(result('ERROR: unable to download video data: HTTP Error 403: Forbidden'))
+    ).toMatchObject({
+      code: 'NetworkError',
+      details: 'unable to download video data: HTTP Error 403: Forbidden'
+    })
+  })
+
+  it('maps a missing format to DownloadError with recovery guidance', () => {
+    expect(
+      toDownloadError(result('ERROR: [youtube] abc: Requested format is not available'))
+    ).toMatchObject({
+      code: 'DownloadError',
+      message: expect.stringContaining('no longer available')
+    })
   })
 
   it('maps filesystem failures to FilesystemError', () => {

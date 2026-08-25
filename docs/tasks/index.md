@@ -33,6 +33,7 @@ Each task has its own file. Update the Status column here when a task changes st
 | B-013 | Double-click starts duplicate conversions                         | Medium   | Open   | [B-013-duplicate-conversion-guard.md](B-013-duplicate-conversion-guard.md) |
 | B-014 | Stale closure allows duplicate history deletes                    | Low      | Open   | [B-014-history-delete-stale-closure.md](B-014-history-delete-stale-closure.md) |
 | B-015 | Relative timestamps never refresh                                 | Low      | Open   | [B-015-relative-time-refresh.md](B-015-relative-time-refresh.md) |
+| B-017 | Downloads fail with generic NetworkError (stale yt-dlp, hidden detail) | Critical | Done | [B-017-ytdlp-error-reporting.md](B-017-ytdlp-error-reporting.md) |
 | B-016 | Renderer downloads state never reconciles (deletedIds, merge)     | Medium   | Open   | [B-016-downloads-state-reconciliation.md](B-016-downloads-state-reconciliation.md) |
 
 ## Security Hardening
@@ -64,6 +65,7 @@ Each task has its own file. Update the Status column here when a task changes st
 | E-005 | Process-tree kill and timeout enforcement             | Medium   | Open   | [E-005-process-kill-hardening.md](E-005-process-kill-hardening.md) |
 | E-006 | Async file existence checks in list path              | Low      | Open   | [E-006-async-existence-checks.md](E-006-async-existence-checks.md) |
 | E-007 | Accessibility improvements (progressbar, badges)      | Low      | Open   | [E-007-accessibility.md](E-007-accessibility.md) |
+| E-008 | Bundle/detect a JS runtime for yt-dlp                 | Medium   | Open   | [E-008-ytdlp-js-runtime.md](E-008-ytdlp-js-runtime.md) |
 
 ## Suggested Order
 

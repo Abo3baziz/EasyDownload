@@ -4,6 +4,7 @@ import type { AppError } from '../../shared/types/errors'
 import type { Download, DownloadStatus } from '../../shared/types/download'
 import { ConversionControl } from '../components/ConversionControl'
 import { EmptyState } from '../components/EmptyState'
+import { ErrorAlert } from '../components/ErrorAlert'
 import { MediaThumbnail } from '../components/MediaThumbnail'
 import { StatusBadge } from '../components/StatusBadge'
 import { useDownloads } from '../hooks/useDownloads'
@@ -224,9 +225,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
     return (
       <section className="page">
         <h1>{definition.title}</h1>
-        <div className="alert" role="alert">
-          <strong>{loadError.code}</strong> {loadError.message}
-        </div>
+        <ErrorAlert error={loadError} />
       </section>
     )
   }
@@ -234,11 +233,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
   if (items.length === 0) {
     return (
       <section className="page">
-        {error && (
-          <div className="alert" role="alert">
-            <strong>{error.code}</strong> {error.message}
-          </div>
-        )}
+        {error && <ErrorAlert error={error} />}
         <div className="page-header">
           <h1>{definition.title}</h1>
           {section === 'downloads' && hasHistory && (
@@ -254,11 +249,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
 
   return (
     <section className="page">
-      {error && (
-        <div className="alert" role="alert">
-          <strong>{error.code}</strong> {error.message}
-        </div>
-      )}
+      {error && <ErrorAlert error={error} />}
       <div className="page-header">
         <h1>{definition.title}</h1>
         {section === 'downloads' && hasHistory && (

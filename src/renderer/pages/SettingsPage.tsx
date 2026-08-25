@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AppError } from '../../shared/types/errors'
 import type { AppSettings } from '../../shared/types/settings'
 import { DEFAULT_SETTINGS } from '../../shared/constants/defaults'
+import { ErrorAlert } from '../components/ErrorAlert'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 
 export function parseConcurrencyLimit(raw: string): number {
@@ -81,9 +82,7 @@ export function SettingsPage() {
     return (
       <section className="page">
         <h1>Settings</h1>
-        <div className="alert" role="alert">
-          <strong>{loadError.code}</strong> {loadError.message}
-        </div>
+        <ErrorAlert error={loadError} />
       </section>
     )
   }
@@ -100,11 +99,7 @@ export function SettingsPage() {
   return (
     <section className="page">
       <h1>Settings</h1>
-      {saveError && (
-        <div className="alert" role="alert">
-          <strong>{saveError.code}</strong> {saveError.message}
-        </div>
-      )}
+      {saveError && <ErrorAlert error={saveError} />}
       <form
         className="settings-form"
         onSubmit={(event) => {
