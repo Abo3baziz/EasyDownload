@@ -29,6 +29,13 @@ export function HistoryStateProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<AppError | null>(null)
   const pendingRef = useRef<HistoryEntry[]>([])
   const loadedRef = useRef(false)
+  const entriesRef = useRef<HistoryEntry[]>([])
+  const deletedIdsRef = useRef<Set<string>>(new Set())
+
+  function commitEntries(next: HistoryEntry[]): void {
+    entriesRef.current = next
+    setEntries(next)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -36,11 +43,12 @@ export function HistoryStateProvider({ children }: { children: ReactNode }) {
       if (!loadedRef.current) {
         pendingRef.current.push(entry)
       }
-      setEntries((previous) => mergeHistory([...previous, entry]))
+      commitEntries(mergeHistory([...entriesRef.current, entry]))
     })
     const unsubscribeDelete = api.onInspectionHistoryDeleted((entry) => {
       pendingRef.current = pendingRef.current.filter((item) => item.id !== entry.id)
-      setEntries((previous) => previous.filter((item) => item.id !== entry.id))
+      deletedIdsRef.current.delete(entry.id)
+      commitEntries(entriesRef.current.filter((item) => item.id !== entry.id))
     })
 
     void (async () => {
@@ -49,7 +57,7 @@ export function HistoryStateProvider({ children }: { children: ReactNode }) {
       if (result.ok) {
         const pending = pendingRef.current
         pendingRef.current = []
-        setEntries(mergeHistory([...pending, ...result.data]))
+        commitEntries(mergeHistory([...pending, ...result.data]))
       } else {
         setError(result.error)
       }
@@ -68,18 +76,26 @@ export function HistoryStateProvider({ children }: { children: ReactNode }) {
 
   const deleteEntry = useCallback(
     async (id: string): Promise<IpcResult<boolean>> => {
-      const removed = entries.find((item) => item.id === id)
+      if (deletedIdsRef.current.has(id)) {
+        return { ok: true, data: true }
+      }
+      const removed = entriesRef.current.find((item) => item.id === id)
       if (!removed) {
         return { ok: true, data: true }
       }
-      setEntries((previous) => previous.filter((item) => item.id !== id))
-      const result = await api.deleteInspectionHistoryEntry(id)
-      if (!result.ok) {
-        setEntries((previous) => mergeHistory([...previous, removed]))
+      deletedIdsRef.current.add(id)
+      commitEntries(entriesRef.current.filter((item) => item.id !== id))
+      try {
+        const result = await api.deleteInspectionHistoryEntry(id)
+        if (!result.ok) {
+          commitEntries(mergeHistory([...entriesRef.current, removed]))
+        }
+        return result
+      } finally {
+        deletedIdsRef.current.delete(id)
       }
-      return result
     },
-    [api, entries]
+    [api]
   )
 
   const value = useMemo<HistoryState>(

@@ -6,6 +6,16 @@
 
 - Playlist entries now download one at a time per playlist instead of filling every concurrency slot: the scheduler serializes entries sharing the same `playlistId` (at most one active per playlist), so a playlist queues its videos and downloads them sequentially. This prevents bursts of parallel requests to the same host, which triggered YouTube rate-limiting (HTTP 403) and failed/frozen downloads. Entries from different playlists, and ordinary single downloads, still share the configured concurrency limit normally.
 
+## 2026-08-25
+
+### Changed
+
+- The application icon now uses the dark logo: the `icon:generate` script input was switched from `resources/logo.png` to `Logo-dark.png` (square 1024×1024 source at the repository root), and the `build/icons` set (Windows `.ico`, macOS `.icns`, Linux PNG set) was regenerated from it.
+
+### Documentation
+
+- Added `docs/PORTFOLIO.md`, a project case study covering the problem, solution, architecture, key features, engineering decisions, security model, testing, and deployment, written for portfolio use.
+
 ## 2026-08-16
 
 ### Changed

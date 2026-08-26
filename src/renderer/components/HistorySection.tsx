@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import type { AppError } from '../../shared/types/errors'
 import type { HistoryEntry } from '../../shared/types/history'
+import { useNowTick } from '../hooks/useNowTick'
 import { useHistoryState } from '../state/historyState'
 import { useHomeState } from '../state/homeState'
 import { formatEntryTime, groupHistoryByDay } from '../utils/history'
 import { EmptyState } from './EmptyState'
+import { ErrorAlert } from './ErrorAlert'
 import { DeleteIcon, InspectIcon } from './icons'
 import { MediaThumbnail } from './MediaThumbnail'
 
@@ -12,6 +14,7 @@ export function HistorySection({ onInspect }: { onInspect: (url: string) => void
   const { entries, loaded, error, deleteEntry } = useHistoryState()
   const { setUrl } = useHomeState()
   const [actionError, setActionError] = useState<AppError | null>(null)
+  const now = useNowTick(30_000)
   const groups = groupHistoryByDay(entries)
 
   async function handleInspect(entry: HistoryEntry) {
@@ -30,16 +33,8 @@ export function HistorySection({ onInspect }: { onInspect: (url: string) => void
 
   return (
     <section className='history-section'>
-      {error && (
-        <div className='alert' role='alert'>
-          <strong>{error.code}</strong> {error.message}
-        </div>
-      )}
-      {actionError && (
-        <div className='alert' role='alert'>
-          <strong>{actionError.code}</strong> {actionError.message}
-        </div>
-      )}
+      {error && <ErrorAlert error={error} />}
+      {actionError && <ErrorAlert error={actionError} />}
       {!error && !loaded && <p className='empty-state'>Loading history…</p>}
       {!error && loaded && groups.length === 0 && (
         <EmptyState message='No history yet. URLs you inspect will appear here.' />
@@ -54,6 +49,7 @@ export function HistorySection({ onInspect }: { onInspect: (url: string) => void
               <HistoryEntryItem
                 key={entry.id}
                 entry={entry}
+                now={now}
                 onInspect={() => void handleInspect(entry)}
                 onDelete={() => void handleDelete(entry)}
               />
@@ -67,10 +63,12 @@ export function HistorySection({ onInspect }: { onInspect: (url: string) => void
 
 function HistoryEntryItem({
   entry,
+  now,
   onInspect,
   onDelete
 }: {
   entry: HistoryEntry
+  now: number
   onInspect: () => void
   onDelete: () => void
 }) {
@@ -88,7 +86,9 @@ function HistoryEntryItem({
           title={entry.url}>
           {entry.url}
         </span>
-        <span className='history-meta'>Inspected · {formatEntryTime(entry.createdAt)}</span>
+        <span className='history-meta'>
+          Inspected · {formatEntryTime(entry.createdAt, now)}
+        </span>
       </div>
       <div className='history-actions'>
         <button

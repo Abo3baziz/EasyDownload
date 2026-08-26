@@ -277,6 +277,33 @@ describe('HistorySection', () => {
     expect(screen.getByText('https://example.com/keep')).toBeInTheDocument()
   })
 
+  it('issues only one IPC delete for rapid double-clicks on Delete', async () => {
+    window.mediaDownloader.listInspectionHistory = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [entry({ id: 'gone', url: 'https://example.com/gone' })]
+    })
+    let resolveDelete: (() => void) | undefined
+    window.mediaDownloader.deleteInspectionHistoryEntry = vi
+      .fn()
+      .mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveDelete = () => resolve({ ok: true, data: true })
+          })
+      )
+
+    await renderSection()
+
+    const button = screen.getByRole('button', { name: 'Delete https://example.com/gone' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+
+    expect(window.mediaDownloader.deleteInspectionHistoryEntry).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      resolveDelete?.()
+    })
+  })
+
   it('restores the entry and shows an error when deletion fails', async () => {
     window.mediaDownloader.listInspectionHistory = vi.fn().mockResolvedValue({
       ok: true,

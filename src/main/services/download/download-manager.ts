@@ -11,6 +11,7 @@ import type {
 import type { DependencyStatus } from '../../../shared/types/dependencies'
 import { normalizeUrl } from '../../../shared/utils/url'
 import { AppError, toAppError } from '../../utils/errors'
+import { sanitizeFilename } from '../../utils/filename'
 import type { HistoryManager } from '../history/history-manager'
 import { buildResolution, isRealCodec, resolvePlaylistFormat } from '../media/normalize'
 import type {
@@ -34,6 +35,7 @@ export interface DownloadManager {
   clearHistory(): Promise<Download[]>
   downloadPlaylist(options: PlaylistDownloadOptions): Promise<PlaylistStartResult>
   cancelPlaylist(playlistId: string): Promise<void>
+  shutdown(): Promise<void>
   onUpdate(listener: (download: Download) => void): () => void
   onDelete(listener: (download: Download) => void): () => void
 }
@@ -224,7 +226,8 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       return 1
     }
     try {
-      return Math.max(1, await options.getConcurrencyLimit())
+      const limit = await options.getConcurrencyLimit()
+      return Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 1
     } catch {
       return 1
     }
@@ -467,11 +470,16 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     if (!meta || !config || !options.fileExists) {
       return undefined
     }
-    const candidate = join(
-      config.directory,
-      `${meta.title} [${meta.id}] [${config.formatId}].${meta.extension}`
-    )
-    return options.fileExists(candidate) ? candidate : undefined
+    for (const title of titleVariants(meta.title)) {
+      const candidate = join(
+        config.directory,
+        `${title} [${meta.id}] [${config.formatId}].${meta.extension}`
+      )
+      if (options.fileExists(candidate)) {
+        return candidate
+      }
+    }
+    return undefined
   }
 
   async function backfillMissingDestinations(): Promise<void> {
@@ -525,7 +533,9 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       return undefined
     }
     const pattern = new RegExp(
-      `^${escapeRegExp(title)} \\[[^\\]]+\\] \\[${escapeRegExp(formatId)}\\]\\.${escapeRegExp(extension)}$`
+      `^(?:${titleVariants(title)
+        .map(escapeRegExp)
+        .join('|')}) \\[[^\\]]+\\] \\[${escapeRegExp(formatId)}\\][. ]*${escapeRegExp(extension)}$`
     )
     const matches = names.filter((name) => pattern.test(name))
     if (matches.length !== 1) {
@@ -871,6 +881,29 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       return [...jobs.values()]
     },
 
+    async shutdown(): Promise<void> {
+      await ensureLoaded()
+      for (const [id, download] of [...jobs]) {
+        if (download.status === 'queued') {
+          const index = queue.indexOf(id)
+          if (index >= 0) {
+            queue.splice(index, 1)
+          }
+          update(id, { status: 'cancelled', progress: {} })
+          continue
+        }
+        if (!ACTIVE_STATUSES.includes(download.status)) {
+          continue
+        }
+        cancelRequests.add(id)
+        pauseRequests.delete(id)
+        handles.get(id)?.cancel()
+        update(id, { status: 'cancelled', progress: {} })
+      }
+      await Promise.allSettled([...executionPromises.values()])
+      await persistHistory()
+    },
+
     onUpdate(listener: (download: Download) => void): () => void {
       listeners.add(listener)
       return () => {
@@ -969,4 +1002,9 @@ function sanitizeFolderName(value: string): string {
     .trim()
     .slice(0, 100)
   return cleaned.length > 0 ? cleaned : 'Playlist'
+}
+
+function titleVariants(title: string): string[] {
+  const sanitized = sanitizeFilename(title)
+  return sanitized === title ? [title] : [title, sanitized]
 }

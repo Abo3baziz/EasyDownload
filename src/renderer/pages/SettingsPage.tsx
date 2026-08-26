@@ -2,12 +2,25 @@ import { useEffect, useState } from 'react'
 import type { AppError } from '../../shared/types/errors'
 import type { AppSettings } from '../../shared/types/settings'
 import { DEFAULT_SETTINGS } from '../../shared/constants/defaults'
+import { ErrorAlert } from '../components/ErrorAlert'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
+
+export function parseConcurrencyLimit(raw: string): number {
+  const parsed = Number(raw)
+  if (raw.trim() === '' || !Number.isFinite(parsed)) {
+    return DEFAULT_SETTINGS.concurrencyLimit
+  }
+  return Math.min(
+    DEFAULT_SETTINGS.maxConcurrencyLimit,
+    Math.max(1, Math.floor(parsed))
+  )
+}
 
 export function SettingsPage() {
   const api = useMediaDownloader()
   const [settings, setSettings] = useState<AppSettings | null>(null)
-  const [error, setError] = useState<AppError | null>(null)
+  const [loadError, setLoadError] = useState<AppError | null>(null)
+  const [saveError, setSaveError] = useState<AppError | null>(null)
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -20,11 +33,11 @@ export function SettingsPage() {
         if (result.ok) {
           setSettings(result.data)
         } else {
-          setError(result.error)
+          setLoadError(result.error)
         }
       } catch (err) {
         if (cancelled) return
-        setError({
+        setLoadError({
           code: 'UnknownError',
           message: err instanceof Error ? err.message : String(err)
         })
@@ -46,16 +59,17 @@ export function SettingsPage() {
     if (!settings) return
     setBusy(true)
     setSaved(false)
+    setSaveError(null)
     try {
       const result = await api.updateSettings(settings)
       if (result.ok) {
         setSettings(result.data)
         setSaved(true)
       } else {
-        setError(result.error)
+        setSaveError(result.error)
       }
     } catch (err) {
-      setError({
+      setSaveError({
         code: 'UnknownError',
         message: err instanceof Error ? err.message : String(err)
       })
@@ -64,13 +78,11 @@ export function SettingsPage() {
     }
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <section className="page">
         <h1>Settings</h1>
-        <div className="alert" role="alert">
-          <strong>{error.code}</strong> {error.message}
-        </div>
+        <ErrorAlert error={loadError} />
       </section>
     )
   }
@@ -87,6 +99,7 @@ export function SettingsPage() {
   return (
     <section className="page">
       <h1>Settings</h1>
+      {saveError && <ErrorAlert error={saveError} />}
       <form
         className="settings-form"
         onSubmit={(event) => {
@@ -127,8 +140,9 @@ export function SettingsPage() {
             min={1}
             max={DEFAULT_SETTINGS.maxConcurrencyLimit}
             value={settings.concurrencyLimit}
+            aria-label="Concurrent downloads"
             onChange={(event) =>
-              setSettings({ ...settings, concurrencyLimit: Number(event.target.value) })
+              setSettings({ ...settings, concurrencyLimit: parseConcurrencyLimit(event.target.value) })
             }
           />
         </label>

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import type { ChildProcessWithoutNullStreams } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 
 export interface RunOptions {
@@ -14,11 +14,6 @@ export interface ProcessResult {
   timedOut: boolean
 }
 
-export interface RunningProcess {
-  kill(): void
-  exitCode: Promise<number | null>
-}
-
 export interface StartStreamingOptions extends RunOptions {
   onStdout?: (line: string) => void
   onStderr?: (line: string) => void
@@ -29,10 +24,68 @@ export interface StartedProcess {
   kill(): void
 }
 
+const FORCE_KILL_GRACE_MS = 2_000
+
+function isWindows(): boolean {
+  return process.platform === 'win32'
+}
+
+/**
+ * Terminates the process and (on supported platforms) its whole tree.
+ * `escalated` requests an immediate hard kill instead of a graceful one.
+ */
+function killTree(child: ChildProcess, escalated = false): void {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return
+  }
+  if (!child.pid) {
+    return
+  }
+  if (isWindows()) {
+    const args = escalated
+      ? ['/pid', String(child.pid), '/T', '/F']
+      : ['/pid', String(child.pid), '/T']
+    const killer = spawn('taskkill', args, { windowsHide: true })
+    killer.on('error', () => {
+      child.kill()
+    })
+    child.kill()
+    return
+  }
+  try {
+    process.kill(-child.pid, escalated ? 'SIGKILL' : 'SIGTERM')
+  } catch {
+    child.kill(escalated ? 'SIGKILL' : 'SIGTERM')
+  }
+}
+
+function killWithEscalation(child: ChildProcess): void {
+  killTree(child)
+  const timer = setTimeout(() => {
+    killTree(child, true)
+  }, FORCE_KILL_GRACE_MS)
+  timer.unref?.()
+  child.once('close', () => {
+    clearTimeout(timer)
+  })
+}
+
+interface SpawnOptions {
+  command: string
+  args: readonly string[]
+}
+
+function createChild(options: Pick<SpawnOptions, 'command' | 'args'>) {
+  return spawn(options.command, [...options.args], {
+    windowsHide: true,
+    detached: !isWindows()
+  })
+}
+
 export class ProcessManager {
   runToCompletion(command: string, options: RunOptions = {}): Promise<ProcessResult> {
     return new Promise((resolve, reject) => {
-      const child = spawn(command, [...(options.args ?? [])], { windowsHide: true })
+      const child = createChild({ command, args: options.args ?? [] })
       const stdoutDecoder = new StringDecoder('utf8')
       const stderrDecoder = new StringDecoder('utf8')
       let stdout = ''
@@ -44,15 +97,15 @@ export class ProcessManager {
         options.timeoutMs !== undefined
           ? setTimeout(() => {
               timedOut = true
-              child.kill()
+              killWithEscalation(child)
             }, options.timeoutMs)
           : undefined
 
-      child.stdout.on('data', (chunk: Buffer) => {
+      child.stdout?.on('data', (chunk: Buffer) => {
         stdout += stdoutDecoder.write(chunk)
       })
 
-      child.stderr.on('data', (chunk: Buffer) => {
+      child.stderr?.on('data', (chunk: Buffer) => {
         stderr += stderrDecoder.write(chunk)
       })
 
@@ -74,22 +127,8 @@ export class ProcessManager {
     })
   }
 
-  spawnProcess(command: string, args: readonly string[]): RunningProcess {
-    const child: ChildProcessWithoutNullStreams = spawn(command, [...args], {
-      windowsHide: true
-    })
-    return {
-      kill: () => child.kill(),
-      exitCode: new Promise((resolve) => {
-        child.on('close', (code) => resolve(code))
-      })
-    }
-  }
-
   startStreaming(command: string, options: StartStreamingOptions = {}): StartedProcess {
-    const child: ChildProcessWithoutNullStreams = spawn(command, [...(options.args ?? [])], {
-      windowsHide: true
-    })
+    const child = createChild({ command, args: options.args ?? [] })
     const stdoutDecoder = new StringDecoder('utf8')
     const stderrDecoder = new StringDecoder('utf8')
     let stdout = ''
@@ -97,42 +136,53 @@ export class ProcessManager {
     let stdoutPending = ''
     let stderrPending = ''
     let settled = false
+    let timedOut = false
 
-    child.stdout.on('data', (chunk: Buffer) => {
+    child.stdout?.on('data', (chunk: Buffer) => {
       const text = stdoutDecoder.write(chunk)
       stdout += text
       stdoutPending = emitLines(stdoutPending, text, options.onStdout)
     })
 
-    child.stderr.on('data', (chunk: Buffer) => {
+    child.stderr?.on('data', (chunk: Buffer) => {
       const text = stderrDecoder.write(chunk)
       stderr += text
       stderrPending = emitLines(stderrPending, text, options.onStderr)
     })
 
+    const timer =
+      options.timeoutMs !== undefined
+        ? setTimeout(() => {
+            timedOut = true
+            killWithEscalation(child)
+          }, options.timeoutMs)
+        : undefined
+
     const result = new Promise<ProcessResult>((resolve, reject) => {
       child.on('error', (err: Error) => {
         if (settled) return
         settled = true
+        if (timer) clearTimeout(timer)
         reject(err)
       })
 
       child.on('close', (code: number | null) => {
         if (settled) return
         settled = true
+        if (timer) clearTimeout(timer)
         const stdoutTail = stdoutDecoder.end()
         const stderrTail = stderrDecoder.end()
         stdout += stdoutTail
         stderr += stderrTail
         stdoutPending = emitLines(stdoutPending, stdoutTail, options.onStdout)
         stderrPending = emitLines(stderrPending, stderrTail, options.onStderr)
-        resolve({ stdout, stderr, exitCode: code, timedOut: false })
+        resolve({ stdout, stderr, exitCode: code, timedOut })
       })
     })
 
     return {
       result,
-      kill: () => child.kill()
+      kill: () => killWithEscalation(child)
     }
   }
 }

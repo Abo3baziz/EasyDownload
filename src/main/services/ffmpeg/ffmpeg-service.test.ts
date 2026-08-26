@@ -8,7 +8,6 @@ import type { ProcessManager, ProcessResult, StartedProcess } from '../process/p
 import {
   buildConvertArgs,
   buildExtractAudioArgs,
-  buildMergeArgs,
   createFfmpegService,
   parseFfmpegProgress,
   toFfmpegError
@@ -29,36 +28,6 @@ function createMockProcesses(): ProcessManager & { startStreaming: Mock } {
   const startStreaming = vi.fn()
   return { startStreaming } as unknown as ProcessManager & { startStreaming: Mock }
 }
-
-describe('buildMergeArgs', () => {
-  it('builds safe merge arguments from input paths', () => {
-    expect(
-      buildMergeArgs({ videoInput: 'video.mp4', audioInput: 'audio.m4a', output: 'out.mp4' })
-    ).toEqual([
-      '-y',
-      '-progress',
-      'pipe:1',
-      '-nostats',
-      '-i',
-      'video.mp4',
-      '-i',
-      'audio.m4a',
-      '-map',
-      '0:v:0',
-      '-map',
-      '1:a:0',
-      '-c',
-      'copy',
-      'out.mp4'
-    ])
-  })
-
-  it('omits the overwrite flag when overwrite is false', () => {
-    expect(
-      buildMergeArgs({ videoInput: 'v.mp4', audioInput: 'a.m4a', output: 'o.mp4', overwrite: false })
-    ).not.toContain('-y')
-  })
-})
 
 describe('buildConvertArgs', () => {
   it('defaults to stream copying for both tracks', () => {
@@ -141,21 +110,6 @@ describe('parseFfmpegProgress', () => {
 })
 
 describe('createFfmpegService', () => {
-  it('runs a merge operation to completion', async () => {
-    const processes = createMockProcesses()
-    processes.startStreaming.mockReturnValue(startedProcess())
-    const service = createFfmpegService({ processes })
-    const options = { videoInput: 'v.mp4', audioInput: 'a.m4a', output: 'o.mp4' }
-
-    const handle = service.merge(options)
-
-    await expect(handle.result).resolves.toMatchObject({ exitCode: 0, cancelled: false })
-    expect(processes.startStreaming).toHaveBeenCalledWith('ffmpeg', {
-      args: buildMergeArgs(options),
-      onStdout: expect.any(Function)
-    })
-  })
-
   it('reports progress parsed from ffmpeg output', async () => {
     const processes = createMockProcesses()
     processes.startStreaming.mockImplementation(
@@ -232,9 +186,8 @@ describe('createFfmpegService', () => {
     processes.startStreaming.mockReturnValue({ result, kill })
     const service = createFfmpegService({ processes })
 
-    const handle = service.merge({
-      videoInput: 'v.mp4',
-      audioInput: 'a.m4a',
+    const handle = service.convert({
+      input: 'v.mp4',
       output: 'o.mp4'
     })
     handle.cancel()

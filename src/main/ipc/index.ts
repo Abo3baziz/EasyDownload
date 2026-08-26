@@ -12,8 +12,13 @@ import {
 import type { InspectionResult } from '../../shared/types/media'
 import type { Services } from '../services'
 import { registerIpcHandler } from './handle'
+import { createPathGuard } from './path-guard'
+import { createBroadcastThrottle } from './broadcast-throttle'
 
 export function registerIpc(services: Services): void {
+  const pathGuard = createPathGuard({
+    getDownloadDirectory: async () => (await services.settings.load()).downloadDirectory
+  })
   registerIpcHandler(ipcMain, IPC_CHANNELS.mediaInspect, inspectUrlSchema, async ({ url }) => {
     const result = await services.media.inspectUrl(url)
     await services.inspectionHistory.add({
@@ -22,12 +27,14 @@ export function registerIpc(services: Services): void {
     })
     return result
   })
-  registerIpcHandler(ipcMain, IPC_CHANNELS.downloadCreate, downloadOptionsSchema, (options) =>
-    services.downloads.create(options)
-  )
-  registerIpcHandler(ipcMain, IPC_CHANNELS.playlistDownload, playlistDownloadSchema, (options) =>
-    services.downloads.downloadPlaylist(options)
-  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.downloadCreate, downloadOptionsSchema, async (options) => {
+    await pathGuard.assertWithinDownloadDirectory(options.directory)
+    return services.downloads.create(options)
+  })
+  registerIpcHandler(ipcMain, IPC_CHANNELS.playlistDownload, playlistDownloadSchema, async (options) => {
+    await pathGuard.assertWithinDownloadDirectory(options.directory)
+    return services.downloads.downloadPlaylist(options)
+  })
   registerIpcHandler(ipcMain, IPC_CHANNELS.playlistCancel, idSchema, ({ id }) =>
     services.downloads.cancelPlaylist(id)
   )
@@ -68,15 +75,18 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.dialogSelectDirectory, undefined, () =>
     services.files.selectDirectory()
   )
-  registerIpcHandler(ipcMain, IPC_CHANNELS.fileOpen, pathSchema, ({ path }) =>
-    services.files.openFile(path)
-  )
-  registerIpcHandler(ipcMain, IPC_CHANNELS.fileOpenDirectory, pathSchema, ({ path }) =>
-    services.files.openDirectory(path)
-  )
-  registerIpcHandler(ipcMain, IPC_CHANNELS.fileOpenLocation, pathSchema, ({ path }) =>
-    services.files.openFileLocation(path)
-  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.fileOpen, pathSchema, async ({ path }) => {
+    await pathGuard.assertWithinDownloadDirectory(path)
+    return services.files.openFile(path)
+  })
+  registerIpcHandler(ipcMain, IPC_CHANNELS.fileOpenDirectory, pathSchema, async ({ path }) => {
+    await pathGuard.assertWithinDownloadDirectory(path)
+    return services.files.openDirectory(path)
+  })
+  registerIpcHandler(ipcMain, IPC_CHANNELS.fileOpenLocation, pathSchema, async ({ path }) => {
+    await pathGuard.assertWithinDownloadDirectory(path)
+    return services.files.openFileLocation(path)
+  })
   registerIpcHandler(ipcMain, IPC_CHANNELS.settingsGet, undefined, () => services.settings.load())
   registerIpcHandler(ipcMain, IPC_CHANNELS.settingsUpdate, settingsSchema, (settings) =>
     services.settings.save(settings)
@@ -84,9 +94,10 @@ export function registerIpc(services: Services): void {
   registerIpcHandler(ipcMain, IPC_CHANNELS.dependenciesGet, undefined, () =>
     services.dependencies.checkAll()
   )
-  registerIpcHandler(ipcMain, IPC_CHANNELS.conversionStart, conversionStartSchema, (options) =>
-    services.conversions.start(options)
-  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.conversionStart, conversionStartSchema, async (options) => {
+    await pathGuard.assertWithinDownloadDirectory(options.input)
+    return services.conversions.start(options)
+  })
   registerIpcHandler(ipcMain, IPC_CHANNELS.conversionCancel, idSchema, ({ id }) =>
     services.conversions.cancel(id)
   )
@@ -100,7 +111,11 @@ export function registerIpc(services: Services): void {
     services.inspectionHistory.remove(id)
   )
 
+  const progressThrottle = createBroadcastThrottle(200)
   services.downloads.onUpdate((download) => {
+    if (!progressThrottle.shouldSend(download)) {
+      return
+    }
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(IPC_CHANNELS.downloadStateEvent, download)
     }

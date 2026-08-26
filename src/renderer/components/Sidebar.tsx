@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import type { DownloadStatus } from '../../shared/types/download'
-import { useDownloads } from '../hooks/useDownloads'
 import type { DownloadSection } from '../pages/DownloadsPage'
+import { useDownloadMeta } from '../state/downloadState'
 import {
   CancelledIcon,
   ChevronDownIcon,
@@ -18,19 +17,16 @@ import {
 
 export type SidebarSection = 'home' | DownloadSection | 'history' | 'settings'
 
-const QUEUE_STATUSES: DownloadStatus[] = ['queued', 'inspecting', 'downloading', 'processing', 'paused']
-
 const DOWNLOAD_ITEMS: ReadonlyArray<{
   id: DownloadSection
   label: string
   icon: (props: { className?: string }) => React.JSX.Element
-  statuses: DownloadStatus[] | null
 }> = [
-  { id: 'downloads', label: 'Downloads', icon: DownloadIcon, statuses: null },
-  { id: 'queue', label: 'Queue', icon: QueueIcon, statuses: QUEUE_STATUSES },
-  { id: 'completed', label: 'Completed', icon: CompletedIcon, statuses: ['completed'] },
-  { id: 'cancelled', label: 'Cancelled', icon: CancelledIcon, statuses: ['cancelled'] },
-  { id: 'failed', label: 'Failed', icon: FailedIcon, statuses: ['failed'] }
+  { id: 'downloads', label: 'Downloads', icon: DownloadIcon },
+  { id: 'queue', label: 'Queue', icon: QueueIcon },
+  { id: 'completed', label: 'Completed', icon: CompletedIcon },
+  { id: 'cancelled', label: 'Cancelled', icon: CancelledIcon },
+  { id: 'failed', label: 'Failed', icon: FailedIcon }
 ]
 
 interface SidebarProps {
@@ -41,13 +37,13 @@ interface SidebarProps {
 export function Sidebar({ section, onNavigate }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [groupOpen, setGroupOpen] = useState(true)
-  const { downloads } = useDownloads()
+  const { counts } = useDownloadMeta()
 
-  const countFor = (statuses: DownloadStatus[] | null): number => {
-    if (!statuses) {
-      return 0
+  const countFor = (id: DownloadSection): number | undefined => {
+    if (id === 'downloads') {
+      return undefined
     }
-    return downloads.filter((download) => statuses.includes(download.status)).length
+    return counts[id]
   }
 
   return (
@@ -96,7 +92,7 @@ export function Sidebar({ section, onNavigate }: SidebarProps) {
                     icon={item.icon}
                     label={item.label}
                     active={section === item.id}
-                    count={countFor(item.statuses)}
+                    count={countFor(item.id)}
                     onClick={() => onNavigate(item.id)}
                   />
                 </li>

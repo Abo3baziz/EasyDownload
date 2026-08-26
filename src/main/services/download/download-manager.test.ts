@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
+import { unlink } from 'node:fs/promises'
 import { AppError } from '../../utils/errors'
+
+vi.mock('node:fs/promises', () => ({
+  unlink: vi.fn().mockResolvedValue(undefined)
+}))
 import type { Download, DownloadOptions } from '../../../shared/types/download'
 import type { HistoryManager } from '../history/history-manager'
 import type { YtDlpMedia } from '../ytdlp/types'
@@ -1002,6 +1007,53 @@ describe('createDownloadManager', () => {
     expect((await manager.get('dl-1')).status).toBe('downloading')
   })
 
+  it('does not let a stale cancelled run delete files of a retried run', async () => {
+    const unlinkMock = vi.mocked(unlink)
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    const manager = createDownloadManager({ ytDlp, generateId: () => 'dl-1' })
+    await manager.create(OPTIONS)
+
+    await manager.start('dl-1')
+    await flush()
+
+    await manager.cancel('dl-1')
+    await manager.retry('dl-1')
+
+    first.completion.resolve({
+      exitCode: null,
+      stdout: '',
+      stderr: '',
+      cancelled: true,
+      destination: 'D:\\Downloads\\Example Video [abc] [137].mp4'
+    })
+    await flush()
+    await flush()
+    await flush()
+
+    expect(ytDlp.inspect).toHaveBeenCalledTimes(2)
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(2)
+    const deletionsBeforeRetriedRun = unlinkMock.mock.calls.length
+
+    second.completion.resolve({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      cancelled: false,
+      destination: 'D:\\Downloads\\Example Video [abc] [137].mp4'
+    })
+    await flush()
+
+    expect(unlinkMock).toHaveBeenCalledTimes(deletionsBeforeRetriedRun)
+    await expect(manager.get('dl-1')).resolves.toMatchObject({
+      status: 'completed',
+      destination: 'D:\\Downloads\\Example Video [abc] [137].mp4'
+    })
+  })
+
   it('pauses an active download and resumes it with continuation', async () => {
     const ytDlp = createMockYtDlp()
     ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
@@ -1025,6 +1077,31 @@ describe('createDownloadManager', () => {
       { ...OPTIONS, resume: true },
       expect.anything()
     )
+  })
+
+  it('falls back to a concurrency limit of 1 when the configured limit is not finite', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => `dl-${ids.shift()}`,
+      getConcurrencyLimit: async () => Number.NaN
+    })
+    const ids = ['1', '2']
+    await manager.create(OPTIONS)
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-1')
+    await flush()
+
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+    expect(ytDlp.startDownload).toHaveBeenCalledTimes(1)
+
+    await manager.start('dl-2')
+    await flush()
+    expect((await manager.get('dl-2')).status).toBe('queued')
   })
 
   it('cancels a queued download without starting it', async () => {
@@ -1979,5 +2056,91 @@ describe('createDownloadManager', () => {
 
       await expect(manager.get('dl-1')).resolves.toMatchObject({ status: 'completed' })
     })
+  })
+
+  it('shutdown cancels active and queued downloads and flushes history', async () => {
+    const ytDlp = createMockYtDlp()
+    ytDlp.inspect.mockResolvedValue({ id: 'abc', title: 'Example Video' })
+    const first = downloadHandle()
+    const second = downloadHandle()
+    ytDlp.startDownload.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle)
+    const { history, save } = createMockHistory()
+    let sequence = 0
+    const manager = createDownloadManager({
+      ytDlp,
+      history,
+      generateId: () => `dl-${++sequence}`
+    })
+    await manager.create(OPTIONS)
+    await manager.create({ ...OPTIONS, formatId: '18' })
+    await manager.start('dl-1')
+    await manager.start('dl-2')
+    await flush()
+    expect((await manager.get('dl-1')).status).toBe('downloading')
+    expect((await manager.get('dl-2')).status).toBe('queued')
+
+    first.completion.resolve({ exitCode: null, stdout: '', stderr: '', cancelled: true })
+    await manager.shutdown()
+
+    expect(first.cancel).toHaveBeenCalled()
+    expect(second.cancel).not.toHaveBeenCalled()
+    expect((await manager.get('dl-1')).status).toBe('cancelled')
+    expect((await manager.get('dl-2')).status).toBe('cancelled')
+    expect(save).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'dl-1', status: 'cancelled' }),
+      expect.objectContaining({ id: 'dl-2', status: 'cancelled' })
+    ])
+  })
+
+  it('derives the destination from the sanitized title when yt-dlp replaced illegal characters', async () => {
+    const ytDlp = createMockYtDlp()
+    const sanitizedTitle = 'What is this_'
+    ytDlp.inspect.mockResolvedValue({
+      id: 'abc123',
+      title: 'What is this?',
+      formats: [{ format_id: '137', vcodec: 'avc1.42001E', acodec: 'mp4a.40.2', ext: 'mp4' }]
+    })
+    const { handle, completion } = downloadHandle()
+    ytDlp.startDownload.mockReturnValue(handle)
+    const sanitizedDestination = `D:\\Downloads\\${sanitizedTitle} [abc123] [137].mp4`
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => 'dl-1',
+      fileExists: (path) => path === sanitizedDestination
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+    completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+
+    await expect(manager.get('dl-1')).resolves.toMatchObject({
+      status: 'completed',
+      destination: sanitizedDestination
+    })
+  })
+
+  it('backfills a completed download whose stored title contains illegal characters', async () => {
+    const record = terminalRecord({
+      id: 'dl-old',
+      status: 'completed',
+      title: 'Video: Premiere?',
+      formatId: '18',
+      directory: 'D:\\Downloads',
+      extension: 'mp4'
+    })
+    const { history, save } = createMockHistory([record])
+    const manager = createDownloadManager({
+      ytDlp: createMockYtDlp(),
+      history,
+      listDirectory: async () => ['Video_ Premiere_ [abc123] [18].mp4', 'Unrelated.mp4'],
+      fileExists: () => true,
+      statFile: async () => ({ size: 42 })
+    })
+
+    await expect(manager.get(record.id)).resolves.toMatchObject({
+      destination: 'D:\\Downloads\\Video_ Premiere_ [abc123] [18].mp4'
+    })
+    expect(save).toHaveBeenCalled()
   })
 })

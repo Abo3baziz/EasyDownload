@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Download } from '../../shared/types/download'
 import type { PreloadApi } from '../../shared/types/preload'
 import { Sidebar } from './Sidebar'
+import { DownloadsStateProvider } from '../state/downloadState'
 
 function createApiMock(): PreloadApi {
   return {
@@ -58,7 +59,7 @@ describe('Sidebar', () => {
   })
 
   it('renders all sections with the download group expanded', () => {
-    render(<Sidebar section="home" onNavigate={vi.fn()} />)
+    render(<DownloadsStateProvider><Sidebar section="home" onNavigate={vi.fn()} /></DownloadsStateProvider>)
 
     expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Download Sections' })).toHaveAttribute(
@@ -75,7 +76,7 @@ describe('Sidebar', () => {
   })
 
   it('collapses and expands the download sections group', () => {
-    render(<Sidebar section="home" onNavigate={vi.fn()} />)
+    render(<DownloadsStateProvider><Sidebar section="home" onNavigate={vi.fn()} /></DownloadsStateProvider>)
 
     const group = screen.getByRole('button', { name: 'Download Sections' })
     fireEvent.click(group)
@@ -87,7 +88,7 @@ describe('Sidebar', () => {
 
   it('navigates when a section is selected', () => {
     const onNavigate = vi.fn()
-    render(<Sidebar section="home" onNavigate={onNavigate} />)
+    render(<DownloadsStateProvider><Sidebar section="home" onNavigate={onNavigate} /></DownloadsStateProvider>)
 
     fireEvent.click(screen.getByRole('button', { name: 'Queue' }))
     expect(onNavigate).toHaveBeenCalledWith('queue')
@@ -97,7 +98,7 @@ describe('Sidebar', () => {
   })
 
   it('highlights the active section', () => {
-    render(<Sidebar section="queue" onNavigate={vi.fn()} />)
+    render(<DownloadsStateProvider><Sidebar section="queue" onNavigate={vi.fn()} /></DownloadsStateProvider>)
 
     expect(screen.getByRole('button', { name: 'Queue' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: 'Home' })).not.toHaveAttribute('aria-current')
@@ -118,7 +119,7 @@ describe('Sidebar', () => {
       ]
     })
 
-    render(<Sidebar section="home" onNavigate={vi.fn()} />)
+    render(<DownloadsStateProvider><Sidebar section="home" onNavigate={vi.fn()} /></DownloadsStateProvider>)
 
     const queue = await screen.findByRole('button', { name: 'Queue' })
     expect(within(queue).getByText('2')).toBeInTheDocument()
@@ -138,7 +139,7 @@ describe('Sidebar', () => {
       return () => undefined
     })
 
-    render(<Sidebar section="home" onNavigate={vi.fn()} />)
+    render(<DownloadsStateProvider><Sidebar section="home" onNavigate={vi.fn()} /></DownloadsStateProvider>)
 
     const queue = await screen.findByRole('button', { name: 'Queue' })
     expect(within(queue).getByText('1')).toBeInTheDocument()
@@ -150,7 +151,7 @@ describe('Sidebar', () => {
   })
 
   it('collapses to an icon-only rail and keeps the group distinguishable', () => {
-    const { container } = render(<Sidebar section="queue" onNavigate={vi.fn()} />)
+    const { container } = render(<DownloadsStateProvider><Sidebar section="queue" onNavigate={vi.fn()} /></DownloadsStateProvider>)
 
     fireEvent.click(screen.getByRole('button', { name: 'Hide sidebar' }))
 
@@ -162,7 +163,7 @@ describe('Sidebar', () => {
   })
 
   it('keeps group expansion state when collapsing the sidebar', () => {
-    render(<Sidebar section="queue" onNavigate={vi.fn()} />)
+    render(<DownloadsStateProvider><Sidebar section="queue" onNavigate={vi.fn()} /></DownloadsStateProvider>)
 
     fireEvent.click(screen.getByRole('button', { name: 'Hide sidebar' }))
     expect(screen.getByRole('button', { name: 'Download Sections' })).toHaveAttribute(

@@ -4,9 +4,10 @@ import type { AppError } from '../../shared/types/errors'
 import type { Download, DownloadStatus } from '../../shared/types/download'
 import { ConversionControl } from '../components/ConversionControl'
 import { EmptyState } from '../components/EmptyState'
+import { ErrorAlert } from '../components/ErrorAlert'
 import { MediaThumbnail } from '../components/MediaThumbnail'
 import { StatusBadge } from '../components/StatusBadge'
-import { useDownloads } from '../hooks/useDownloads'
+import { hasTerminalStatus, useDownloadsData, useDownloadMeta } from '../state/downloadState'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 import { formatBytes, formatDate, formatDuration } from '../../shared/utils/format'
 import { groupByDay } from '../utils/history'
@@ -54,8 +55,10 @@ const GROUPED_SECTIONS: ReadonlySet<DownloadSection> = new Set([
 
 export function DownloadsPage({ section }: { section: DownloadSection }) {
   const api = useMediaDownloader()
-  const { downloads, error: loadError, replaceDownloads } = useDownloads()
+  const { downloads, replaceDownloads } = useDownloadsData()
+  const { error: loadError } = useDownloadMeta()
   const [conversions, setConversions] = useState<Record<string, Conversion>>({})
+  const [startingConversions, setStartingConversions] = useState<ReadonlySet<string>>(new Set())
   const [error, setError] = useState<AppError | null>(null)
 
   useEffect(() => {
@@ -160,16 +163,27 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
     download: Download,
     options: Omit<ConversionStartOptions, 'input'>
   ) {
-    if (!download.destination) return
-    const result = await api.startConversion({
-      ...options,
-      input: download.destination,
-      title: download.title,
-      thumbnail: download.thumbnail,
-      duration: download.duration
-    })
-    if (!result.ok) {
-      setError(result.error)
+    const input = download.destination
+    if (!input) return
+    if (startingConversions.has(input)) return
+    setStartingConversions((previous) => new Set(previous).add(input))
+    try {
+      const result = await api.startConversion({
+        ...options,
+        input,
+        title: download.title,
+        thumbnail: download.thumbnail,
+        duration: download.duration
+      })
+      if (!result.ok) {
+        setError(result.error)
+      }
+    } finally {
+      setStartingConversions((previous) => {
+        const next = new Set(previous)
+        next.delete(input)
+        return next
+      })
     }
   }
 
@@ -206,6 +220,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
 
   const downloadListProps = {
     conversions,
+    startingConversions,
     onCancel: (item: Download) => void handleCancel(item),
     onCancelPlaylist: (playlistId: string) => void handleCancelPlaylist(playlistId),
     onDelete: (item: Download) => void handleDelete(item),
@@ -226,27 +241,13 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
       ? downloads
       : downloads.filter((download) => statuses.includes(download.status))
   const groups = GROUPED_SECTIONS.has(section) ? groupByDay(items) : undefined
-  const hasHistory = downloads.some((download) => TERMINAL_STATUSES.includes(download.status))
-
-  if (loadError) {
-    return (
-      <section className="page">
-        <h1>{definition.title}</h1>
-        <div className="alert" role="alert">
-          <strong>{loadError.code}</strong> {loadError.message}
-        </div>
-      </section>
-    )
-  }
+  const hasHistory = hasTerminalStatus(downloads)
 
   if (items.length === 0) {
     return (
       <section className="page">
-        {error && (
-          <div className="alert" role="alert">
-            <strong>{error.code}</strong> {error.message}
-          </div>
-        )}
+        {loadError && <ErrorAlert error={loadError} />}
+        {error && <ErrorAlert error={error} />}
         <div className="page-header">
           <h1>{definition.title}</h1>
           {section === 'downloads' && hasHistory && (
@@ -262,11 +263,8 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
 
   return (
     <section className="page">
-      {error && (
-        <div className="alert" role="alert">
-          <strong>{error.code}</strong> {error.message}
-        </div>
-      )}
+      {loadError && <ErrorAlert error={loadError} />}
+      {error && <ErrorAlert error={error} />}
       <div className="page-header">
         <h1>{definition.title}</h1>
         {section === 'downloads' && hasHistory && (
@@ -298,6 +296,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
 interface DownloadListProps {
   downloads: Download[]
   conversions: Record<string, Conversion>
+  startingConversions: ReadonlySet<string>
   onCancel: (download: Download) => void
   onCancelPlaylist: (playlistId: string) => void
   onDelete: (download: Download) => void
@@ -419,6 +418,7 @@ function PlaylistGroup({
 interface DownloadListItemProps {
   download: Download
   conversions: Record<string, Conversion>
+  startingConversions: ReadonlySet<string>
   onCancel: (download: Download) => void
   onDelete: (download: Download) => void
   onPause: (download: Download) => void
@@ -434,6 +434,7 @@ interface DownloadListItemProps {
 function DownloadListItem({
   download,
   conversions,
+  startingConversions,
   onCancel,
   onDelete,
   onPause,
@@ -521,6 +522,7 @@ function DownloadListItem({
       {download.status === 'completed' && download.destination && (
         <ConversionControl
           conversion={conversion}
+          disabled={startingConversions.has(download.destination)}
           onStart={(options) => onStartConversion(download, options)}
           onCancel={(id) => onCancelConversion(id)}
         />

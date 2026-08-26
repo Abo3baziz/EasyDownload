@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MediaInfo } from '../../shared/types/media'
 import type { PreloadApi } from '../../shared/types/preload'
 import { HomeStateProvider } from '../state/homeState'
+import { DownloadsStateProvider } from '../state/downloadState'
 import { HomePage } from './HomePage'
 
 function createApiMock(): PreloadApi {
@@ -44,7 +45,9 @@ function createApiMock(): PreloadApi {
 function renderHome() {
   return render(
     <HomeStateProvider>
-      <HomePage />
+      <DownloadsStateProvider>
+        <HomePage />
+      </DownloadsStateProvider>
     </HomeStateProvider>
   )
 }

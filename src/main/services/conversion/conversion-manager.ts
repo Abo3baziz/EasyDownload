@@ -11,6 +11,7 @@ export interface ConversionManager {
   removeForInput(input: string): Promise<Conversion[]>
   list(): Promise<Conversion[]>
   clearHistory(): Promise<Conversion[]>
+  shutdown(): Promise<void>
   onUpdate(listener: (conversion: Conversion) => void): () => void
 }
 
@@ -20,6 +21,8 @@ export interface ConversionManagerOptions {
   history?: JsonStore<Conversion>
   now?: () => number
   generateId?: () => string
+  fileExists?: (path: string) => boolean
+  deleteFile?: (path: string) => Promise<void>
 }
 
 export function createConversionManager(options: ConversionManagerOptions): ConversionManager {
@@ -27,6 +30,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
   const generateId = options.generateId ?? (() => randomUUID())
   const conversions = new Map<string, Conversion>()
   const handles = new Map<string, FfmpegHandle>()
+  const runPromises = new Map<string, Promise<void>>()
   const listeners = new Set<(conversion: Conversion) => void>()
   let historyLoaded = false
   let loadingHistory: Promise<void> | undefined
@@ -78,7 +82,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
   function update(id: string, changes: Partial<Conversion>): Conversion {
     const conversion = conversions.get(id)
     if (!conversion) {
-      throw new AppError('DownloadError', 'The conversion was not found.')
+      throw new AppError('ProcessingError', 'The conversion was not found.')
     }
     const updated: Conversion = { ...conversion, ...changes, updatedAt: now() }
     conversions.set(id, updated)
@@ -92,7 +96,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
   function getOrThrow(id: string): Conversion {
     const conversion = conversions.get(id)
     if (!conversion) {
-      throw new AppError('DownloadError', 'The conversion was not found.')
+      throw new AppError('ProcessingError', 'The conversion was not found.')
     }
     return conversion
   }
@@ -119,6 +123,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
             {
               input,
               output: conversion.output,
+              overwrite: false,
               videoCodec: startOptions.videoCodec,
               audioCodec: startOptions.audioCodec
             },
@@ -128,6 +133,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
             {
               input,
               output: conversion.output,
+              overwrite: false,
               audioCodec: startOptions.audioCodec
             },
             { onProgress: (progress) => update(conversion.id, { progress, status: 'running' }) }
@@ -137,6 +143,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
     try {
       const result = await handle.result
       if (result.cancelled) {
+        await deletePartialOutput(conversion.output)
         update(conversion.id, { status: 'cancelled' })
       } else {
         const fileSize = await readOutputFileSize(conversion.output)
@@ -147,22 +154,60 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
         })
       }
     } catch (err) {
+      await deletePartialOutput(conversion.output)
       update(conversion.id, { status: 'failed', error: toAppError(err).toPayload() })
     } finally {
       handles.delete(conversion.id)
     }
   }
 
+  async function deletePartialOutput(output: string): Promise<void> {
+    if (!options.deleteFile) {
+      return
+    }
+    try {
+      await options.deleteFile(output)
+    } catch {
+      // Best-effort cleanup; a missing file is not an error.
+    }
+  }
+
+  async function resolveConversionOutputPath(
+    input: string,
+    startOptions: ConversionStartOptions
+  ): Promise<string> {
+    const candidate = buildConversionOutputPath(input, startOptions)
+    if (!options.fileExists) {
+      return candidate
+    }
+    let current = candidate
+    let index = 1
+    while (options.fileExists(current)) {
+      index += 1
+      current = withNumericSuffix(candidate, index)
+    }
+    return current
+  }
+
   return {
     async start(startOptions: ConversionStartOptions): Promise<Conversion> {
       await ensureLoaded()
+      const running = [...conversions.values()].find(
+        (conversion) => conversion.input === startOptions.input && conversion.status === 'running'
+      )
+      if (running) {
+        throw new AppError(
+          'ProcessingError',
+          'A conversion for this file is already running. Wait for it to finish or cancel it first.'
+        )
+      }
       if (options.statFile) {
         const info = await options.statFile(startOptions.input).catch(() => undefined)
         if (!info) {
           throw new AppError('FilesystemError', 'The source file does not exist.')
         }
       }
-      const output = buildConversionOutputPath(startOptions.input, startOptions)
+      const output = await resolveConversionOutputPath(startOptions.input, startOptions)
       const conversion: Conversion = {
         id: generateId(),
         type: startOptions.type,
@@ -178,7 +223,12 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       }
       conversions.set(conversion.id, conversion)
       emit(conversion)
-      void run(conversion, startOptions.input, startOptions)
+      const runPromise = run(conversion, startOptions.input, startOptions)
+        .catch(() => undefined)
+        .finally(() => {
+          runPromises.delete(conversion.id)
+        })
+      runPromises.set(conversion.id, runPromise)
       return conversion
     },
 
@@ -202,7 +252,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       await ensureLoaded()
       const removed = [...conversions.values()].filter((conversion) => conversion.input === input)
       if (removed.some((conversion) => conversion.status === 'running')) {
-        throw new AppError('DownloadError', 'Cannot delete a download while a conversion is running.')
+        throw new AppError('ProcessingError', 'Cannot delete a download while a conversion is running.')
       }
       if (removed.length === 0) {
         return []
@@ -236,6 +286,15 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       }
       await persistHistory()
       return [...conversions.values()]
+    },
+
+    async shutdown(): Promise<void> {
+      await ensureLoaded()
+      for (const handle of handles.values()) {
+        handle.cancel()
+      }
+      await Promise.allSettled([...runPromises.values()])
+      await persistHistory()
     },
 
     onUpdate(listener: (conversion: Conversion) => void): () => void {
@@ -292,4 +351,11 @@ function buildPath(input: string, extension: string): string {
     return join(dir, `${base} [converted].${extension}`)
   }
   return candidate
+}
+
+export function withNumericSuffix(filePath: string, index: number): string {
+  const dir = dirname(filePath)
+  const extension = extname(filePath)
+  const base = basename(filePath, extension)
+  return join(dir, `${base} [${index}]${extension}`)
 }

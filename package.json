@@ -1,6 +1,6 @@
 {
   "name": "easydownload",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Cross-platform desktop media downloader built with Electron, React, and TypeScript.",
   "main": "./out/main/index.js",
   "private": true,
@@ -22,7 +22,7 @@
     "test": "npm run test:unit && npm run test:integration && npm run test:renderer",
     "download:yt-dlp": "node scripts/download-ytdlp.mjs",
     "download:ffmpeg": "node scripts/download-ffmpeg.mjs",
-    "icon:generate": "electron-icon-builder --input=resources/logo.png --output=build --flatten",
+    "icon:generate": "electron-icon-builder --input=Logo-dark.png --output=build --flatten",
     "dist:win": "npm run download:yt-dlp && npm run download:ffmpeg && npm run build && electron-builder --win --publish never",
     "dist:mac": "npm run download:yt-dlp && npm run download:ffmpeg && npm run build && electron-builder --mac --publish never",
     "dist:linux": "npm run download:yt-dlp && npm run download:ffmpeg && npm run build && electron-builder --linux --publish never"

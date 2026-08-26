@@ -59,7 +59,6 @@ export function buildInspectArgs(url: string): readonly string[] {
     '--no-playlist',
     '--skip-download',
     '--no-warnings',
-    '--no-call-home',
     '--encoding',
     'utf-8',
     url
@@ -89,7 +88,7 @@ export function buildDownloadArgs(
   const args = [
     '--newline',
     '--no-playlist',
-    '--no-call-home',
+    '--progress',
     '--encoding',
     'utf-8',
     '-f',
@@ -240,8 +239,16 @@ export function createYtDlpService(options: YtDlpServiceOptions): YtDlpService {
 
 export function toInspectionError(result: ProcessResult): AppError {
   const output = `${result.stdout}\n${result.stderr}`
+  const detail = extractErrorLine(result.stderr)
   if (/unsupported url/i.test(output)) {
     return new AppError('UnsupportedMediaError', 'The provided URL is not supported by yt-dlp.')
+  }
+  if (/requested format is not available/i.test(output)) {
+    return new AppError(
+      'DownloadError',
+      'The media information could not be inspected in the requested format.',
+      detail
+    )
   }
   if (
     /unable to (download|fetch|extract)|network|connection|timed out|http error|\b403\b|\b404\b|geo[- ]?restricted|video (is )?unavailable/i.test(
@@ -250,10 +257,10 @@ export function toInspectionError(result: ProcessResult): AppError {
   ) {
     return new AppError(
       'NetworkError',
-      'yt-dlp could not fetch media information. The video may be unavailable or the network request failed.'
+      'yt-dlp could not fetch media information. The video may be unavailable or the network request failed.',
+      detail
     )
   }
-  const detail = extractErrorLine(result.stderr)
   return new AppError('ProcessError', detail ?? `yt-dlp exited with code ${result.exitCode}.`)
 }
 
@@ -261,8 +268,16 @@ export function toDownloadError(
   result: Pick<ProcessResult, 'exitCode' | 'stdout' | 'stderr'>
 ): AppError {
   const output = `${result.stdout}\n${result.stderr}`
+  const detail = extractErrorLine(result.stderr)
   if (/unsupported url/i.test(output)) {
     return new AppError('UnsupportedMediaError', 'The provided URL is not supported by yt-dlp.')
+  }
+  if (/requested format is not available/i.test(output)) {
+    return new AppError(
+      'DownloadError',
+      'The selected format is no longer available for this video. Inspect the URL again and choose another format.',
+      detail
+    )
   }
   if (
     /unable to (download|fetch|extract)|network|connection|timed out|http error|\b403\b|\b404\b|geo[- ]?restricted|video (is )?unavailable/i.test(
@@ -271,19 +286,20 @@ export function toDownloadError(
   ) {
     return new AppError(
       'NetworkError',
-      'yt-dlp could not complete the download. The video may be unavailable or the network request failed.'
+      'yt-dlp could not complete the download. The video may be unavailable or the network request failed.',
+      detail
     )
   }
   if (/no space|disk|permission|access denied|destination|unable to write/i.test(output)) {
-    return new AppError('FilesystemError', 'yt-dlp could not write the downloaded file.')
+    return new AppError('FilesystemError', 'yt-dlp could not write the downloaded file.', detail)
   }
   if (/ffmpeg|postprocess|merger|video conver|extract audio|unable to fix/i.test(output)) {
     return new AppError(
       'ProcessingError',
-      'yt-dlp could not process the downloaded media after downloading.'
+      'yt-dlp could not process the downloaded media after downloading.',
+      detail
     )
   }
-  const detail = extractErrorLine(result.stderr)
   return new AppError('ProcessError', detail ?? `yt-dlp exited with code ${result.exitCode}.`)
 }
 

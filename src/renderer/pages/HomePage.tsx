@@ -4,13 +4,14 @@ import type { PlaylistFormat } from '../../shared/types/download'
 import type { Download } from '../../shared/types/download'
 import type { InspectionResult, MediaFormat, MediaInfo, PlaylistInfo } from '../../shared/types/media'
 import { formatBytes, formatDuration } from '../../shared/utils/format'
-import { useDownloads } from '../hooks/useDownloads'
+import { ErrorAlert } from '../components/ErrorAlert'
+import { useDownloadsData } from '../state/downloadState'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 import { useHomeState } from '../state/homeState'
 
 export function HomePage() {
   const api = useMediaDownloader()
-  const { downloads } = useDownloads()
+  const { downloads } = useDownloadsData()
   const {
     url,
     setUrl,
@@ -170,13 +171,7 @@ export function HomePage() {
         </div>
       )}
 
-      {error && (
-        <div
-          className='alert'
-          role='alert'>
-          <strong>{error.code}</strong> {error.message}
-        </div>
-      )}
+      {error && <ErrorAlert error={error} />}
 
       {inspection && inspection.kind === 'video' && (
         <MediaDetails

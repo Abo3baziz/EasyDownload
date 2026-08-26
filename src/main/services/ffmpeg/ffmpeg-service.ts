@@ -5,13 +5,6 @@ import type { ProcessManager, ProcessResult } from '../process/process-manager'
 export type FfmpegVideoCodec = VideoCodec
 export type FfmpegAudioCodec = AudioCodec
 
-export interface FfmpegMergeOptions {
-  videoInput: string
-  audioInput: string
-  output: string
-  overwrite?: boolean
-}
-
 export interface FfmpegConvertOptions {
   input: string
   output: string
@@ -48,7 +41,6 @@ export interface FfmpegCallbacks {
 }
 
 export interface FfmpegService {
-  merge(options: FfmpegMergeOptions, callbacks?: FfmpegCallbacks): FfmpegHandle
   convert(options: FfmpegConvertOptions, callbacks?: FfmpegCallbacks): FfmpegHandle
   extractAudio(options: FfmpegExtractAudioOptions, callbacks?: FfmpegCallbacks): FfmpegHandle
 }
@@ -79,24 +71,6 @@ export const AUDIO_CODEC_ARGS: Record<FfmpegAudioCodec, readonly string[]> = {
 
 function overwriteArgs(overwrite: boolean | undefined): readonly string[] {
   return overwrite === false ? [] : OVERWRITE_ARG
-}
-
-export function buildMergeArgs(options: FfmpegMergeOptions): readonly string[] {
-  return [
-    ...overwriteArgs(options.overwrite),
-    ...PROGRESS_ARGS,
-    '-i',
-    options.videoInput,
-    '-i',
-    options.audioInput,
-    '-map',
-    '0:v:0',
-    '-map',
-    '1:a:0',
-    '-c',
-    'copy',
-    options.output
-  ]
 }
 
 export function buildConvertArgs(options: FfmpegConvertOptions): readonly string[] {
@@ -183,7 +157,6 @@ export function createFfmpegService(options: FfmpegServiceOptions): FfmpegServic
   }
 
   return {
-    merge: (mergeOptions, callbacks) => run(buildMergeArgs(mergeOptions), callbacks),
     convert: (convertOptions, callbacks) => run(buildConvertArgs(convertOptions), callbacks),
     extractAudio: (extractOptions, callbacks) =>
       run(buildExtractAudioArgs(extractOptions), callbacks)

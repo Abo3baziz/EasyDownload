@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { createFileManager } from './file-manager'
+import { createFileManager, isPathWithin } from './file-manager'
 
 function createManager(overrides: {
   showItemInFolder?: (path: string) => void
@@ -32,6 +32,28 @@ describe('createFileManager', () => {
     it('rejects sibling and parent paths', () => {
       expect(manager.isPathInside(base, join('media', 'other', 'video.mp4'))).toBe(false)
       expect(manager.isPathInside(base, join('media', 'video.mp4'))).toBe(false)
+    })
+  })
+
+  describe('isPathWithin', () => {
+    const base = join('media', 'downloads')
+
+    it('accepts paths inside the directory', () => {
+      expect(isPathWithin(base, join(base, 'video.mp4'))).toBe(true)
+      expect(isPathWithin(base, join(base, 'nested', 'video.mp4'))).toBe(true)
+    })
+
+    it('accepts the directory itself', () => {
+      expect(isPathWithin(base, base)).toBe(true)
+    })
+
+    it('rejects sibling and parent paths', () => {
+      expect(isPathWithin(base, join('media', 'other', 'video.mp4'))).toBe(false)
+      expect(isPathWithin(base, join('media', 'video.mp4'))).toBe(false)
+    })
+
+    it('rejects traversal escapes', () => {
+      expect(isPathWithin(base, join(base, '..', 'secrets.txt'))).toBe(false)
     })
   })
 
