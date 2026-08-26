@@ -41,8 +41,8 @@ Each task has its own file. Update the Status column here when a task changes st
 
 | ID    | Title                                                     | Priority | Status | Task File                                              |
 | ----- | --------------------------------------------------------- | -------- | ------ | ------------------------------------------------------ |
-| S-001 | Validate URL scheme before `shell.openExternal`            | Low      | Open   | [S-001-open-external-scheme-check.md](S-001-open-external-scheme-check.md) |
-| S-002 | Sanitize unknown error messages crossing IPC boundary      | Low      | Open   | [S-002-ipc-error-sanitization.md](S-002-ipc-error-sanitization.md) |
+| S-001 | Validate URL scheme before `shell.openExternal`            | Low      | Done   | [S-001-open-external-scheme-check.md](S-001-open-external-scheme-check.md) |
+| S-002 | Sanitize unknown error messages crossing IPC boundary      | Low      | Done   | [S-002-ipc-error-sanitization.md](S-002-ipc-error-sanitization.md) |
 
 ## Refactoring
 

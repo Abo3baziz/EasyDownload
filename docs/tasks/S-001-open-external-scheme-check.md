@@ -1,6 +1,6 @@
 # S-001: Validate URL scheme before shell.openExternal
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Low
 - **Category:** Security hardening
 - **Branch:** `chore/open-external-scheme-check`

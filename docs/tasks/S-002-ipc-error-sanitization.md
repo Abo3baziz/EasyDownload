@@ -1,6 +1,6 @@
 # S-002: Sanitize unknown error messages crossing IPC boundary
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Low
 - **Category:** Security hardening
 - **Branch:** `chore/ipc-error-sanitization`

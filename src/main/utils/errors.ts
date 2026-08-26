@@ -29,6 +29,11 @@ export function toAppError(error: unknown): AppError {
       issues: error.issues
     })
   }
-  const message = error instanceof Error ? error.message : String(error)
-  return new AppError('UnknownError', message)
+  const detail = error instanceof Error ? error.message : String(error)
+  logUnknownError(detail)
+  return new AppError('UnknownError', 'An unexpected internal error occurred.', undefined)
+}
+
+function logUnknownError(detail: string): void {
+  console.error('[main] Unknown IPC error:', detail)
 }
