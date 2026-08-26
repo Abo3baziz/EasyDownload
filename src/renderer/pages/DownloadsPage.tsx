@@ -7,7 +7,7 @@ import { EmptyState } from '../components/EmptyState'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { MediaThumbnail } from '../components/MediaThumbnail'
 import { StatusBadge } from '../components/StatusBadge'
-import { useDownloads } from '../hooks/useDownloads'
+import { hasTerminalStatus, useDownloadsData, useDownloadMeta } from '../state/downloadState'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 import { formatBytes, formatDate, formatDuration } from '../../shared/utils/format'
 import { groupByDay } from '../utils/history'
@@ -55,7 +55,8 @@ const GROUPED_SECTIONS: ReadonlySet<DownloadSection> = new Set([
 
 export function DownloadsPage({ section }: { section: DownloadSection }) {
   const api = useMediaDownloader()
-  const { downloads, error: loadError, replaceDownloads } = useDownloads()
+  const { downloads, replaceDownloads } = useDownloadsData()
+  const { error: loadError } = useDownloadMeta()
   const [conversions, setConversions] = useState<Record<string, Conversion>>({})
   const [error, setError] = useState<AppError | null>(null)
 
@@ -219,20 +220,12 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
       ? downloads
       : downloads.filter((download) => statuses.includes(download.status))
   const groups = GROUPED_SECTIONS.has(section) ? groupByDay(items) : undefined
-  const hasHistory = downloads.some((download) => TERMINAL_STATUSES.includes(download.status))
-
-  if (loadError) {
-    return (
-      <section className="page">
-        <h1>{definition.title}</h1>
-        <ErrorAlert error={loadError} />
-      </section>
-    )
-  }
+  const hasHistory = hasTerminalStatus(downloads)
 
   if (items.length === 0) {
     return (
       <section className="page">
+        {loadError && <ErrorAlert error={loadError} />}
         {error && <ErrorAlert error={error} />}
         <div className="page-header">
           <h1>{definition.title}</h1>
@@ -249,6 +242,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
 
   return (
     <section className="page">
+      {loadError && <ErrorAlert error={loadError} />}
       {error && <ErrorAlert error={error} />}
       <div className="page-header">
         <h1>{definition.title}</h1>

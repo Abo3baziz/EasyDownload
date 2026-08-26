@@ -6,6 +6,7 @@ import { HistoryPage } from './pages/HistoryPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { HistoryStateProvider } from './state/historyState'
 import { HomeStateProvider } from './state/homeState'
+import { DownloadsStateProvider } from './state/downloadState'
 
 const DOWNLOAD_SECTIONS: DownloadSection[] = ['downloads', 'queue', 'completed', 'cancelled', 'failed']
 
@@ -19,15 +20,17 @@ export default function App() {
   return (
     <HomeStateProvider>
       <HistoryStateProvider>
-        <div className="app">
-          <Sidebar section={section} onNavigate={setSection} />
-          <main className="app-content">
-            {section === 'home' && <HomePage />}
-            {isDownloadSection(section) && <DownloadsPage section={section} />}
-            {section === 'history' && <HistoryPage onInspect={() => setSection('home')} />}
-            {section === 'settings' && <SettingsPage />}
-          </main>
-        </div>
+        <DownloadsStateProvider>
+          <div className="app">
+            <Sidebar section={section} onNavigate={setSection} />
+            <main className="app-content">
+              {section === 'home' && <HomePage />}
+              {isDownloadSection(section) && <DownloadsPage section={section} />}
+              {section === 'history' && <HistoryPage onInspect={() => setSection('home')} />}
+              {section === 'settings' && <SettingsPage />}
+            </main>
+          </div>
+        </DownloadsStateProvider>
       </HistoryStateProvider>
     </HomeStateProvider>
   )

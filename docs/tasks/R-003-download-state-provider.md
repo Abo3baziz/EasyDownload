@@ -1,6 +1,6 @@
 # R-003: Create shared DownloadStateProvider for renderer
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Medium
 - **Category:** Refactoring / Performance
 - **Branch:** `refactor/download-state-provider`

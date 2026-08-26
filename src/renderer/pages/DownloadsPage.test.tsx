@@ -6,6 +6,7 @@ import type { Conversion } from '../../shared/types/conversion'
 import type { Download } from '../../shared/types/download'
 import type { PreloadApi } from '../../shared/types/preload'
 import { DownloadsPage, type DownloadSection } from './DownloadsPage'
+import { DownloadsStateProvider } from '../state/downloadState'
 
 function createApiMock(): PreloadApi {
   return {
@@ -111,7 +112,11 @@ const groupedSectionCases: Array<{
 ]
 
 function renderSection(section: DownloadSection) {
-  return render(<DownloadsPage section={section} />)
+  return render(
+    <DownloadsStateProvider>
+      <DownloadsPage section={section} />
+    </DownloadsStateProvider>
+  )
 }
 
 describe('DownloadsPage', () => {

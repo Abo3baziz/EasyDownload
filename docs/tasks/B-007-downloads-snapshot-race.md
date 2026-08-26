@@ -1,9 +1,9 @@
 # B-007: Downloads snapshot overwrite race in renderer
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Medium
 - **Category:** Bug
-- **Branch:** `bugfix/downloads-snapshot-race`
+- **Branch:** `refactor/download-state-provider`
 
 ## Source
 

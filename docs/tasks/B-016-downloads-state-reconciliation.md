@@ -1,9 +1,9 @@
 # B-016: Renderer downloads state never reconciles
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Medium
 - **Category:** Bug / State consistency
-- **Branch:** `bugfix/downloads-state-reconciliation`
+- **Branch:** `refactor/download-state-provider`
 
 ## Source
 
