@@ -109,6 +109,21 @@ describe('createSettingsManager', () => {
       await expect(manager.load()).resolves.toEqual({ ...defaults, ...backup })
     })
   })
+
+  it('serves subsequent loads from the cache instead of re-reading disk', async () => {
+    await withTempDir(async (dir) => {
+      const manager = createSettingsManager({ dir, defaults })
+      await manager.save({ ...defaults, concurrencyLimit: 4 })
+
+      await writeFile(
+        join(dir, 'settings.json'),
+        JSON.stringify({ ...defaults, concurrencyLimit: 9 }),
+        'utf8'
+      )
+
+      await expect(manager.load()).resolves.toEqual({ ...defaults, concurrencyLimit: 4 })
+    })
+  })
 })
 
 describe('sanitizePersistedSettings', () => {

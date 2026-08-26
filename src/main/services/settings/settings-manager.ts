@@ -41,20 +41,26 @@ export function sanitizePersistedSettings(raw: unknown): Partial<AppSettings> {
 export function createSettingsManager(options: SettingsManagerOptions): SettingsManager {
   const filePath = join(options.dir, options.fileName ?? 'settings.json')
   const backupPath = backupPathFor(filePath)
+  let cache: AppSettings | undefined
 
   async function load(): Promise<AppSettings> {
+    if (cache) {
+      return cache
+    }
     try {
-      return await readSettings(filePath)
+      cache = await readSettings(filePath)
     } catch (err) {
       if (isMissingFileError(err)) {
-        return options.defaults
-      }
-      try {
-        return await readSettings(backupPath)
-      } catch {
-        throw new AppError('FilesystemError', 'Failed to read settings.', describeError(err))
+        cache = options.defaults
+      } else {
+        try {
+          cache = await readSettings(backupPath)
+        } catch {
+          throw new AppError('FilesystemError', 'Failed to read settings.', describeError(err))
+        }
       }
     }
+    return cache
   }
 
   async function readSettings(path: string): Promise<AppSettings> {
@@ -65,6 +71,7 @@ export function createSettingsManager(options: SettingsManagerOptions): Settings
   async function save(settings: AppSettings): Promise<AppSettings> {
     try {
       await writeFileAtomic(filePath, JSON.stringify(settings, null, 2))
+      cache = settings
       return settings
     } catch (err) {
       throw new AppError('FilesystemError', 'Failed to write settings.', describeError(err))

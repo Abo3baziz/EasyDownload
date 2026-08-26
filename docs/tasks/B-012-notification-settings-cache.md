@@ -1,6 +1,6 @@
 # B-012: Notification manager reads settings from disk per progress tick
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Low
 - **Category:** Bug / Performance
 - **Branch:** `perf/notification-settings-cache`

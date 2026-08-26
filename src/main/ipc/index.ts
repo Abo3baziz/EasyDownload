@@ -11,6 +11,7 @@ import {
 import type { Services } from '../services'
 import { registerIpcHandler } from './handle'
 import { createPathGuard } from './path-guard'
+import { createBroadcastThrottle } from './broadcast-throttle'
 
 export function registerIpc(services: Services): void {
   const pathGuard = createPathGuard({
@@ -101,7 +102,11 @@ export function registerIpc(services: Services): void {
     services.inspectionHistory.remove(id)
   )
 
+  const progressThrottle = createBroadcastThrottle(200)
   services.downloads.onUpdate((download) => {
+    if (!progressThrottle.shouldSend(download)) {
+      return
+    }
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(IPC_CHANNELS.downloadStateEvent, download)
     }

@@ -29,7 +29,7 @@ Each task has its own file. Update the Status column here when a task changes st
 | B-009 | Destination detection uses unsanitized media title                | Medium   | Open   | [B-009-destination-title-sanitization.md](B-009-destination-title-sanitization.md) |
 | B-010 | SettingsPage save failure destroys form UI                        | High     | Done   | [B-010-settings-form-save-error.md](B-010-settings-form-save-error.md) |
 | B-011 | Concurrency setting accepts invalid values                        | Medium   | Done   | [B-011-concurrency-input-validation.md](B-011-concurrency-input-validation.md) |
-| B-012 | Notification manager reads settings from disk per progress tick   | Low      | Open   | [B-012-notification-settings-cache.md](B-012-notification-settings-cache.md) |
+| B-012 | Notification manager reads settings from disk per progress tick   | Low      | Done   | [B-012-notification-settings-cache.md](B-012-notification-settings-cache.md) |
 | B-013 | Double-click starts duplicate conversions                         | Medium   | Done   | [B-013-duplicate-conversion-guard.md](B-013-duplicate-conversion-guard.md) |
 | B-014 | Stale closure allows duplicate history deletes                    | Low      | Done   | [B-014-history-delete-stale-closure.md](B-014-history-delete-stale-closure.md) |
 | B-015 | Relative timestamps never refresh                                 | Low      | Open   | [B-015-relative-time-refresh.md](B-015-relative-time-refresh.md) |
@@ -59,7 +59,7 @@ Each task has its own file. Update the Status column here when a task changes st
 
 | ID    | Title                                                | Priority | Status | Task File                                        |
 | ----- | ---------------------------------------------------- | -------- | ------ | ------------------------------------------------ |
-| E-001 | Throttle download progress IPC broadcasts             | Medium   | Open   | [E-001-progress-throttling.md](E-001-progress-throttling.md) |
+| E-001 | Throttle download progress IPC broadcasts             | Medium   | Done   | [E-001-progress-throttling.md](E-001-progress-throttling.md) |
 | E-002 | Add concurrency limit/queue for conversions           | Medium   | Open   | [E-002-conversion-concurrency.md](E-002-conversion-concurrency.md) |
 | E-003 | Automatic retry for transient network failures        | Low      | Open   | [E-003-transient-retry.md](E-003-transient-retry.md) |
 | E-004 | Parallelize and cache dependency checks               | Low      | Open   | [E-004-dependency-checks.md](E-004-dependency-checks.md) |

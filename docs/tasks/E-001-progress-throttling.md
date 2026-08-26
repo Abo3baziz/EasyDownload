@@ -1,6 +1,6 @@
 # E-001: Throttle download progress IPC broadcasts
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Medium
 - **Category:** Enhancement / Performance
 - **Branch:** `feature/progress-throttling`
