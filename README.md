@@ -11,7 +11,7 @@ with a queue, pause/resume, automatic retry, playlist support, media conversion,
 persistent history. Powered by bundled yt-dlp and FFmpeg binaries.
 
 [![Download](https://img.shields.io/github/v/release/Abo3baziz/EasyDownload?style=for-the-badge&color=blue)](https://github.com/Abo3baziz/EasyDownload/releases/latest)
-[![Portfolio](https://img.shields.io/badge/Portfolio-Case%20Study-4A90D9?style=for-the-badge)](docs/PORTFOLIO.md)
+[![Portfolio](https://img.shields.io/badge/Portfolio-Case%20Study-4A90D9?style=for-the-badge)](https://www.codebyahmed.online/)
 [![GitHub](https://img.shields.io/badge/GitHub-Abo3baziz-181717?style=for-the-badge&logo=github)](https://github.com/Abo3baziz)
 
 [Download](https://github.com/Abo3baziz/EasyDownload/releases/latest) ·
