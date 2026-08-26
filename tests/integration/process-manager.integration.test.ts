@@ -98,4 +98,51 @@ describe('ProcessManager.startStreaming', () => {
     const started = processes.startStreaming('definitely-not-a-real-command-xyz', {})
     await expect(started.result).rejects.toThrow(/ENOENT/)
   })
+
+  it('honors timeoutMs and reports the timeout', async () => {
+    const started = processes.startStreaming(process.execPath, {
+      args: ['-e', 'setInterval(() => {}, 60_000)'],
+      timeoutMs: 300
+    })
+
+    const result = await started.result
+    expect(result.timedOut).toBe(true)
+    expect(result.exitCode).not.toBe(0)
+  })
+
+  it('kills the whole process tree when kill is called', async () => {
+    const script = [
+      'const { spawn } = require("node:child_process");',
+      'const child = spawn(process.execPath, ["-e", "console.log(\\"GC:\\" + process.pid); setInterval(() => {}, 60000)"]);',
+      'child.stdout.on("data", (c) => process.stdout.write(c));',
+      'setInterval(() => {}, 60000);'
+    ].join('\n')
+    const lines: string[] = []
+    const started = processes.startStreaming(process.execPath, {
+      args: ['-e', script],
+      onStdout: (line) => lines.push(line)
+    })
+    void started.result.catch(() => undefined)
+
+    await waitFor(() => lines.some((line) => line.startsWith('GC:')))
+    const grandchildPid = Number(lines.find((line) => line.startsWith('GC:'))!.slice(3))
+
+    // The grandchild must be alive before we kill the tree.
+    expect(() => process.kill(grandchildPid, 0)).not.toThrow()
+
+    started.kill()
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    expect(() => process.kill(grandchildPid, 0)).toThrow(/ESRCH/)
+  }, 15_000)
+
+  async function waitFor(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
+    const deadline = Date.now() + timeoutMs
+    while (!predicate()) {
+      if (Date.now() > deadline) {
+        throw new Error('waitFor timed out')
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+  }
 })

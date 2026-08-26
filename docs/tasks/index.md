@@ -63,7 +63,7 @@ Each task has its own file. Update the Status column here when a task changes st
 | E-002 | Add concurrency limit/queue for conversions           | Medium   | Open   | [E-002-conversion-concurrency.md](E-002-conversion-concurrency.md) |
 | E-003 | Automatic retry for transient network failures        | Low      | Open   | [E-003-transient-retry.md](E-003-transient-retry.md) |
 | E-004 | Parallelize and cache dependency checks               | Low      | Open   | [E-004-dependency-checks.md](E-004-dependency-checks.md) |
-| E-005 | Process-tree kill and timeout enforcement             | Medium   | Open   | [E-005-process-kill-hardening.md](E-005-process-kill-hardening.md) |
+| E-005 | Process-tree kill and timeout enforcement             | Medium   | Done   | [E-005-process-kill-hardening.md](E-005-process-kill-hardening.md) |
 | E-006 | Async file existence checks in list path              | Low      | Open   | [E-006-async-existence-checks.md](E-006-async-existence-checks.md) |
 | E-007 | Accessibility improvements (progressbar, badges)      | Low      | Open   | [E-007-accessibility.md](E-007-accessibility.md) |
 | E-008 | Bundle/detect a JS runtime for yt-dlp                 | Medium   | Open   | [E-008-ytdlp-js-runtime.md](E-008-ytdlp-js-runtime.md) |

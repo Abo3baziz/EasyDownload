@@ -1,6 +1,6 @@
 # E-005: Process-tree kill and timeout enforcement
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Medium
 - **Category:** Enhancement / Robustness
 - **Branch:** `feature/process-kill-hardening`
