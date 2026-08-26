@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Conversion, ConversionStartOptions } from '../../shared/types/conversion'
 import type { AppError } from '../../shared/types/errors'
+import type { IpcResult } from '../../shared/types/ipc'
 import type { Download, DownloadStatus } from '../../shared/types/download'
 import { ConversionControl } from '../components/ConversionControl'
 import { EmptyState } from '../components/EmptyState'
@@ -97,66 +98,60 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
     }
   }, [api])
 
-  async function handleCancel(download: Download) {
-    const result = await api.cancelDownload(download.id)
-    if (!result.ok) {
-      setError(result.error)
-    }
-  }
-
-  async function handleCancelPlaylist(playlistId: string) {
-    const result = await api.cancelPlaylist(playlistId)
-    if (!result.ok) {
-      setError(result.error)
-    }
-  }
-
-  async function handleDelete(download: Download) {
-    const result = await api.deleteDownload(download.id)
-    if (!result.ok) {
-      setError(result.error)
-      return
-    }
-    if (download.destination) {
-      setConversions((previous) => {
-        const next = { ...previous }
-        for (const [id, conversion] of Object.entries(next)) {
-          if (conversion.input === download.destination) {
-            delete next[id]
-          }
-        }
-        return next
+  async function runAction(action: () => Promise<IpcResult<unknown>>): Promise<void> {
+    try {
+      const result = await action()
+      if (!result.ok) {
+        setError(result.error)
+      }
+    } catch (err) {
+      setError({
+        code: 'UnknownError',
+        message: err instanceof Error ? err.message : String(err)
       })
     }
   }
 
-  async function handlePause(download: Download) {
-    const result = await api.pauseDownload(download.id)
-    if (!result.ok) {
-      setError(result.error)
-    }
+  const handleCancel = (download: Download) =>
+    runAction(() => api.cancelDownload(download.id))
+
+  const handleCancelPlaylist = (playlistId: string) =>
+    runAction(() => api.cancelPlaylist(playlistId))
+
+  const handlePause = (download: Download) => runAction(() => api.pauseDownload(download.id))
+
+  const handleResume = (download: Download) => runAction(() => api.resumeDownload(download.id))
+
+  const handleRetry = (download: Download) => runAction(() => api.retryDownload(download.id))
+
+  const handleOpenConversion = (path: string) => runAction(() => api.openFile(path))
+
+  const handleOpenFileLocation = (path: string) => runAction(() => api.openFileLocation(path))
+
+  async function handleDelete(download: Download) {
+    await runAction(async () => {
+      const result = await api.deleteDownload(download.id)
+      if (!result.ok) {
+        return result
+      }
+      if (download.destination) {
+        setConversions((previous) => {
+          const next = { ...previous }
+          for (const [id, conversion] of Object.entries(next)) {
+            if (conversion.input === download.destination) {
+              delete next[id]
+            }
+          }
+          return next
+        })
+      }
+      return result
+    })
   }
 
-  async function handleResume(download: Download) {
-    const result = await api.resumeDownload(download.id)
-    if (!result.ok) {
-      setError(result.error)
-    }
-  }
-
-  async function handleRetry(download: Download) {
-    const result = await api.retryDownload(download.id)
-    if (!result.ok) {
-      setError(result.error)
-    }
-  }
-
-  async function handleOpenFile(download: Download) {
+  const handleOpenFile = (download: Download) => {
     if (!download.destination) return
-    const result = await api.openFile(download.destination)
-    if (!result.ok) {
-      setError(result.error)
-    }
+    void runAction(() => api.openFile(download.destination!))
   }
 
   async function handleStartConversion(
@@ -168,16 +163,15 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
     if (startingConversions.has(input)) return
     setStartingConversions((previous) => new Set(previous).add(input))
     try {
-      const result = await api.startConversion({
-        ...options,
-        input,
-        title: download.title,
-        thumbnail: download.thumbnail,
-        duration: download.duration
-      })
-      if (!result.ok) {
-        setError(result.error)
-      }
+      await runAction(() =>
+        api.startConversion({
+          ...options,
+          input,
+          title: download.title,
+          thumbnail: download.thumbnail,
+          duration: download.duration
+        })
+      )
     } finally {
       setStartingConversions((previous) => {
         const next = new Set(previous)
@@ -187,26 +181,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
     }
   }
 
-  async function handleCancelConversion(id: string) {
-    const result = await api.cancelConversion(id)
-    if (!result.ok) {
-      setError(result.error)
-    }
-  }
-
-  async function handleOpenConversion(path: string) {
-    const result = await api.openFile(path)
-    if (!result.ok) {
-      setError(result.error)
-    }
-  }
-
-  async function handleOpenFileLocation(path: string) {
-    const result = await api.openFileLocation(path)
-    if (!result.ok) {
-      setError(result.error)
-    }
-  }
+  const handleCancelConversion = (id: string) => runAction(() => api.cancelConversion(id))
 
   async function handleClearHistory() {
     const result = await api.clearHistory()
@@ -242,20 +217,28 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
       : downloads.filter((download) => statuses.includes(download.status))
   const groups = GROUPED_SECTIONS.has(section) ? groupByDay(items) : undefined
   const hasHistory = hasTerminalStatus(downloads)
+  const header = (
+    <div className="page-header">
+      <h1>{definition.title}</h1>
+      {section === 'downloads' && hasHistory && (
+        <button type="button" className="btn" onClick={() => void handleClearHistory()}>
+          Clear history
+        </button>
+      )}
+    </div>
+  )
+  const alerts = (
+    <>
+      {loadError && <ErrorAlert error={loadError} />}
+      {error && <ErrorAlert error={error} />}
+    </>
+  )
 
   if (items.length === 0) {
     return (
       <section className="page">
-        {loadError && <ErrorAlert error={loadError} />}
-        {error && <ErrorAlert error={error} />}
-        <div className="page-header">
-          <h1>{definition.title}</h1>
-          {section === 'downloads' && hasHistory && (
-            <button type="button" className="btn" onClick={() => void handleClearHistory()}>
-              Clear history
-            </button>
-          )}
-        </div>
+        {alerts}
+        {header}
         <EmptyState message={definition.emptyMessage} />
       </section>
     )
@@ -263,16 +246,8 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
 
   return (
     <section className="page">
-      {loadError && <ErrorAlert error={loadError} />}
-      {error && <ErrorAlert error={error} />}
-      <div className="page-header">
-        <h1>{definition.title}</h1>
-        {section === 'downloads' && hasHistory && (
-          <button type="button" className="btn" onClick={() => void handleClearHistory()}>
-            Clear history
-          </button>
-        )}
-      </div>
+      {alerts}
+      {header}
       {groups ? (
         groups.map((group) => (
           <div key={group.key} className="history-day-group">

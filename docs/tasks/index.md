@@ -51,7 +51,7 @@ Each task has its own file. Update the Status column here when a task changes st
 | R-001 | Extract shared persistent-collection abstraction              | Medium   | Open   | [R-001-persistent-collection.md](R-001-persistent-collection.md) |
 | R-002 | Extract job registry/scheduler from DownloadManager           | Medium   | Open   | [R-002-download-job-scheduler.md](R-002-download-job-scheduler.md) |
 | R-003 | Create shared DownloadStateProvider for renderer              | Medium   | Done   | [R-003-download-state-provider.md](R-003-download-state-provider.md) |
-| R-004 | Collapse duplicated action handlers and alert markup          | Low      | Open   | [R-004-renderer-handler-deduplication.md](R-004-renderer-handler-deduplication.md) |
+| R-004 | Collapse duplicated action handlers and alert markup          | Low      | Done   | [R-004-renderer-handler-deduplication.md](R-004-renderer-handler-deduplication.md) |
 | R-005 | Remove dead code (spawnProcess, FfmpegService.merge, isPathInside decision) | Low | Done | [R-005-remove-dead-code.md](R-005-remove-dead-code.md) |
 | R-006 | Deduplicate main-process helper functions                     | Low      | Done   | [R-006-main-helper-deduplication.md](R-006-main-helper-deduplication.md) |
 

@@ -1,6 +1,6 @@
 # R-004: Collapse duplicated action handlers and alert markup
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Low
 - **Category:** Refactoring
 - **Branch:** `refactor/renderer-handler-deduplication`
