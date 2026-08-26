@@ -68,6 +68,15 @@ Each task has its own file. Update the Status column here when a task changes st
 | E-007 | Accessibility improvements (progressbar, badges)      | Low      | Open   | [E-007-accessibility.md](E-007-accessibility.md) |
 | E-008 | Bundle/detect a JS runtime for yt-dlp                 | Medium   | Open   | [E-008-ytdlp-js-runtime.md](E-008-ytdlp-js-runtime.md) |
 
+## Features
+
+| ID    | Title                                                | Priority | Status      | Task File                                        |
+| ----- | ---------------------------------------------------- | -------- | ----------- | ------------------------------------------------ |
+| F-001 | Playlist downloads (FR-020)                           | High     | In Progress | [F-001-playlist-downloads.md](F-001-playlist-downloads.md) |
+
+> Note: the `feature/playlist-downloads` branch includes transient auto-retry with
+> backoff, overlapping E-003 — dedupe when integrating.
+
 ## Suggested Order
 
 1. B-001 (security trio — enforcement helper already exists)
