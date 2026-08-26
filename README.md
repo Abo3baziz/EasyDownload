@@ -18,7 +18,7 @@ persistent history. Powered by bundled yt-dlp and FFmpeg binaries.
 [Features](#features) ·
 [How it works](#how-it-works) ·
 [Development](#development) ·
-[Portfolio case study](docs/PORTFOLIO.md)
+[case study](docs/PORTFOLIO.md)
 
 </div>
 
