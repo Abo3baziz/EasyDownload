@@ -31,19 +31,17 @@ Detect playlist URLs during inspection and fan out downloads for every entry:
 
 ## Integration Work Required Before Merge
 
-⚠️ The branch forked from `main` at `4d3221a` and is now **25 commits behind**. Our
-completed fixes touch the same files heavily (`download-manager.ts`, IPC layer, schemas,
-renderer state). Required work:
+⚠️ The branch forked from `main` at `4d3221a` and was 25 commits behind. Integration
+completed on 2026-08-26:
 
-- [ ] Rebase onto latest `main` (or merge main into the branch)
-- [ ] Resolve conflicts in `download-manager.ts` (path guard interplay, shutdown(),
-      concurrency clamp, cancel/retry changes) and `ytdlp-service.ts` (--progress,
-      error mappers with details)
-- [ ] Fold branch's transient auto-retry into E-003 scope — dedupe with this task or close E-003 when merged
-- [ ] Verify new code against B-001 path containment (playlist entry downloads must pass the PathGuard directory check)
-- [ ] Reconcile shared schema changes (`src/shared/schemas/index.ts`) with the tightened http(s)-only urlSchema
-- [ ] Update renderer state to consume `DownloadsStateProvider` (branch predates it)
-- [ ] Full typecheck + test suite green; manual end-to-end playlist download test
+- [x] Merged latest `main` into the branch (single conflict-resolution pass)
+- [x] Resolved `download-manager.ts` conflicts — playlist fan-out coexists with shutdown(), sanitized title variants, NaN-safe concurrency clamp, and cancel/retry fixes
+- [x] Applied B-001 PathGuard containment to the new `playlistDownload` IPC channel
+- [x] Kept http(s)-only `urlSchema`, throttled broadcasts (E-001), atomic persistence (B-005), and IPC error sanitization (S-002)
+- [x] Renderer: HomePage tests wrapped in `DownloadsStateProvider`; api mocks extended with playlist methods
+- [x] E-003 transient retry implemented by this branch (task closed as covered)
+- [x] Full typecheck + suite green after integration (316 unit / 12 integration / 120 renderer)
+- [ ] Manual end-to-end playlist download against live YouTube (deferred — bot-check dependent)
 
 ## Acceptance Criteria
 
