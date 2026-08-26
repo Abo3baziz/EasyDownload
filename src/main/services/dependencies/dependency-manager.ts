@@ -20,6 +20,7 @@ export function createDependencyManager(
   const ytDlpCommand = options.ytDlpCommand ?? 'yt-dlp'
   const ffmpegCommand = options.ffmpegCommand ?? 'ffmpeg'
   const timeoutMs = options.timeoutMs ?? 5000
+  const cache = new Map<DependencyName, DependencyStatus>()
 
   async function check(
     name: DependencyName,
@@ -40,13 +41,29 @@ export function createDependencyManager(
     }
   }
 
+  async function checkCached(
+    name: DependencyName,
+    command: string,
+    versionArgs: readonly string[]
+  ): Promise<DependencyStatus> {
+    const cached = cache.get(name)
+    if (cached?.available) {
+      return cached
+    }
+    const status = await check(name, command, versionArgs)
+    if (status.available) {
+      cache.set(name, status)
+    }
+    return status
+  }
+
+  const checkYtDlp = () => checkCached('yt-dlp', ytDlpCommand, ['--version'])
+  const checkFfmpeg = () => checkCached('ffmpeg', ffmpegCommand, ['-version'])
+
   return {
-    checkYtDlp: () => check('yt-dlp', ytDlpCommand, ['--version']),
-    checkFfmpeg: () => check('ffmpeg', ffmpegCommand, ['-version']),
-    checkAll: async () => [
-      await check('yt-dlp', ytDlpCommand, ['--version']),
-      await check('ffmpeg', ffmpegCommand, ['-version'])
-    ]
+    checkYtDlp,
+    checkFfmpeg,
+    checkAll: () => Promise.all([checkYtDlp(), checkFfmpeg()])
   }
 }
 

@@ -1,6 +1,6 @@
 # E-006: Async file existence checks in list path
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Low
 - **Category:** Enhancement / Performance
 - **Branch:** `perf/async-existence-checks`

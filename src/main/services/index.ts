@@ -1,6 +1,6 @@
 import { Notification } from 'electron'
 import { existsSync } from 'node:fs'
-import { readdir, stat, unlink } from 'node:fs/promises'
+import { access, readdir, stat, unlink } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { Conversion } from '../../shared/types/conversion'
 import type { AppSettings } from '../../shared/types/settings'
@@ -134,6 +134,14 @@ export function createServices(deps: ServicesDeps): Services {
       }
     },
     getConcurrencyLimit: async () => (await settings.load()).concurrencyLimit,
+    fileExistsAsync: async (path) => {
+      try {
+        await access(path)
+        return true
+      } catch {
+        return false
+      }
+    },
     statFile
   })
 

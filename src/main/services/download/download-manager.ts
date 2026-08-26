@@ -46,9 +46,10 @@ export interface DownloadManagerOptions {
   history?: HistoryManager
   statFile?: (path: string) => Promise<{ size: number } | undefined>
   fileExists?: (path: string) => boolean
+  fileExistsAsync?: (path: string) => Promise<boolean>
   listDirectory?: (path: string) => Promise<string[]>
   getConcurrencyLimit?: () => number | Promise<number>
-  getRetryDelayMs?: (attempt: number) => number
+  getRetryDelayMs?: () => number
   now?: () => number
   generateId?: () => string
 }
@@ -135,14 +136,15 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     return persistChain
   }
 
-  function pruneMissingFiles(): void {
-    if (!options.fileExists) {
+  async function pruneMissingFiles(): Promise<void> {
+    if (!options.fileExists && !options.fileExistsAsync) {
       return
     }
+    const exists = options.fileExistsAsync ?? (async (path: string) => !!options.fileExists?.(path))
     let removed = false
     for (const [id, download] of jobs) {
       if (download.status === 'completed' && download.destination) {
-        if (!options.fileExists(download.destination)) {
+        if (!(await exists(download.destination))) {
           jobs.delete(id)
           configs.delete(id)
           removed = true
@@ -617,7 +619,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
   return {
     async create(optionsPayload: DownloadOptions): Promise<Download> {
       await ensureLoaded()
-      pruneMissingFiles()
+      await pruneMissingFiles()
       const alreadyDownloaded = [...jobs.values()].some(
         (download) =>
           download.status === 'completed' &&
@@ -866,7 +868,7 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
 
     async list(): Promise<Download[]> {
       await ensureLoaded()
-      pruneMissingFiles()
+      await pruneMissingFiles()
       return [...jobs.values()]
     },
 

@@ -1,6 +1,6 @@
 # E-004: Parallelize and cache dependency checks
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Low
 - **Category:** Enhancement / Performance
 - **Branch:** `perf/dependency-checks`
