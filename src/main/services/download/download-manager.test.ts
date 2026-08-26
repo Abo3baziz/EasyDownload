@@ -1640,4 +1640,56 @@ describe('createDownloadManager', () => {
       expect.objectContaining({ id: 'dl-2', status: 'cancelled' })
     ])
   })
+
+  it('derives the destination from the sanitized title when yt-dlp replaced illegal characters', async () => {
+    const ytDlp = createMockYtDlp()
+    const sanitizedTitle = 'What is this_'
+    ytDlp.inspect.mockResolvedValue({
+      id: 'abc123',
+      title: 'What is this?',
+      formats: [{ format_id: '137', vcodec: 'avc1.42001E', acodec: 'mp4a.40.2', ext: 'mp4' }]
+    })
+    const { handle, completion } = downloadHandle()
+    ytDlp.startDownload.mockReturnValue(handle)
+    const sanitizedDestination = `D:\\Downloads\\${sanitizedTitle} [abc123] [137].mp4`
+    const manager = createDownloadManager({
+      ytDlp,
+      generateId: () => 'dl-1',
+      fileExists: (path) => path === sanitizedDestination
+    })
+    await manager.create(OPTIONS)
+    await manager.start('dl-1')
+    await flush()
+    completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+
+    await expect(manager.get('dl-1')).resolves.toMatchObject({
+      status: 'completed',
+      destination: sanitizedDestination
+    })
+  })
+
+  it('backfills a completed download whose stored title contains illegal characters', async () => {
+    const record = terminalRecord({
+      id: 'dl-old',
+      status: 'completed',
+      title: 'Video: Premiere?',
+      formatId: '18',
+      directory: 'D:\\Downloads',
+      extension: 'mp4'
+    })
+    const { history, save } = createMockHistory([record])
+    const manager = createDownloadManager({
+      ytDlp: createMockYtDlp(),
+      history,
+      listDirectory: async () => ['Video_ Premiere_ [abc123] [18].mp4', 'Unrelated.mp4'],
+      fileExists: () => true,
+      statFile: async () => ({ size: 42 })
+    })
+
+    await expect(manager.get(record.id)).resolves.toMatchObject({
+      destination: 'D:\\Downloads\\Video_ Premiere_ [abc123] [18].mp4'
+    })
+    expect(save).toHaveBeenCalled()
+  })
 })

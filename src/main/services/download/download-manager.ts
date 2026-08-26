@@ -5,6 +5,7 @@ import type { Download, DownloadOptions, DownloadStatus } from '../../../shared/
 import type { DependencyStatus } from '../../../shared/types/dependencies'
 import { normalizeUrl } from '../../../shared/utils/url'
 import { AppError, toAppError } from '../../utils/errors'
+import { sanitizeFilename } from '../../utils/filename'
 import type { HistoryManager } from '../history/history-manager'
 import { buildResolution, isRealCodec } from '../media/normalize'
 import type {
@@ -351,11 +352,16 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
     if (!meta || !config || !options.fileExists) {
       return undefined
     }
-    const candidate = join(
-      config.directory,
-      `${meta.title} [${meta.id}] [${config.formatId}].${meta.extension}`
-    )
-    return options.fileExists(candidate) ? candidate : undefined
+    for (const title of titleVariants(meta.title)) {
+      const candidate = join(
+        config.directory,
+        `${title} [${meta.id}] [${config.formatId}].${meta.extension}`
+      )
+      if (options.fileExists(candidate)) {
+        return candidate
+      }
+    }
+    return undefined
   }
 
   async function backfillMissingDestinations(): Promise<void> {
@@ -409,7 +415,9 @@ export function createDownloadManager(options: DownloadManagerOptions): Download
       return undefined
     }
     const pattern = new RegExp(
-      `^${escapeRegExp(title)} \\[[^\\]]+\\] \\[${escapeRegExp(formatId)}\\]\\.${escapeRegExp(extension)}$`
+      `^(?:${titleVariants(title)
+        .map(escapeRegExp)
+        .join('|')}) \\[[^\\]]+\\] \\[${escapeRegExp(formatId)}\\][. ]*${escapeRegExp(extension)}$`
     )
     const matches = names.filter((name) => pattern.test(name))
     if (matches.length !== 1) {
@@ -737,4 +745,9 @@ function formatMetadata(
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function titleVariants(title: string): string[] {
+  const sanitized = sanitizeFilename(title)
+  return sanitized === title ? [title] : [title, sanitized]
 }

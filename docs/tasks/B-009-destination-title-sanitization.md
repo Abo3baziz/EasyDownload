@@ -1,6 +1,6 @@
 # B-009: Destination detection uses unsanitized media title
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Medium
 - **Category:** Bug
 - **Branch:** `bugfix/destination-title-sanitization`
