@@ -102,7 +102,7 @@ The app is organized around a single collapsible sidebar: **Home** (inspect and 
 
 The primary flow:
 
-<Mermaid>{`
+```mermaid
 flowchart TD
     A[Open EasyDownload] --> B[Paste a video or playlist URL]
     B --> C{Inspect}
@@ -112,7 +112,7 @@ flowchart TD
     F --> G[Pause, resume, cancel, or retry as needed]
     G --> H[Completed - open file, open location, or convert / extract audio]
     H --> I[Tracked in history, available after restart]
-`}</Mermaid>
+```
 
 Details that matter for day-to-day use:
 
@@ -127,7 +127,7 @@ Under the hood, EasyDownload is a desktop app with three cooperating layers: the
 
 When the user clicks Download, this happens:
 
-<Mermaid>{`
+```mermaid
 sequenceDiagram
     participant UI as Interface (React)
     participant Bridge as Bridge (preload)
@@ -155,7 +155,7 @@ sequenceDiagram
     YT-->>Q: printed final file path
     Q->>Q: save terminal record to history
     Q-->>UI: completed event
-`}</Mermaid>
+```
 
 Two things make this interesting:
 
@@ -164,7 +164,7 @@ Two things make this interesting:
 
 ## Architecture
 
-<Mermaid>{`
+```mermaid
 flowchart TB
     User[User]
 
@@ -206,7 +206,7 @@ flowchart TB
     YT --> FS
     FF --> FS
     DM -. normalized state events .-> IPC
-`}</Mermaid>
+```
 
 The major parts, in simple terms:
 
@@ -251,7 +251,7 @@ The desktop equivalent of a backend, running on the user's machine:
 - **Binary management** — yt-dlp and FFmpeg are fetched at build time into `resources/bin/` and resolved at runtime (packaged path first, PATH fallback); the bundled FFmpeg directory is passed to yt-dlp via `--ffmpeg-location`.
 - **Download state machine** — a documented, tested lifecycle:
 
-<Mermaid>{`
+```mermaid
 stateDiagram-v2
     [*] --> Queued
     Queued --> Inspecting
@@ -270,7 +270,7 @@ stateDiagram-v2
     Completed --> [*]
     Failed --> [*]
     Cancelled --> [*]
-`}</Mermaid>
+```
 
 - **Concurrency that is actually enforced** — the Download Manager limits simultaneous work to the configured setting (1–10), reads it on every queue drain, and isolates per-download state, processes, and cleanup. Playlist entries are additionally serialized per playlist (at most one active at a time) to avoid host rate-limiting.
 
@@ -278,37 +278,41 @@ stateDiagram-v2
 
 Persistence is four small JSON files in the Electron user-data directory, owned by main-process stores:
 
-<Mermaid>{`
+```mermaid
 erDiagram
-    DOWNLOAD ||--o{ CONVERSION : "audio extractions reference source"
+    DOWNLOAD ||--o{ CONVERSION : "source"
+
     DOWNLOAD {
         string id PK "UUID"
         string url
         string status
-        string destination "final file path"
+        string destination "Final file path"
         string formatId
         string thumbnail
-        string playlistId "optional"
-        number retryCount "optional"
+        string playlistId "Optional"
+        int retryCount "Optional"
     }
+
     CONVERSION {
         string id PK "UUID"
-        string input "source download file"
+        string input "Source download file"
         string output
         string type "extractAudio only"
     }
+
     SETTINGS {
         string downloadDirectory
         boolean notificationsEnabled
         int concurrencyLimit "1-10"
     }
+
     INSPECTION_HISTORY {
         string id PK "UUID"
-        string url "unique per normalized URL"
+        string url UK "Unique normalized URL"
         string thumbnail
-        number timestamp "absolute"
+        int timestamp "Absolute timestamp"
     }
-`}</Mermaid>
+```
 
 Notable design decisions:
 
