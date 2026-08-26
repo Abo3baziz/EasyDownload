@@ -30,7 +30,7 @@ Each task has its own file. Update the Status column here when a task changes st
 | B-010 | SettingsPage save failure destroys form UI                        | High     | Done   | [B-010-settings-form-save-error.md](B-010-settings-form-save-error.md) |
 | B-011 | Concurrency setting accepts invalid values                        | Medium   | Done   | [B-011-concurrency-input-validation.md](B-011-concurrency-input-validation.md) |
 | B-012 | Notification manager reads settings from disk per progress tick   | Low      | Open   | [B-012-notification-settings-cache.md](B-012-notification-settings-cache.md) |
-| B-013 | Double-click starts duplicate conversions                         | Medium   | Open   | [B-013-duplicate-conversion-guard.md](B-013-duplicate-conversion-guard.md) |
+| B-013 | Double-click starts duplicate conversions                         | Medium   | Done   | [B-013-duplicate-conversion-guard.md](B-013-duplicate-conversion-guard.md) |
 | B-014 | Stale closure allows duplicate history deletes                    | Low      | Open   | [B-014-history-delete-stale-closure.md](B-014-history-delete-stale-closure.md) |
 | B-015 | Relative timestamps never refresh                                 | Low      | Open   | [B-015-relative-time-refresh.md](B-015-relative-time-refresh.md) |
 | B-017 | Downloads fail with generic NetworkError (stale yt-dlp, hidden detail) | Critical | Done | [B-017-ytdlp-error-reporting.md](B-017-ytdlp-error-reporting.md) |

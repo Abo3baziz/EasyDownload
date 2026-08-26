@@ -27,11 +27,12 @@ const CONVERSION_OPTIONS: readonly { label: string; options: Omit<ConversionStar
 
 interface ConversionControlProps {
   conversion?: Conversion
+  disabled?: boolean
   onStart: (options: Omit<ConversionStartOptions, 'input'>) => void
   onCancel: (id: string) => void
 }
 
-export function ConversionControl({ conversion, onStart, onCancel }: ConversionControlProps) {
+export function ConversionControl({ conversion, disabled, onStart, onCancel }: ConversionControlProps) {
   const [selected, setSelected] = useState(0)
 
   if (conversion?.status === 'running') {
@@ -77,9 +78,10 @@ export function ConversionControl({ conversion, onStart, onCancel }: ConversionC
         <button
           type="button"
           className="btn"
+          disabled={disabled}
           onClick={() => onStart(CONVERSION_OPTIONS[selected]!.options)}
         >
-          Convert
+          {disabled ? 'Starting…' : 'Convert'}
         </button>
       </div>
     </div>

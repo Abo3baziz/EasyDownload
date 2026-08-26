@@ -58,6 +58,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
   const { downloads, replaceDownloads } = useDownloadsData()
   const { error: loadError } = useDownloadMeta()
   const [conversions, setConversions] = useState<Record<string, Conversion>>({})
+  const [startingConversions, setStartingConversions] = useState<ReadonlySet<string>>(new Set())
   const [error, setError] = useState<AppError | null>(null)
 
   useEffect(() => {
@@ -155,16 +156,27 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
     download: Download,
     options: Omit<ConversionStartOptions, 'input'>
   ) {
-    if (!download.destination) return
-    const result = await api.startConversion({
-      ...options,
-      input: download.destination,
-      title: download.title,
-      thumbnail: download.thumbnail,
-      duration: download.duration
-    })
-    if (!result.ok) {
-      setError(result.error)
+    const input = download.destination
+    if (!input) return
+    if (startingConversions.has(input)) return
+    setStartingConversions((previous) => new Set(previous).add(input))
+    try {
+      const result = await api.startConversion({
+        ...options,
+        input,
+        title: download.title,
+        thumbnail: download.thumbnail,
+        duration: download.duration
+      })
+      if (!result.ok) {
+        setError(result.error)
+      }
+    } finally {
+      setStartingConversions((previous) => {
+        const next = new Set(previous)
+        next.delete(input)
+        return next
+      })
     }
   }
 
@@ -201,6 +213,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
 
   const downloadListProps = {
     conversions,
+    startingConversions,
     onCancel: (item: Download) => void handleCancel(item),
     onDelete: (item: Download) => void handleDelete(item),
     onPause: (item: Download) => void handlePause(item),
@@ -275,6 +288,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
 interface DownloadListProps {
   downloads: Download[]
   conversions: Record<string, Conversion>
+  startingConversions: ReadonlySet<string>
   onCancel: (download: Download) => void
   onDelete: (download: Download) => void
   onPause: (download: Download) => void
@@ -300,6 +314,7 @@ function DownloadList({ downloads, ...props }: DownloadListProps) {
 interface DownloadListItemProps {
   download: Download
   conversions: Record<string, Conversion>
+  startingConversions: ReadonlySet<string>
   onCancel: (download: Download) => void
   onDelete: (download: Download) => void
   onPause: (download: Download) => void
@@ -315,6 +330,7 @@ interface DownloadListItemProps {
 function DownloadListItem({
   download,
   conversions,
+  startingConversions,
   onCancel,
   onDelete,
   onPause,
@@ -402,6 +418,7 @@ function DownloadListItem({
       {download.status === 'completed' && download.destination && (
         <ConversionControl
           conversion={conversion}
+          disabled={startingConversions.has(download.destination)}
           onStart={(options) => onStartConversion(download, options)}
           onCancel={(id) => onCancelConversion(id)}
         />

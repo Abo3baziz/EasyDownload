@@ -192,6 +192,15 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
   return {
     async start(startOptions: ConversionStartOptions): Promise<Conversion> {
       await ensureLoaded()
+      const running = [...conversions.values()].find(
+        (conversion) => conversion.input === startOptions.input && conversion.status === 'running'
+      )
+      if (running) {
+        throw new AppError(
+          'DownloadError',
+          'A conversion for this file is already running. Wait for it to finish or cancel it first.'
+        )
+      }
       if (options.statFile) {
         const info = await options.statFile(startOptions.input).catch(() => undefined)
         if (!info) {

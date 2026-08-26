@@ -274,7 +274,11 @@ describe('createConversionManager', () => {
     const manager = createConversionManager({ ffmpeg, generateId: () => `cv-${++sequence}` })
 
     await manager.start(OPTIONS)
-    await manager.start({ ...OPTIONS, audioCodec: 'flac' })
+    await manager.start({
+      ...OPTIONS,
+      input: 'C:\\Downloads\\Other [def].mp4',
+      audioCodec: 'flac'
+    })
 
     expect((await manager.list()).map((conversion) => conversion.id)).toEqual(['cv-1', 'cv-2'])
   })
@@ -560,5 +564,34 @@ describe('createConversionManager', () => {
     await flush()
 
     expect(deleteFile).toHaveBeenCalledWith(join('C:\\Downloads', 'Example [abc].mp3'))
+  })
+
+  it('rejects a second conversion while one is running for the same input', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const manager = createConversionManager({ ffmpeg, generateId: () => 'cv-1' })
+    await manager.start(OPTIONS)
+
+    await expect(manager.start(OPTIONS)).rejects.toMatchObject({
+      code: 'DownloadError',
+      message: expect.stringContaining('already running')
+    })
+    // The rejected request must not have spawned a second ffmpeg process.
+    expect(ffmpeg.extractAudio).toHaveBeenCalledTimes(1)
+  })
+
+  it('allows a new conversion for the same input after the previous one finished', async () => {
+    const ffmpeg = createMockFfmpeg()
+    const { handle, completion } = mockHandle()
+    ffmpeg.extractAudio.mockReturnValue(handle)
+    const manager = createConversionManager({ ffmpeg, generateId: () => 'cv-1' })
+    await manager.start(OPTIONS)
+
+    completion.resolve({ exitCode: 0, stdout: '', stderr: '', cancelled: false })
+    await flush()
+
+    await expect(manager.start(OPTIONS)).resolves.toMatchObject({ status: 'running' })
+    expect(ffmpeg.extractAudio).toHaveBeenCalledTimes(2)
   })
 })

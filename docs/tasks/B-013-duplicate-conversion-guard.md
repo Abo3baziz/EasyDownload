@@ -1,6 +1,6 @@
 # B-013: Double-click starts duplicate conversions
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Medium
 - **Category:** Bug / UX
 - **Branch:** `bugfix/duplicate-conversion-guard`
