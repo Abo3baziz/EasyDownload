@@ -1,6 +1,6 @@
 # E-007: Accessibility improvements
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Low
 - **Category:** Enhancement / A11y
 - **Branch:** `feature/accessibility`

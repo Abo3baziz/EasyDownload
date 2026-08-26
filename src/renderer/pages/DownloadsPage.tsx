@@ -679,10 +679,17 @@ function DownloadProgressBar({ download }: { download: Download }) {
 
   return (
     <div className="download-progress">
-      <div className="progress-track">
+      <div
+        className="progress-track"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent !== undefined ? Math.round(percent) : undefined}
+        aria-label={`${download.title ?? download.url} download progress`}
+      >
         <div
           className="progress-fill"
-          style={{ width: `${Math.min(100, Math.max(0, effectivePercent ?? 0))}%` }}
+          style={{ width: `${Math.min(100, Math.max(0, percent ?? 0))}%` }}
         />
       </div>
       <span className="progress-label">

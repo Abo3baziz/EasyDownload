@@ -9,7 +9,7 @@ import { useDownloadsData } from '../state/downloadState'
 import { useMediaDownloader } from '../hooks/useMediaDownloader'
 import { useHomeState } from '../state/homeState'
 
-export function HomePage() {
+export function HomePage({ onNavigateDownloads }: { onNavigateDownloads?: () => void }) {
   const api = useMediaDownloader()
   const { downloads } = useDownloadsData()
   const {
@@ -168,6 +168,11 @@ export function HomePage() {
           className='notice'
           role='status'>
           {notice}
+          {onNavigateDownloads && (
+            <button type='button' className='btn' onClick={onNavigateDownloads}>
+              Go to Downloads
+            </button>
+          )}
         </div>
       )}
 

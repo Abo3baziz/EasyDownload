@@ -24,7 +24,9 @@ export default function App() {
           <div className="app">
             <Sidebar section={section} onNavigate={setSection} />
             <main className="app-content">
-              {section === 'home' && <HomePage />}
+              {section === 'home' && (
+                <HomePage onNavigateDownloads={() => setSection('downloads')} />
+              )}
               {isDownloadSection(section) && <DownloadsPage section={section} />}
               {section === 'history' && <HistoryPage onInspect={() => setSection('home')} />}
               {section === 'settings' && <SettingsPage />}
