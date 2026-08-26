@@ -1,6 +1,6 @@
 # B-015: Relative timestamps never refresh
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Low
 - **Category:** Bug / UX
 - **Branch:** `bugfix/relative-time-refresh`

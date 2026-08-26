@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { AppError } from '../../shared/types/errors'
 import type { HistoryEntry } from '../../shared/types/history'
+import { useNowTick } from '../hooks/useNowTick'
 import { useHistoryState } from '../state/historyState'
 import { useHomeState } from '../state/homeState'
 import { formatEntryTime, groupHistoryByDay } from '../utils/history'
@@ -13,6 +14,7 @@ export function HistorySection({ onInspect }: { onInspect: (url: string) => void
   const { entries, loaded, error, deleteEntry } = useHistoryState()
   const { setUrl } = useHomeState()
   const [actionError, setActionError] = useState<AppError | null>(null)
+  const now = useNowTick(30_000)
   const groups = groupHistoryByDay(entries)
 
   async function handleInspect(entry: HistoryEntry) {
@@ -47,6 +49,7 @@ export function HistorySection({ onInspect }: { onInspect: (url: string) => void
               <HistoryEntryItem
                 key={entry.id}
                 entry={entry}
+                now={now}
                 onInspect={() => void handleInspect(entry)}
                 onDelete={() => void handleDelete(entry)}
               />
@@ -60,10 +63,12 @@ export function HistorySection({ onInspect }: { onInspect: (url: string) => void
 
 function HistoryEntryItem({
   entry,
+  now,
   onInspect,
   onDelete
 }: {
   entry: HistoryEntry
+  now: number
   onInspect: () => void
   onDelete: () => void
 }) {
@@ -81,7 +86,9 @@ function HistoryEntryItem({
           title={entry.url}>
           {entry.url}
         </span>
-        <span className='history-meta'>Inspected · {formatEntryTime(entry.createdAt)}</span>
+        <span className='history-meta'>
+          Inspected · {formatEntryTime(entry.createdAt, now)}
+        </span>
       </div>
       <div className='history-actions'>
         <button
