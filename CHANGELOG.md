@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-26 (v1.3.1)
+
+### Fixed
+
+- Playlist video counter in the Queue section now counts videos completed outside the queue view and stays live as entries finish, instead of freezing at "0 of N".
+- Playlist entries split by interleaved downloads are grouped into a single playlist group again instead of showing duplicate counters.
+
 ## 2026-08-26 (v1.3.0)
 
 ### Added
@@ -37,7 +44,7 @@
 
 ### Changed
 
-- The application icon now uses the dark logo: the `icon:generate` script input was switched from `resources/logo.png` to `Logo-dark.png` (square 1024×1024 source at the repository root), and the `build/icons` set (Windows `.ico`, macOS `.icns`, Linux PNG set) was regenerated from it.
+- The application icon now uses the dark logo: the `icon:generate` script input was switched from `resources/logo.png` to `Logo-dark.png` (square 1024ط£â€”1024 source at the repository root), and the `build/icons` set (Windows `.ico`, macOS `.icns`, Linux PNG set) was regenerated from it.
 
 ### Documentation
 
@@ -65,7 +72,7 @@
 
 ### Fixed
 
-- Concurrent downloads no longer fail when a second download is started while the first is still being scheduled: `create` no longer enqueues the job (only `start`/`resume`/`retry` do), so a pending scheduler pass can never pick up a not-yet-started download and move it to `inspecting` before `start()` runs — previously this surfaced as `Cannot start a download in state "inspecting"` for the second download. Regression test added.
+- Concurrent downloads no longer fail when a second download is started while the first is still being scheduled: `create` no longer enqueues the job (only `start`/`resume`/`retry` do), so a pending scheduler pass can never pick up a not-yet-started download and move it to `inspecting` before `start()` runs أ¢â‚¬â€‌ previously this surfaced as `Cannot start a download in state "inspecting"` for the second download. Regression test added.
 - Downloads, Completed, Cancelled, and Failed sections now group downloads by local calendar day with the same `Today`, `Yesterday`, and readable-date headers used by inspection History. Items and day groups remain newest first; Queue stays as a flat active-work list.
 
 ### Added
@@ -76,7 +83,7 @@
 
 ### Added
 
-- Concurrent downloads (FR-012, FR-016): the Download Manager now enforces the configured concurrency limit instead of the hardcoded single-slot scheduler. The manager reads the persisted `concurrencyLimit` setting (1–10) via a new `getConcurrencyLimit` option wired from the settings service, starts up to that many downloads simultaneously, and never exceeds the limit. Each job occupies one slot for its full lifecycle; when a download completes, fails, cancels, or pauses, its slot is released and the next queued download starts automatically. Retrying a failed or cancelled download re-enters the queue and respects the limit, pausing frees the slot (resume re-queues), and starting the same download twice cannot create a second process (status guards, queue re-entry guards, and an active-execution guard that defers a re-queued job until its previous process has fully exited). Cancellation cleanup no longer clobbers a download that was retried while its old process was still exiting, and per-download state, processes, progress events, and cleanup remain fully isolated across concurrent jobs.
+- Concurrent downloads (FR-012, FR-016): the Download Manager now enforces the configured concurrency limit instead of the hardcoded single-slot scheduler. The manager reads the persisted `concurrencyLimit` setting (1أ¢â‚¬â€œ10) via a new `getConcurrencyLimit` option wired from the settings service, starts up to that many downloads simultaneously, and never exceeds the limit. Each job occupies one slot for its full lifecycle; when a download completes, fails, cancels, or pauses, its slot is released and the next queued download starts automatically. Retrying a failed or cancelled download re-enters the queue and respects the limit, pausing frees the slot (resume re-queues), and starting the same download twice cannot create a second process (status guards, queue re-entry guards, and an active-execution guard that defers a re-queued job until its previous process has fully exited). Cancellation cleanup no longer clobbers a download that was retried while its old process was still exiting, and per-download state, processes, progress events, and cleanup remain fully isolated across concurrent jobs.
 
 ## 2026-08-14
 
@@ -88,7 +95,7 @@
 
 ### Changed
 
-- Inspection history is now unique per URL: re-inspecting an already-listed URL refreshes that single entry (new `Inspected · <time>` timestamp, updated thumbnail) and moves it back to the top instead of creating a duplicate entry. URLs are compared with the existing `normalizeUrl` helper, legacy duplicate records in `inspection-history.json` are pruned to the newest one on load, and history entries are still only created for inspections that succeeded (failed inspections never reach the history manager).
+- Inspection history is now unique per URL: re-inspecting an already-listed URL refreshes that single entry (new `Inspected ط¢آ· <time>` timestamp, updated thumbnail) and moves it back to the top instead of creating a duplicate entry. URLs are compared with the existing `normalizeUrl` helper, legacy duplicate records in `inspection-history.json` are pruned to the newest one on load, and history entries are still only created for inspections that succeeded (failed inspections never reach the history manager).
 
 ## 2026-08-14
 
@@ -105,7 +112,7 @@
 
 ### Added
 
-- Home page inspection history: a new History section (originally on the Home page, later moved into the dedicated sidebar History section) shows the URLs previously inspected. Each successful inspection creates a persistent entry (URL, thumbnail reference, `INSPECTED` operation, absolute timestamp) recorded by a new Inspection History Manager main-process service and stored offline in `inspection-history.json` (reusing the existing `createJsonStore<T>` helper). Entries are sorted newest first, grouped by the user's local calendar day (`Today`, `Yesterday`, or a readable date), and each shows a truncated URL with a full-URL tooltip, the inspection thumbnail (with a `No thumbnail` fallback when missing or offline), and an `Inspected · <relative time>` indicator. Re-inspecting a URL adds a new entry at the top. A renderer `HistoryStateProvider` loads history on startup and subscribes to a new `inspectionHistory:state` event so new entries appear automatically without restarting; persistence failures are logged and never block the inspection result.
+- Home page inspection history: a new History section (originally on the Home page, later moved into the dedicated sidebar History section) shows the URLs previously inspected. Each successful inspection creates a persistent entry (URL, thumbnail reference, `INSPECTED` operation, absolute timestamp) recorded by a new Inspection History Manager main-process service and stored offline in `inspection-history.json` (reusing the existing `createJsonStore<T>` helper). Entries are sorted newest first, grouped by the user's local calendar day (`Today`, `Yesterday`, or a readable date), and each shows a truncated URL with a full-URL tooltip, the inspection thumbnail (with a `No thumbnail` fallback when missing or offline), and an `Inspected ط¢آ· <relative time>` indicator. Re-inspecting a URL adds a new entry at the top. A renderer `HistoryStateProvider` loads history on startup and subscribes to a new `inspectionHistory:state` event so new entries appear automatically without restarting; persistence failures are logged and never block the inspection result.
 
 ## 2026-08-13
 
@@ -135,7 +142,7 @@
 
 ### Added
 
-- Downloads page navigation sections: the Downloads page now acts as a section selector with navigation cards (Completed, Queue, Cancelled, Failed) showing live download counts. Clicking a card opens a dedicated full-page view for that status (filtered by the existing status model, reusing the same download item card), with a "← Downloads" button back to the selector. Empty section pages show an appropriate empty message, and counts update automatically when statuses change.
+- Downloads page navigation sections: the Downloads page now acts as a section selector with navigation cards (Completed, Queue, Cancelled, Failed) showing live download counts. Clicking a card opens a dedicated full-page view for that status (filtered by the existing status model, reusing the same download item card), with a "أ¢â€ ع¯ Downloads" button back to the selector. Empty section pages show an appropriate empty message, and counts update automatically when statuses change.
 
 ## 2026-08-13
 
@@ -193,7 +200,7 @@
 
 ### Added
 
-- Home page state persistence: Home page state now lives in a renderer-level `HomeStateProvider` context mounted above the tab navigation, so the entered URL and inspection results survive navigating Home → Downloads → Home and Home → Settings → Home without re-inspecting the URL.
+- Home page state persistence: Home page state now lives in a renderer-level `HomeStateProvider` context mounted above the tab navigation, so the entered URL and inspection results survive navigating Home أ¢â€ â€™ Downloads أ¢â€ â€™ Home and Home أ¢â€ â€™ Settings أ¢â€ â€™ Home without re-inspecting the URL.
 - A new `Clear` button clears the current URL input and the active inspection view without deleting the cached inspection result; re-entering the same URL restores the previous metadata and formats, while entering a different URL never displays stale data.
 - Inspection results are cached per normalized URL (`Record<normalizedUrl, MediaInfo>`), so switching between previously inspected URLs restores each result; results are always associated with the URL that produced them.
 - New `normalizeUrl` helper in `src/shared/utils/url.ts` (trim + `new URL(...).toString()` normalization of host/scheme case and root trailing slash) defines consistent URL comparison. Unit, renderer, and navigation tests added.
@@ -226,7 +233,7 @@
 
 ### Added
 
-- Application icon set: `electron-icon-builder` and `sharp` dev dependencies with an `icon:generate` script that turns a square 1024×1024 source PNG (`resources/logo.png`) into `build/icons/` (Windows `.ico`, macOS `.icns`, and a Linux PNG set); electron-builder config points `win`/`mac`/`linux` at the generated icons, and the main window uses the icon in development. A `scripts/extract-ico-png.mjs` helper extracts the largest embedded PNG from an ICO source and upscales it to the required 1024×1024 source. Verified end-to-end with an unpacked Windows build (`EasyDownload.exe` carries the icon).
+- Application icon set: `electron-icon-builder` and `sharp` dev dependencies with an `icon:generate` script that turns a square 1024ط£â€”1024 source PNG (`resources/logo.png`) into `build/icons/` (Windows `.ico`, macOS `.icns`, and a Linux PNG set); electron-builder config points `win`/`mac`/`linux` at the generated icons, and the main window uses the icon in development. A `scripts/extract-ico-png.mjs` helper extracts the largest embedded PNG from an ICO source and upscales it to the required 1024ط£â€”1024 source. Verified end-to-end with an unpacked Windows build (`EasyDownload.exe` carries the icon).
 
 ## 2026-08-11
 
