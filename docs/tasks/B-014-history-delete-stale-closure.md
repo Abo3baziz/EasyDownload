@@ -1,6 +1,6 @@
 # B-014: Stale closure allows duplicate history deletes
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Low
 - **Category:** Bug
 - **Branch:** `bugfix/history-delete-stale-closure`
