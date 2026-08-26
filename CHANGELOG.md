@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-08-26 (v1.3.0)
+
+### Added
+
+- Playlist downloads (FR-020): playlist inspection, fan-out downloads serialized per playlist, aggregate and per-entry progress, and playlist-level cancel.
+- Transient download failures auto-retry with escalating backoff; a retry indicator is shown in the UI.
+- Conversions now run through a concurrency-limited queue with a visible Queued state.
+- Accessibility: progressbar semantics on progress tracks, human-friendly status labels, and a Go to Downloads action on the started notice.
+
+### Fixed
+
+- Renderer-supplied paths are now validated against the download directory before file open, download creation, and conversion start.
+- Downloads no longer stall silently when a corrupted settings file yields an invalid concurrency limit; persisted settings are schema-validated per field.
+- Persisted stores are written atomically with backup recovery instead of direct overwrites.
+- Cancelling or quitting the app now terminates yt-dlp/ffmpeg process trees (with hard-kill escalation) and flushes history.
+- Download progress is visible again: `--print` quiet mode was suppressing all progress output (`--progress` added).
+- yt-dlp failures surface their real error detail instead of a generic message; stale formats get dedicated guidance.
+- Conversion output collisions no longer overwrite existing files; partial outputs are cleaned up on failure or cancel.
+- Settings form keeps edits visible when a save fails; concurrency input is validated and clamped.
+- History deletion is idempotent under rapid clicks; relative timestamps refresh automatically.
+
+### Changed
+
+- Media URLs are restricted to http(s) at the IPC boundary for both inspection and downloads.
+- Download progress IPC broadcasts are throttled to one update per download every 200 ms; settings are cached in memory.
+- Dependency checks run in parallel and cache successful results; list-path pruning uses async filesystem access.
+- Unknown internal errors no longer leak raw messages to the renderer; external URL opening is restricted to http(s).
 ## 2026-08-16
 
 ### Changed
