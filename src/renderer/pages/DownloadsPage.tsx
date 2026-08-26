@@ -196,6 +196,7 @@ export function DownloadsPage({ section }: { section: DownloadSection }) {
   const downloadListProps = {
     conversions,
     startingConversions,
+    playlistProgress: downloads,
     onCancel: (item: Download) => void handleCancel(item),
     onCancelPlaylist: (playlistId: string) => void handleCancelPlaylist(playlistId),
     onDelete: (item: Download) => void handleDelete(item),
@@ -272,6 +273,7 @@ interface DownloadListProps {
   downloads: Download[]
   conversions: Record<string, Conversion>
   startingConversions: ReadonlySet<string>
+  playlistProgress: Download[]
   onCancel: (download: Download) => void
   onCancelPlaylist: (playlistId: string) => void
   onDelete: (download: Download) => void
@@ -292,29 +294,65 @@ interface PlaylistGroupEntry {
   items: Download[]
 }
 
+interface PlaylistProgress {
+  completed: number
+  total: number
+}
+
+function playlistProgressById(downloads: Download[]): Map<string, PlaylistProgress> {
+  const progress = new Map<string, PlaylistProgress>()
+  for (const download of downloads) {
+    if (!download.playlistId) {
+      continue
+    }
+    const entry =
+      progress.get(download.playlistId) ??
+      ({ completed: 0, total: download.playlistCount ?? 0 } satisfies PlaylistProgress)
+    if (download.status === 'completed') {
+      entry.completed += 1
+    }
+    if (!entry.total && download.playlistCount) {
+      entry.total = download.playlistCount
+    }
+    progress.set(download.playlistId, entry)
+  }
+  return progress
+}
+
 function groupByPlaylist(downloads: Download[]): PlaylistGroupEntry[] {
+  const playlists = new Map<string, PlaylistGroupEntry>()
   const groups: PlaylistGroupEntry[] = []
   for (const download of downloads) {
     if (!download.playlistId) {
       groups.push({ key: download.id, items: [download] })
       continue
     }
-    const last = groups[groups.length - 1]
-    if (last && last.playlistId === download.playlistId) {
-      last.items.push(download)
-    } else {
-      groups.push({
+    let group = playlists.get(download.playlistId)
+    if (!group) {
+      group = {
         key: download.playlistId,
         playlistId: download.playlistId,
         playlistTitle: download.playlistTitle,
-        items: [download]
-      })
+        items: []
+      }
+      playlists.set(download.playlistId, group)
+      groups.push(group)
     }
+    if (!group.playlistTitle && download.playlistTitle) {
+      group.playlistTitle = download.playlistTitle
+    }
+    group.items.push(download)
   }
   return groups
 }
 
-function DownloadList({ downloads, onCancelPlaylist, ...props }: DownloadListProps) {
+function DownloadList({
+  downloads,
+  playlistProgress,
+  onCancelPlaylist,
+  ...props
+}: DownloadListProps) {
+  const progressById = playlistProgressById(playlistProgress)
   return (
     <ul className='download-list'>
       {groupByPlaylist(downloads).map((group) =>
@@ -322,6 +360,7 @@ function DownloadList({ downloads, onCancelPlaylist, ...props }: DownloadListPro
           <PlaylistGroup
             key={group.key}
             group={group}
+            progress={progressById.get(group.playlistId)}
             onCancelPlaylist={onCancelPlaylist}
             {...props}
           />
@@ -339,14 +378,16 @@ function DownloadList({ downloads, onCancelPlaylist, ...props }: DownloadListPro
 
 function PlaylistGroup({
   group,
+  progress,
   onCancelPlaylist,
   ...props
 }: {
   group: PlaylistGroupEntry
+  progress?: PlaylistProgress
   onCancelPlaylist: (playlistId: string) => void
-} & Omit<DownloadListProps, 'downloads' | 'onCancelPlaylist'>) {
-  const total = group.items[0]?.playlistCount ?? group.items.length
-  const completed = group.items.filter((download) => download.status === 'completed').length
+} & Omit<DownloadListProps, 'downloads' | 'onCancelPlaylist' | 'playlistProgress'>) {
+  const total = progress?.total || group.items[0]?.playlistCount || group.items.length
+  const completed = progress?.completed ?? 0
   const activeCredit = group.items
     .filter((download) => download.status === 'downloading' || download.status === 'processing')
     .reduce((sum, download) => sum + (download.progress.percent ?? 0) / 100, 0)

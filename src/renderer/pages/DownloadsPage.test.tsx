@@ -992,4 +992,63 @@ describe('DownloadsPage', () => {
     expect(await screen.findByText('2 of 2 videos · 100%')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel playlist' })).not.toBeInTheDocument()
   })
+  it('shows completed playlist videos in the queue counter even though they left the queue', async () => {
+    const entry = (id: string, status: Download['status'], percent?: number): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: `Video ${id}`,
+      status,
+      progress: percent !== undefined ? { percent } : {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: 1,
+      playlistCount: 3,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        entry('dl-done', 'completed'),
+        entry('dl-active', 'downloading', 50),
+        entry('dl-waiting', 'queued')
+      ]
+    })
+
+    renderSection('queue')
+
+    expect(await screen.findByText('My Playlist')).toBeInTheDocument()
+    expect(screen.getByText((content) => content.startsWith('1 of 3 videos'))).toBeInTheDocument()
+  })
+
+  it('groups non-adjacent entries of the same playlist into one group', async () => {
+    const entry = (id: string, status: Download['status'], index: number): Download => ({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: `Video ${index}`,
+      status,
+      progress: {},
+      playlistId: 'PL123',
+      playlistTitle: 'My Playlist',
+      playlistIndex: index,
+      playlistCount: 3,
+      createdAt: 1,
+      updatedAt: 1
+    })
+    window.mediaDownloader.listDownloads = vi.fn().mockResolvedValue({
+      ok: true,
+      data: [
+        entry('dl-1', 'downloading', 1),
+        { ...downloadingDownload(), id: 'dl-standalone' },
+        entry('dl-2', 'queued', 2)
+      ]
+    })
+
+    renderSection('queue')
+
+    expect(await screen.findAllByText('My Playlist')).toHaveLength(1)
+    expect(screen.getByText((content) => content.startsWith('0 of 3 videos'))).toBeInTheDocument()
+    expect(screen.getByText('Video 2')).toBeInTheDocument()
+    expect(screen.getByText('Example Video')).toBeInTheDocument()
+  })
 })
