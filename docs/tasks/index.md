@@ -25,7 +25,7 @@ Each task has its own file. Update the Status column here when a task changes st
 | B-005 | Non-atomic JSON writes risk corrupting persisted stores           | High     | Done   | [B-005-atomic-json-writes.md](B-005-atomic-json-writes.md) |
 | B-006 | Conversion output collisions overwrite files; partials left behind | High     | Done   | [B-006-conversion-output-handling.md](B-006-conversion-output-handling.md) |
 | B-007 | Downloads snapshot overwrite race in renderer                     | Medium   | Done   | [B-007-downloads-snapshot-race.md](B-007-downloads-snapshot-race.md) |
-| B-008 | Download URL scheme not restricted to http(s)                     | Medium   | Open   | [B-008-url-scheme-restriction.md](B-008-url-scheme-restriction.md) |
+| B-008 | Download URL scheme not restricted to http(s)                     | Medium   | Done   | [B-008-url-scheme-restriction.md](B-008-url-scheme-restriction.md) |
 | B-009 | Destination detection uses unsanitized media title                | Medium   | Open   | [B-009-destination-title-sanitization.md](B-009-destination-title-sanitization.md) |
 | B-010 | SettingsPage save failure destroys form UI                        | High     | Done   | [B-010-settings-form-save-error.md](B-010-settings-form-save-error.md) |
 | B-011 | Concurrency setting accepts invalid values                        | Medium   | Done   | [B-011-concurrency-input-validation.md](B-011-concurrency-input-validation.md) |

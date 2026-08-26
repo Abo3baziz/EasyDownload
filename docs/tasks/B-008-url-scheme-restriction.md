@@ -1,6 +1,6 @@
 # B-008: Download URL scheme not restricted to http(s)
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Medium
 - **Category:** Bug / Security
 - **Branch:** `bugfix/url-scheme-restriction`

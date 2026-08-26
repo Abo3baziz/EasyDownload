@@ -1,6 +1,12 @@
 import { z } from 'zod'
+import { isValidMediaUrl } from '../utils/url'
 
-export const urlSchema = z.string().url()
+export const urlSchema = z
+  .string()
+  .url()
+  .refine((value) => isValidMediaUrl(value), {
+    message: 'Only http and https URLs are supported.'
+  })
 
 export const inspectUrlSchema = z
   .object({
