@@ -23,6 +23,7 @@ export interface ConversionManagerOptions {
   generateId?: () => string
   fileExists?: (path: string) => boolean
   deleteFile?: (path: string) => Promise<void>
+  maxConcurrent?: number
 }
 
 export function createConversionManager(options: ConversionManagerOptions): ConversionManager {
@@ -31,6 +32,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
   const conversions = new Map<string, Conversion>()
   const handles = new Map<string, FfmpegHandle>()
   const runPromises = new Map<string, Promise<void>>()
+  const waiting: Array<{ conversion: Conversion; input: string; startOptions: ConversionStartOptions }> = []
   const listeners = new Set<(conversion: Conversion) => void>()
   let historyLoaded = false
   let loadingHistory: Promise<void> | undefined
@@ -189,13 +191,52 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
     return current
   }
 
+  function resolveMaxConcurrent(): number {
+    if (options.maxConcurrent === undefined) {
+      return 1
+    }
+    return Number.isFinite(options.maxConcurrent) && options.maxConcurrent >= 1
+      ? Math.floor(options.maxConcurrent)
+      : 1
+  }
+
+  function activeCount(): number {
+    let count = 0
+    for (const conversion of conversions.values()) {
+      if (conversion.status === 'running') {
+        count += 1
+      }
+    }
+    return count
+  }
+
+  function pump(): void {
+    const limit = resolveMaxConcurrent()
+    while (waiting.length > 0 && activeCount() < limit) {
+      const next = waiting.shift()
+      if (!next) {
+        break
+      }
+      update(next.conversion.id, { status: 'running' })
+      const runPromise = run(next.conversion, next.input, next.startOptions)
+        .catch(() => undefined)
+        .finally(() => {
+          runPromises.delete(next.conversion.id)
+          pump()
+        })
+      runPromises.set(next.conversion.id, runPromise)
+    }
+  }
+
   return {
     async start(startOptions: ConversionStartOptions): Promise<Conversion> {
       await ensureLoaded()
-      const running = [...conversions.values()].find(
-        (conversion) => conversion.input === startOptions.input && conversion.status === 'running'
+      const active = [...conversions.values()].find(
+        (conversion) =>
+          conversion.input === startOptions.input &&
+          (conversion.status === 'running' || conversion.status === 'queued')
       )
-      if (running) {
+      if (active) {
         throw new AppError(
           'ProcessingError',
           'A conversion for this file is already running. Wait for it to finish or cancel it first.'
@@ -208,12 +249,14 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
         }
       }
       const output = await resolveConversionOutputPath(startOptions.input, startOptions)
+      const limit = resolveMaxConcurrent()
+      const shouldQueue = activeCount() >= limit
       const conversion: Conversion = {
         id: generateId(),
         type: startOptions.type,
         input: startOptions.input,
         output,
-        status: 'running',
+        status: shouldQueue ? 'queued' : 'running',
         progress: { processedMs: 0 },
         title: startOptions.title,
         thumbnail: startOptions.thumbnail,
@@ -223,10 +266,15 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       }
       conversions.set(conversion.id, conversion)
       emit(conversion)
+      if (shouldQueue) {
+        waiting.push({ conversion, input: startOptions.input, startOptions })
+        return conversion
+      }
       const runPromise = run(conversion, startOptions.input, startOptions)
         .catch(() => undefined)
         .finally(() => {
           runPromises.delete(conversion.id)
+          pump()
         })
       runPromises.set(conversion.id, runPromise)
       return conversion
@@ -235,6 +283,13 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
     async cancel(id: string): Promise<Conversion> {
       await ensureLoaded()
       const conversion = getOrThrow(id)
+      if (conversion.status === 'queued') {
+        const queueIndex = waiting.findIndex((item) => item.conversion.id === id)
+        if (queueIndex >= 0) {
+          waiting.splice(queueIndex, 1)
+        }
+        return update(id, { status: 'cancelled' })
+      }
       if (conversion.status !== 'running') {
         throw new AppError(
           'CancellationError',
@@ -251,7 +306,11 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
     async removeForInput(input: string): Promise<Conversion[]> {
       await ensureLoaded()
       const removed = [...conversions.values()].filter((conversion) => conversion.input === input)
-      if (removed.some((conversion) => conversion.status === 'running')) {
+      if (
+        removed.some(
+          (conversion) => conversion.status === 'running' || conversion.status === 'queued'
+        )
+      ) {
         throw new AppError('ProcessingError', 'Cannot delete a download while a conversion is running.')
       }
       if (removed.length === 0) {
@@ -292,6 +351,12 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       await ensureLoaded()
       for (const handle of handles.values()) {
         handle.cancel()
+      }
+      while (waiting.length > 0) {
+        const next = waiting.pop()
+        if (next) {
+          update(next.conversion.id, { status: 'cancelled' })
+        }
       }
       await Promise.allSettled([...runPromises.values()])
       await persistHistory()

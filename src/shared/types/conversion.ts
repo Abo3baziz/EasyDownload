@@ -4,7 +4,7 @@ export type VideoCodec = 'copy' | 'h264' | 'hevc'
 export type AudioCodec = 'copy' | 'mp3' | 'aac' | 'opus' | 'flac' | 'vorbis'
 
 export type ConversionType = 'convert' | 'extractAudio'
-export type ConversionStatus = 'running' | 'completed' | 'failed' | 'cancelled'
+export type ConversionStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 
 export interface ConversionProgress {
   processedMs: number

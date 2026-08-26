@@ -35,6 +35,17 @@ interface ConversionControlProps {
 export function ConversionControl({ conversion, disabled, onStart, onCancel }: ConversionControlProps) {
   const [selected, setSelected] = useState(0)
 
+  if (conversion?.status === 'queued') {
+    return (
+      <div className="conversion-control">
+        <span className="progress-label">Queued…</span>
+        <button type="button" className="btn" onClick={() => onCancel(conversion.id)}>
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
   if (conversion?.status === 'running') {
     const processedSeconds = Math.round(conversion.progress.processedMs / 1000)
     return (

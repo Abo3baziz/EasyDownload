@@ -1,6 +1,6 @@
 # E-002: Add concurrency limit/queue for conversions
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Medium
 - **Category:** Enhancement
 - **Branch:** `feature/conversion-concurrency`
