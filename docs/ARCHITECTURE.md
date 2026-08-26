@@ -102,20 +102,14 @@ flowchart TB
 
 The application follows a **privileged-core + unprivileged-UI** model.
 
-```text
-Renderer
-   │
-   │ controlled IPC
-   ▼
-Preload
-   │
-   ▼
-Main Process
-   │
-   ├── Services
-   ├── Process Management
-   ├── Filesystem
-   └── Native APIs
+```mermaid
+flowchart TD
+    Renderer["Renderer"] -->|"controlled IPC"| Preload["Preload"]
+    Preload --> Main["Main Process"]
+    Main --> S["Services"]
+    Main --> PM["Process Management"]
+    Main --> FS["Filesystem"]
+    Main --> OS["Native APIs"]
 ```
 
 The renderer must never directly access privileged operating-system functionality.
@@ -126,29 +120,21 @@ The renderer must never directly access privileged operating-system functionalit
 
 Electron provides three primary layers in this application:
 
-```text
-┌────────────────────────────────────┐
-│ Renderer Process                   │
-│ React + TypeScript                 │
-│                                    │
-│ UI / State / Presentation          │
-└─────────────────┬──────────────────┘
-                  │
-                  │ IPC
-                  ▼
-┌────────────────────────────────────┐
-│ Preload                            │
-│                                    │
-│ Controlled Renderer API            │
-└─────────────────┬──────────────────┘
-                  │
-                  │ IPC
-                  ▼
-┌────────────────────────────────────┐
-│ Main Process                       │
-│                                    │
-│ Application / Native Services      │
-└────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph R["Renderer Process"]
+        direction TB
+        R1["React + TypeScript"]
+        R2["UI / State / Presentation"]
+    end
+    subgraph P["Preload"]
+        P1["Controlled Renderer API"]
+    end
+    subgraph M["Main Process"]
+        M1["Application / Native Services"]
+    end
+    R -->|"IPC"| P
+    P -->|"IPC"| M
 ```
 
 ---
@@ -192,16 +178,12 @@ The preload script acts as a security boundary between the renderer and Electron
 
 Conceptually:
 
-```text
-React
-  ↓
-window.mediaDownloader
-  ↓
-Preload
-  ↓
-IPC
-  ↓
-Main
+```mermaid
+flowchart TD
+    A["React"] --> B["window.mediaDownloader"]
+    B --> C["Preload"]
+    C --> D["IPC"]
+    D --> E["Main"]
 ```
 
 The preload layer should expose a minimal and explicit API.
@@ -273,30 +255,19 @@ The main process should contain separate services with clear responsibilities.
 
 Suggested conceptual structure:
 
-```text
-Main Process
-│
-├── Download Manager
-│
-├── Media Service
-│
-├── Process Manager
-│
-├── File Manager
-│
-├── Dependency Manager
-│
-├── Settings Manager
-│
-├── History Manager
-│
-├── Inspection History Manager
-│
-├── Notification Manager
-│
-├── FFmpeg Service
-│
-└── Conversion Manager
+```mermaid
+flowchart TD
+    Main["Main Process"] --> DM["Download Manager"]
+    Main --> MS["Media Service"]
+    Main --> PM["Process Manager"]
+    Main --> FM["File Manager"]
+    Main --> DEP["Dependency Manager"]
+    Main --> SET["Settings Manager"]
+    Main --> HIST["History Manager"]
+    Main --> IHIST["Inspection History Manager"]
+    Main --> NM["Notification Manager"]
+    Main --> FF["FFmpeg Service"]
+    Main --> CM["Conversion Manager"]
 ```
 
 The Notification Manager owns desktop notifications (FR-015). It observes the Download Manager's update stream and, when notifications are enabled in settings, surfaces download completion and failure to the user. Notification behavior is isolated from the core download workflow: the Download Manager is unaware of notifications, and notification failures are swallowed so they never affect downloads.
@@ -382,20 +353,14 @@ Responsibilities:
 
 Conceptual flow:
 
-```text
-URL
- ↓
-Validation
- ↓
-yt-dlp Inspection
- ↓
-Raw Metadata
- ↓
-Parser / Normalizer
- ↓
-Application Media Model
- ↓
-Renderer
+```mermaid
+flowchart TD
+    A["URL"] --> B["Validation"]
+    B --> C["yt-dlp Inspection"]
+    C --> D["Raw Metadata"]
+    D --> E["Parser / Normalizer"]
+    E --> F["Application Media Model"]
+    F --> G["Renderer"]
 ```
 
 The renderer should never parse raw yt-dlp output.
@@ -410,14 +375,11 @@ The rest of the application should not depend directly on yt-dlp's command-line 
 
 Conceptually:
 
-```text
-Download Manager
-       ↓
-yt-dlp Service
-       ↓
-Process Manager
-       ↓
-yt-dlp executable
+```mermaid
+flowchart TD
+    A["Download Manager"] --> B["yt-dlp Service"]
+    B --> C["Process Manager"]
+    C --> D["yt-dlp executable"]
 ```
 
 The yt-dlp service is responsible for:
@@ -441,14 +403,11 @@ FFmpeg should also be isolated behind a dedicated service.
 
 Conceptually:
 
-```text
-Download Manager
-       ↓
-FFmpeg Service
-       ↓
-Process Manager
-       ↓
-FFmpeg executable
+```mermaid
+flowchart TD
+    A["Download Manager"] --> B["FFmpeg Service"]
+    B --> C["Process Manager"]
+    C --> D["FFmpeg executable"]
 ```
 
 FFmpeg may be required for operations such as:
@@ -491,14 +450,14 @@ Responsibilities:
 
 Conceptual interface:
 
-```text
-ProcessManager
-├── spawn()
-├── stdout
-├── stderr
-├── exit
-├── kill()
-└── dispose()
+```mermaid
+flowchart TD
+    PM["ProcessManager"] --> S["spawn()"]
+    PM --> STDOUT["stdout"]
+    PM --> STDERR["stderr"]
+    PM --> EXIT["exit"]
+    PM --> K["kill()"]
+    PM --> D["dispose()"]
 ```
 
 The Process Manager must never execute user-provided strings as shell commands.
@@ -521,15 +480,10 @@ shell command string
 
 Filesystem operations should be centralized through a File Manager.
 
-```text
-Renderer
-   │
-   │ IPC
-   ▼
-File Manager
-   │
-   ▼
-Operating System
+```mermaid
+flowchart TD
+    R["Renderer"] -->|"IPC"| FM["File Manager"]
+    FM --> OS["Operating System"]
 ```
 
 The File Manager is responsible for:
@@ -552,12 +506,10 @@ Downloads should be stored on the user's local filesystem.
 
 Conceptually:
 
-```text
-Application
-    │
-    ├── Temporary Files
-    │
-    └── User-selected Download Directory
+```mermaid
+flowchart TD
+    A["Application"] --> B["Temporary Files"]
+    A --> C["User-selected Download Directory"]
 ```
 
 The application should distinguish between:
@@ -607,14 +559,11 @@ The architecture should support application-managed versions of these dependenci
 
 Conceptually:
 
-```text
-Application
-│
-├── Dependency Manager
-│
-├── yt-dlp
-│
-└── FFmpeg
+```mermaid
+flowchart TD
+    A["Application"] --> B["Dependency Manager"]
+    B --> C["yt-dlp"]
+    B --> D["FFmpeg"]
 ```
 
 The Dependency Manager should be responsible for:
@@ -647,11 +596,11 @@ Platform-specific functionality should be isolated.
 
 Examples:
 
-```text
-platform/
-├── windows
-├── macos
-└── linux
+```mermaid
+flowchart TD
+    P["platform/"] --> W["windows"]
+    P --> M["macos"]
+    P --> L["linux"]
 ```
 
 The exact directory structure is an implementation decision.
@@ -672,23 +621,12 @@ IPC is the primary communication mechanism between the renderer and main process
 
 Conceptually:
 
-```text
-Renderer
-   │
-   │ request
-   ▼
-Preload
-   │
-   │ IPC
-   ▼
-Main
-   │
-   ▼
-Service
-   │
-   │ response/event
-   ▼
-Renderer
+```mermaid
+flowchart LR
+    R["Renderer"] -->|"request"| PL["Preload"]
+    PL -->|"IPC"| M["Main"]
+    M --> S["Service"]
+    S -->|"response/event"| R
 ```
 
 ---
@@ -833,20 +771,14 @@ Errors should be handled at the layer where they originate and converted into ap
 
 Conceptually:
 
-```text
-yt-dlp error
-      ↓
-Process Manager
-      ↓
-yt-dlp Service
-      ↓
-Download Manager
-      ↓
-IPC Error
-      ↓
-Renderer
-      ↓
-User-friendly message
+```mermaid
+flowchart TD
+    A["yt-dlp error"] --> B["Process Manager"]
+    B --> C["yt-dlp Service"]
+    C --> D["Download Manager"]
+    D --> E["IPC Error"]
+    E --> F["Renderer"]
+    F --> G["User-friendly message"]
 ```
 
 The renderer should not receive unnecessary raw stack traces or internal process details.
@@ -1010,37 +942,34 @@ The exact structure may evolve, but the project should maintain clear boundaries
 
 Conceptual structure:
 
-```text
-src/
-├── main/
-│   ├── main.ts
-│   ├── ipc/
-│   ├── services/
-│   │   ├── download/
-│   │   ├── media/
-│   │   ├── process/
-│   │   ├── filesystem/
-│   │   └── dependencies/
-│   ├── platform/
-│   └── utils/
-│
-├── preload/
-│   ├── preload.ts
-│   └── api/
-│
-├── renderer/
-│   ├── components/
-│   ├── features/
-│   ├── pages/
-│   ├── hooks/
-│   ├── state/
-│   ├── services/
-│   └── types/
-│
-└── shared/
-    ├── types/
-    ├── schemas/
-    └── constants/
+```mermaid
+flowchart TD
+    SRC["src/"] --> MAIN["main/"]
+    MAIN --> MT["main.ts"]
+    MAIN --> IPC["ipc/"]
+    MAIN --> SERVICES["services/"]
+    SERVICES --> DL["download/"]
+    SERVICES --> MED["media/"]
+    SERVICES --> PROC["process/"]
+    SERVICES --> FS["filesystem/"]
+    SERVICES --> DEP["dependencies/"]
+    MAIN --> PLAT["platform/"]
+    MAIN --> UTILS["utils/"]
+    SRC --> PRELOAD["preload/"]
+    PRELOAD --> PLT["preload.ts"]
+    PRELOAD --> API["api/"]
+    SRC --> RENDERER["renderer/"]
+    RENDERER --> COMP["components/"]
+    RENDERER --> FEAT["features/"]
+    RENDERER --> PAGES["pages/"]
+    RENDERER --> HOOKS["hooks/"]
+    RENDERER --> STATE["state/"]
+    RENDERER --> RSVCS["services/"]
+    RENDERER --> TYPES["types/"]
+    SRC --> SHARED["shared/"]
+    SHARED --> STYPES["types/"]
+    SHARED --> SCHEMAS["schemas/"]
+    SHARED --> CONST["constants/"]
 ```
 
 The exact directory names are implementation details.
@@ -1071,18 +1000,13 @@ This prevents duplicated contracts between the renderer and main process.
 
 The following dependency direction should be maintained:
 
-```text
-Renderer
-   ↓
-Preload API
-   ↓
-IPC
-   ↓
-Main
-   ↓
-Application Services
-   ↓
-External Tools / OS
+```mermaid
+flowchart TD
+    A["Renderer"] --> B["Preload API"]
+    B --> C["IPC"]
+    C --> D["Main"]
+    D --> E["Application Services"]
+    E --> F["External Tools / OS"]
 ```
 
 Avoid reverse dependencies such as:
@@ -1115,16 +1039,12 @@ The main process remains the source of truth for privileged operations and activ
 
 For active downloads:
 
-```text
-Main Process
-    ↓
-Download Manager
-    ↓
-Download State
-    ↓
-Renderer Events
-    ↓
-UI State
+```mermaid
+flowchart TD
+    A["Main Process"] --> B["Download Manager"]
+    B --> C["Download State"]
+    C --> D["Renderer Events"]
+    D --> E["UI State"]
 ```
 
 The renderer should not assume that a local UI state change means the underlying process succeeded.
@@ -1139,12 +1059,11 @@ The Download Manager treats downloads as independent jobs.
 
 Conceptually:
 
-```text
-Download Manager
-│
-├── Job A → yt-dlp
-├── Job B → yt-dlp
-└── Job C → yt-dlp
+```mermaid
+flowchart TD
+    DM["Download Manager"] --> A["Job A - yt-dlp"]
+    DM --> B["Job B - yt-dlp"]
+    DM --> C["Job C - yt-dlp"]
 ```
 
 The Download Manager enforces a configurable concurrency limit (FR-016): at most `concurrencyLimit` downloads run at the same time, and the limit is never exceeded. Each active job occupies one concurrency slot for its whole execution (inspection, download, and post-processing); when a job reaches a terminal state (completed, failed, cancelled) or pauses, its slot is released and the next queued job starts automatically. Queued, paused, failed, and cancelled downloads never occupy a slot.
@@ -1163,12 +1082,11 @@ Temporary files must be associated with the relevant download job.
 
 Example:
 
-```text
-Download Job
-   │
-   ├── temp directory
-   ├── intermediate media
-   └── final media
+```mermaid
+flowchart TD
+    DJ["Download Job"] --> TD["temp directory"]
+    DJ --> IM["intermediate media"]
+    DJ --> FM["final media"]
 ```
 
 Cleanup must occur when appropriate.
@@ -1246,16 +1164,12 @@ Test:
 
 Test critical user workflows such as:
 
-```text
-Enter URL
- ↓
-Inspect
- ↓
-Select format
- ↓
-Download
- ↓
-Completed
+```mermaid
+flowchart LR
+    A["Enter URL"] --> B["Inspect"]
+    B --> C["Select format"]
+    C --> D["Download"]
+    D --> E["Completed"]
 ```
 
 The exact testing strategy is defined in `docs/TESTING.md`.
@@ -1288,17 +1202,17 @@ Important architectural decisions should be documented as ADRs.
 
 Recorded ADRs:
 
-```text
-docs/ADR/
-├── 001-build-time-yt-dlp-bundling.md
-├── 002-build-time-ffmpeg-bundling.md
-├── 003-electron.md
-├── 004-local-first-architecture.md
-├── 005-yt-dlp-integration.md
-├── 006-ffmpeg-integration.md
-├── 007-electron-security.md
-├── 008-chrome-extension-integration.md
-└── 009-playlist-downloads.md
+```mermaid
+flowchart TD
+    ADR["docs/ADR/"] --> F1["001-build-time-yt-dlp-bundling.md"]
+    ADR --> F2["002-build-time-ffmpeg-bundling.md"]
+    ADR --> F3["003-electron.md"]
+    ADR --> F4["004-local-first-architecture.md"]
+    ADR --> F5["005-yt-dlp-integration.md"]
+    ADR --> F6["006-ffmpeg-integration.md"]
+    ADR --> F7["007-electron-security.md"]
+    ADR --> F8["008-chrome-extension-integration.md"]
+    ADR --> F9["009-playlist-downloads.md"]
 ```
 
 Not all decisions need an ADR.
@@ -1311,22 +1225,12 @@ Create an ADR when a decision is significant, difficult to reverse, or likely to
 
 Documentation responsibilities are separated as follows:
 
-```text
-REQUIREMENTS.md
-    ↓
-What the product must do
-
-ARCHITECTURE.md
-    ↓
-How the product is structured
-
-ADR/
-    ↓
-Why significant architectural decisions were made
-
-TESTING.md
-    ↓
-How the product is tested
+```mermaid
+flowchart TD
+    A["REQUIREMENTS.md"] -->|"What the product must do"| A1["requirements"]
+    B["ARCHITECTURE.md"] -->|"How the product is structured"| B1["architecture"]
+    C["ADR/"] -->|"Why significant decisions were made"| C1["decisions"]
+    D["TESTING.md"] -->|"How the product is tested"| D1["testing"]
 ```
 
 Before implementing a feature, the agent must consult the relevant documentation.

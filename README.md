@@ -10,6 +10,10 @@ Paste a video or playlist URL, pick a quality, and download directly to your dev
 with a queue, pause/resume, automatic retry, playlist support, media conversion, and
 persistent history. Powered by bundled yt-dlp and FFmpeg binaries.
 
+[![Download](https://img.shields.io/github/v/release/Abo3baziz/EasyDownload?style=for-the-badge&color=blue)](https://github.com/Abo3baziz/EasyDownload/releases/latest)
+[![Portfolio](https://img.shields.io/badge/Portfolio-Case%20Study-4A90D9?style=for-the-badge)](docs/PORTFOLIO.md)
+[![GitHub](https://img.shields.io/badge/GitHub-Abo3baziz-181717?style=for-the-badge&logo=github)](https://github.com/Abo3baziz)
+
 [Download](https://github.com/Abo3baziz/EasyDownload/releases/latest) ·
 [Features](#features) ·
 [How it works](#how-it-works) ·
@@ -50,21 +54,18 @@ macOS (DMG) and Linux (AppImage) packaging is configured (`npm run dist:mac` /
 
 ## How it works
 
-```
-┌───────────────────────────── Electron ─────────────────────────────┐
-│  Renderer (React)          Preload bridge            Main process  │
-│  Home / Downloads /  ⇄  window.mediaDownloader  ⇄  Media Service    │
-│  History / Settings        (typed IPC API)         Download Manager │
-│                                                     YtDlp Service  │
-│  zod-validated IPC channels                 FFmpeg Service         │
-│  structured error payloads                  Process Manager        │
-│                                             Settings / History     │
-│                                             Dependency Manager     │
-└────────────────────────────────────────────────────────────────────┘
-                    │                              │
-                    ▼                              ▼
-               yt-dlp binary                  ffmpeg binary
-            (bundled extraResource)       (bundled extraResource)
+```mermaid
+flowchart TD
+    subgraph Electron["Electron"]
+        direction LR
+        R["Renderer (React)<br/>Home / Downloads /<br/>History / Settings<br/>zod-validated IPC channels<br/>structured error payloads"]
+        P["Preload bridge<br/>window.mediaDownloader<br/>(typed IPC API)"]
+        M["Main process<br/>Media Service<br/>Download Manager<br/>YtDlp Service<br/>FFmpeg Service<br/>Process Manager<br/>Settings / History<br/>Dependency Manager"]
+        R <--> P
+        P <--> M
+    end
+    M --> Y["yt-dlp binary<br/>(bundled extraResource)"]
+    M --> F["ffmpeg binary<br/>(bundled extraResource)"]
 ```
 
 - Every renderer request crosses a strict [zod](https://zod.dev)-validated IPC channel and returns a structured `IpcResult` — never raw exceptions.

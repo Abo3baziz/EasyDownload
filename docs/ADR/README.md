@@ -92,9 +92,10 @@ docs/ADR/
 
 ## Source of Truth
 
-```text
-REQUIREMENTS.md  → What the product must do
-ARCHITECTURE.md  → How the product is structured
-ADR/             → Why significant decisions were made
-TESTING.md       → How the product is tested
+```mermaid
+flowchart LR
+    REQ["REQUIREMENTS.md"] --> RQ["What the product must do"]
+    ARC["ARCHITECTURE.md"] --> AR["How the product is structured"]
+    ADR["ADR/"] --> AD["Why significant decisions were made"]
+    TST["TESTING.md"] --> TS["How the product is tested"]
 ```

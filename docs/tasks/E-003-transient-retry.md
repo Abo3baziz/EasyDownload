@@ -7,7 +7,7 @@
 
 ## Source
 
-- `src/main/services/ytdlp/ytdlp-service.ts` — inspection fails terminally
+- `src/main/services/ytdlp/ytdlp-service.ts` â€” inspection fails terminally
 - `toDownloadError` NetworkError classification
 
 ## Resolution

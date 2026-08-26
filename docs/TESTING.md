@@ -112,38 +112,27 @@ End-to-end tests verify critical user workflows through the running application.
 
 Critical workflows:
 
-```text
-Enter URL
- ↓
-Inspect
- ↓
-Select format
- ↓
-Download
- ↓
-Completed
+```mermaid
+flowchart TD
+    A["Enter URL"] --> B["Inspect"]
+    B --> C["Select format"]
+    C --> D["Download"]
+    D --> E["Completed"]
 ```
 
-```text
-Enter URL
- ↓
-Inspect
- ↓
-Download
- ↓
-Cancel
- ↓
-Cancelled
+```mermaid
+flowchart TD
+    A["Enter URL"] --> B["Inspect"]
+    B --> C["Download"]
+    C --> D["Cancel"]
+    D --> E["Cancelled"]
 ```
 
-```text
-Download
- ↓
-Fail
- ↓
-Retry
- ↓
-Completed
+```mermaid
+flowchart TD
+    A["Download"] --> B["Fail"]
+    B --> C["Retry"]
+    C --> D["Completed"]
 ```
 
 End-to-end tests should run against mocked external processes to remain deterministic.

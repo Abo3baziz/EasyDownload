@@ -452,22 +452,15 @@ The application must follow Electron's process model.
 
 The architecture should separate:
 
-```text
-Renderer Process
-      |
-      | IPC
-      v
-Preload
-      |
-      | Controlled API
-      v
-Main Process
-      |
-      ├── Download Manager
-      ├── yt-dlp Manager
-      ├── FFmpeg Manager
-      ├── File Manager
-      └── Application Services
+```mermaid
+flowchart TD
+    R["Renderer Process"] -->|"IPC"| P["Preload"]
+    P -->|"Controlled API"| M["Main Process"]
+    M --> DM["Download Manager"]
+    M --> YM["yt-dlp Manager"]
+    M --> FM["FFmpeg Manager"]
+    M --> FLM["File Manager"]
+    M --> AS["Application Services"]
 ```
 
 ---
@@ -620,18 +613,14 @@ The application must account for platform-specific executables and behavior.
 
 Conceptually:
 
-```text
-Windows
-├── yt-dlp executable
-└── FFmpeg executable
-
-macOS
-├── yt-dlp executable
-└── FFmpeg executable
-
-Linux
-├── yt-dlp executable
-└── FFmpeg executable
+```mermaid
+flowchart TD
+    W["Windows"] --> WY["yt-dlp executable"]
+    W --> WF["FFmpeg executable"]
+    M["macOS"] --> MY["yt-dlp executable"]
+    M --> MF["FFmpeg executable"]
+    L["Linux"] --> LY["yt-dlp executable"]
+    L --> LF["FFmpeg executable"]
 ```
 
 The exact packaging strategy is an architecture decision.
@@ -644,22 +633,15 @@ The exact packaging strategy is an architecture decision.
 
 The main workflow should be:
 
-```text
-Enter URL
-    ↓
-Inspect
-    ↓
-View Media
-    ↓
-Choose Format
-    ↓
-Choose Location
-    ↓
-Download
-    ↓
-Track Progress
-    ↓
-Completed
+```mermaid
+flowchart TD
+    A["Enter URL"] --> B["Inspect"]
+    B --> C["View Media"]
+    C --> D["Choose Format"]
+    D --> E["Choose Location"]
+    E --> F["Download"]
+    F --> G["Track Progress"]
+    G --> H["Completed"]
 ```
 
 The user should not need to understand yt-dlp commands.
