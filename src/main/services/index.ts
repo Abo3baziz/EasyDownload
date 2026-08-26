@@ -58,6 +58,14 @@ export interface ServicesDeps {
 
 export function createServices(deps: ServicesDeps): Services {
   const processes = new ProcessManager()
+  const statFile = async (path: string): Promise<{ size: number } | undefined> => {
+    try {
+      const info = await stat(path)
+      return { size: info.size }
+    } catch {
+      return undefined
+    }
+  }
   const ytDlpCommand =
     resolveYtDlpBinary({
       isPackaged: deps.isPackaged,
@@ -110,14 +118,7 @@ export function createServices(deps: ServicesDeps): Services {
     deleteFile: async (path) => {
       await unlink(path).catch(() => undefined)
     },
-    statFile: async (path) => {
-      try {
-        const info = await stat(path)
-        return { size: info.size }
-      } catch {
-        return undefined
-      }
-    }
+    statFile
   })
   const media = createMediaService({ dependencies, ytDlp })
   const downloads = createDownloadManager({
@@ -133,14 +134,7 @@ export function createServices(deps: ServicesDeps): Services {
       }
     },
     getConcurrencyLimit: async () => (await settings.load()).concurrencyLimit,
-    statFile: async (path) => {
-      try {
-        const info = await stat(path)
-        return { size: info.size }
-      } catch {
-        return undefined
-      }
-    }
+    statFile
   })
 
   return {

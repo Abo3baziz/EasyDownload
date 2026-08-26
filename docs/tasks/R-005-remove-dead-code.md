@@ -1,6 +1,6 @@
 # R-005: Remove dead code
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Low
 - **Category:** Refactoring
 - **Branch:** `refactor/remove-dead-code`

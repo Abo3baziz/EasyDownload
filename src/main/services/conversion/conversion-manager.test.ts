@@ -574,7 +574,7 @@ describe('createConversionManager', () => {
     await manager.start(OPTIONS)
 
     await expect(manager.start(OPTIONS)).rejects.toMatchObject({
-      code: 'DownloadError',
+      code: 'ProcessingError',
       message: expect.stringContaining('already running')
     })
     // The rejected request must not have spawned a second ffmpeg process.

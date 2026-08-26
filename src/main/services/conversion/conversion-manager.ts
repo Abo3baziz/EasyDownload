@@ -82,7 +82,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
   function update(id: string, changes: Partial<Conversion>): Conversion {
     const conversion = conversions.get(id)
     if (!conversion) {
-      throw new AppError('DownloadError', 'The conversion was not found.')
+      throw new AppError('ProcessingError', 'The conversion was not found.')
     }
     const updated: Conversion = { ...conversion, ...changes, updatedAt: now() }
     conversions.set(id, updated)
@@ -96,7 +96,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
   function getOrThrow(id: string): Conversion {
     const conversion = conversions.get(id)
     if (!conversion) {
-      throw new AppError('DownloadError', 'The conversion was not found.')
+      throw new AppError('ProcessingError', 'The conversion was not found.')
     }
     return conversion
   }
@@ -197,7 +197,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       )
       if (running) {
         throw new AppError(
-          'DownloadError',
+          'ProcessingError',
           'A conversion for this file is already running. Wait for it to finish or cancel it first.'
         )
       }
@@ -252,7 +252,7 @@ export function createConversionManager(options: ConversionManagerOptions): Conv
       await ensureLoaded()
       const removed = [...conversions.values()].filter((conversion) => conversion.input === input)
       if (removed.some((conversion) => conversion.status === 'running')) {
-        throw new AppError('DownloadError', 'Cannot delete a download while a conversion is running.')
+        throw new AppError('ProcessingError', 'Cannot delete a download while a conversion is running.')
       }
       if (removed.length === 0) {
         return []

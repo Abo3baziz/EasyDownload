@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { AppSettings } from '../../../shared/types/settings'
 import { DEFAULT_SETTINGS } from '../../../shared/constants/defaults'
 import { AppError } from '../../utils/errors'
+import { describeError, isMissingFileError } from '../../utils/fs-errors'
 import { backupPathFor, writeFileAtomic } from '../../utils/atomic-file'
 
 export interface SettingsManager {
@@ -79,12 +80,4 @@ export function createSettingsManager(options: SettingsManagerOptions): Settings
   }
 
   return { load, save }
-}
-
-function isMissingFileError(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && (err as NodeJS.ErrnoException).code === 'ENOENT'
-}
-
-function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }

@@ -14,11 +14,6 @@ export interface ProcessResult {
   timedOut: boolean
 }
 
-export interface RunningProcess {
-  kill(): void
-  exitCode: Promise<number | null>
-}
-
 export interface StartStreamingOptions extends RunOptions {
   onStdout?: (line: string) => void
   onStderr?: (line: string) => void
@@ -130,16 +125,6 @@ export class ProcessManager {
         resolve({ stdout, stderr, exitCode: code, timedOut })
       })
     })
-  }
-
-  spawnProcess(command: string, args: readonly string[]): RunningProcess {
-    const child = createChild({ command, args })
-    return {
-      kill: () => killWithEscalation(child),
-      exitCode: new Promise((resolve) => {
-        child.on('close', (code) => resolve(code))
-      })
-    }
   }
 
   startStreaming(command: string, options: StartStreamingOptions = {}): StartedProcess {

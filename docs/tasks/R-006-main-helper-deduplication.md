@@ -1,6 +1,6 @@
 # R-006: Deduplicate main-process helper functions
 
-- **Status:** Open
+- **Status:** Done
 - **Priority:** Low
 - **Category:** Refactoring
 - **Branch:** `refactor/main-helper-deduplication`

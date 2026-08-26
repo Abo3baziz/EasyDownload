@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { AppError } from '../../utils/errors'
+import { describeError, isMissingFileError } from '../../utils/fs-errors'
 import { backupPathFor, writeFileAtomic } from '../../utils/atomic-file'
 
 export interface JsonStore<T> {
@@ -46,12 +47,4 @@ export function createJsonStore<T>(options: JsonStoreOptions): JsonStore<T> {
 function parseRecords(raw: string): unknown[] {
   const parsed = JSON.parse(raw) as unknown
   return Array.isArray(parsed) ? parsed : []
-}
-
-function isMissingFileError(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && (err as NodeJS.ErrnoException).code === 'ENOENT'
-}
-
-function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
